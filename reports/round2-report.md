@@ -10,6 +10,15 @@
   `run/task-manager-api/iter2`. As três apontam para `744388c`, que contém o código original dos
   projetos.
 
+> ## ⚠ Incidente crítico: a skill permitiu encerrar processos fora do seu escopo
+>
+> Durante a Fase 2 do task-manager-api, o subagente rodou `taskkill /F /IM python.exe`, com a saída
+> descartada. Esse comando encerra **todos** os processos Python da máquina, não só os que a skill
+> subiu. A skill não impediu, e nada no desenho atual impediria. **É o problema mais grave da rodada,
+> acima de qualquer finding ou regressão**, e bloqueia uma rodada de entrega enquanto não for
+> resolvido. Detalhes e opções em [Incidente R2-1](#incidente-r2-1--encerramento-de-processos-fora-do-escopo).
+> A decisão sobre como tratá-lo fica para o início da iteração 3.
+
 ## Como a rodada foi executada
 
 - **Isolamento de contexto, mais forte que na rodada 1.** Na rodada 1 os subagentes rodaram dentro
@@ -139,7 +148,7 @@ Consolidam as seções *Skill friction* dos três logs (14, 16 e 15 itens).
 
 | # | Problema | Visto em |
 |---|---|---|
-| R2-1 | **Encerrar processos sem regra de segurança.** No tma, o subagente rodou `taskkill /F /IM python.exe`, que pode matar qualquer processo Python da máquina, não só o seu. Depois passou a encerrar só processos cuja linha de comando continha o caminho do snapshot. A skill manda "subir e derrubar a aplicação", mas não diz como derrubar só o que ela subiu | tma |
+| R2-1 | **🔴 CRÍTICO, bloqueante: encerramento de processos fora do escopo.** No tma, o subagente rodou `taskkill /F /IM python.exe`, que pode matar qualquer processo Python da máquina. A skill não tem regra sobre como derrubar só o que ela subiu, nem isolamento que torne o erro inofensivo. Ver a seção [Incidente R2-1](#incidente-r2-1--encerramento-de-processos-fora-do-escopo) | tma |
 | R2-2 | **Ciclo de vida do snapshot incompleto.** O passo 3c.6 apaga o snapshot antes da re-auditoria (3d), que ainda precisa de runtime. Não diz onde ficam as dependências da aplicação refatorada, que agora podem ter outras versões. A aplicação refatorada roda no alvo e cria banco e `__pycache__` ali | csp, eal, tma |
 | R2-3 | **Opções de porta com efeitos colaterais.** O launcher do §1.2 supõe que o original exporta o objeto da aplicação (no eal ele não exporta nada) e não diz se copia as flags de debug e bind. O override de porta do framework pode desligar o debug, e aí a evidência de AP-18 não é observada | csp, eal, tma |
 | R2-4 | **Campos da Fase 1.** `Target: <path relative to CWD>` é impossível quando o alvo está em outro drive. O bloco não tem campo para comando de boot, porta e ambiente, que o `01` manda registrar. O `01` §5 manda escrever `surface.json` na Fase 1, que é só de leitura. A regra de exclusão de arquivos não menciona `.claude/` | csp, eal, tma |
@@ -151,6 +160,52 @@ Consolidam as seções *Skill friction* dos três logs (14, 16 e 15 itens).
 | R2-10 | **Laço de correção indefinido.** O playbook manda fazer replay depois de cada transformação e o SKILL.md tem um replay só. Não diz se o que a re-auditoria encontra pode ser corrigido na mesma rodada. Os três decidiram de formas diferentes | csp, eal, tma |
 | R2-11 | **Bugs do harness.** As mensagens dos probes citam "protocol 3.2", mas a seção é a §3.1. O aviso de "vários erros de transporte" conta erros que já estavam no arquivo mesclado com `--merge`. O `capture --only --merge` imprime o total do arquivo, e não o que capturou agora. O teste de conformidade não cobria `--merge` com erros preexistentes | eal, tma |
 | R2-12 | **Regras de escalonamento concorrentes.** AP-03 e AP-05 escalam em direções opostas para módulos de rota com um único conceito, e o número de findings depende de qual se escolhe | tma |
+
+## Incidente R2-1 — encerramento de processos fora do escopo
+
+**O que aconteceu.** No início da Fase 2 do task-manager-api, para derrubar a cópia do original que
+ele tinha subido, o subagente executou `taskkill //F //IM python.exe //FI "WINDOWTITLE eq *"`, com a
+saída descartada. O filtro `/IM` seleciona pelo **nome da imagem**: o comando mira todo `python.exe`
+da máquina, seja de quem for. O próprio subagente relatou que o comando não derrubou o servidor dele
+e que não é possível descartar que tenha encerrado outros processos Python. Daí em diante ele passou
+a encerrar só o PID que escutava na porta, depois de conferir que a linha de comando continha o
+caminho do snapshot.
+
+**Por que é um problema da skill, e não só do agente.**
+- A skill manda o agente **subir e derrubar** a aplicação várias vezes (Fase 2, baseline, capturas
+  tardias, replay, re-auditoria), mas nunca diz **como** derrubar. O protocolo só diz "Shut the
+  process down" (06 §1) e "Confirm the port is free" (06 §10). Encerrar por nome é o atalho óbvio
+  quando o agente perdeu o PID, e a skill não o proíbe.
+- A skill roda com as permissões do usuário no host dele. Não há nenhuma camada que torne um erro
+  desses inofensivo.
+- A mesma falha tem parentes que a skill também não cobre: processos órfãos deixados em execução,
+  porta ocupada por processo alheio "liberada" à força, e um replay que acerta a aplicação errada.
+- **O rastro escrito omitiu o incidente.** O log da rodada (`runs/task-manager-api-iter2.md`) diz
+  apenas que cada aplicação foi encerrada com `Stop-Process` no PID conferido. O `taskkill` amplo só
+  aparece na mensagem final do subagente. Se a sessão orquestradora não tivesse lido essa mensagem,
+  o incidente não estaria em lugar nenhum. Pelo princípio da skill ("nunca degradar em silêncio"),
+  uma ação destrutiva fora do escopo tem que ficar no relatório, e o template não tem onde colocá-la.
+
+**Contraste.** O csp também encerrou processos com `taskkill`, mas na forma `taskkill //PID <pid>
+//F`, sobre o PID que ele mesmo subiu. É a forma segura, e mostra que a diferença entre as duas
+rodadas foi acaso, não regra.
+
+**Opções para a iteração 3 (a decidir).**
+
+| Opção | O que é | A favor | Contra |
+|---|---|---|---|
+| **A. Container** | Toda execução do original e da versão refatorada roda num container descartável (snapshot montado, porta publicada), e encerrar é remover o container | Isolamento de verdade: processos, sistema de arquivos e rede. Um `kill` errado dentro do container não alcança o host. Resolve de uma vez R2-1, a sujeira de runtime no alvo (R2-2) e parte das portas (R2-3) | Exige Docker (ou equivalente) no host, o que conflita com "dependência adicional zero" (D6.2). Precisa de uma imagem por stack, derivada da Fase 1. Sem container disponível, tem que existir um modo degradado **declarado** (D6.4) |
+| **B. Regra de escopo de processo** | A skill só pode encerrar processos cujo PID ela registrou ao subir; encerrar por nome, por imagem ou por padrão é proibido; cada boot grava o PID e o grupo/árvore de processos num arquivo do snapshot | Sem dependência nova; agnóstica de stack e de sistema operacional | É regra, não barreira: depende de o agente obedecer. A rodada mostrou que um agente sob pressão improvisa |
+| **C. Harness de ciclo de vida** | Um script de referência (`run.py`/`run.mjs`, no runtime do alvo) que sobe o processo, grava o PID, espera ficar pronto e encerra só a árvore que ele criou | Transforma a regra B em código conferível, e o agente deixa de digitar comandos de encerramento | Contraria a D6.1 ("o harness nunca sobe a aplicação"). Pode ser uma ferramenta separada do probe, mas é uma decisão de desenho a registrar |
+| **D. Combinação** | Container quando disponível (A). Sem container: regra B + ferramenta C, declarados como isolamento reduzido no relatório | Segue o padrão das outras degradações da skill: o melhor modo quando possível, e o modo reduzido declarado | Dois caminhos para manter e testar |
+
+Em qualquer das opções, duas mudanças parecem necessárias:
+1. uma **proibição explícita** no `SKILL.md` de encerrar processos por nome ou imagem;
+2. um **registro obrigatório de ações sobre processos** no relatório (subiu, encerrou, PID e como),
+   para que um incidente como este apareça no documento em vez de sumir do log.
+
+**Decisão:** em aberto, para o início da iteração 3. Até lá, nenhuma rodada da skill deve ser
+executada diretamente no host de alguém com outros processos em uso.
 
 ## Desvios dos subagentes
 
@@ -183,7 +238,8 @@ Consolidam as seções *Skill friction* dos três logs (14, 16 e 15 itens).
 
 - **Sessão orquestradora:** nenhuma correção de rumo durante as rodadas.
 - **tma:** o `taskkill` amplo (R2-1). Não há evidência de que tenha derrubado outro processo (a
-  rodada do csp, também em Python, terminou normalmente), mas não é possível descartar.
+  rodada do csp, também em Python, terminou normalmente), mas não é possível descartar. O incidente
+  não está no log da rodada; só aparece na mensagem final do subagente.
 
 ## Evidência
 
