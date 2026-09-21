@@ -50,10 +50,10 @@ mba-ia-refactor-projects-skill/
 │   ├── SKILL.md                           #   orquestração das 3 fases
 │   ├── references/
 │   │   ├── 01-project-analysis.md         #   heurísticas de detecção (Fase 1)
-│   │   ├── 02-antipattern-catalog.md      #   catálogo de 17 anti-patterns (Fase 2)
+│   │   ├── 02-antipattern-catalog.md      #   catálogo de 19 anti-patterns (Fase 2)
 │   │   ├── 03-report-template.md          #   formato normativo do relatório (Fase 2)
 │   │   ├── 04-architecture-guidelines.md  #   arquitetura alvo e gate de contrato (Fase 3)
-│   │   ├── 05-refactoring-playbook.md     #   16 transformações antes/depois (Fase 3)
+│   │   ├── 05-refactoring-playbook.md     #   18 transformações antes/depois (Fase 3)
 │   │   └── 06-validation-protocol.md      #   protocolo normativo de validação (Fase 3)
 │   └── scripts/
 │       ├── probe.py                       #   harness de referência — Python stdlib
@@ -153,10 +153,10 @@ A skill tem nove arquivos, com uma divisão de papéis deliberada:
 |---|---|---|
 | `SKILL.md` | **Orquestra.** Contrato de invocação, sequência das fases, formato exato dos blocos impressos, o gate, as regras invioláveis. | Sempre, inteiro |
 | `references/01-project-analysis.md` | Heurísticas de detecção: linguagem, framework, dependências, banco, tipo de aplicação, superfície pública, comando de boot | Início da Fase 1 |
-| `references/02-antipattern-catalog.md` | Catálogo de 17 anti-patterns, com sinais observáveis e regras de severidade | Início da Fase 2 |
+| `references/02-antipattern-catalog.md` | Catálogo de 19 anti-patterns, com sinais observáveis e regras de severidade | Início da Fase 2 |
 | `references/03-report-template.md` | Formato normativo do relatório e regras de cada campo | Ao escrever o relatório |
 | `references/04-architecture-guidelines.md` | Arquitetura alvo, direção de dependências, teste "camada real ou nominal", gate de contrato público | Ao planejar a Fase 3 |
-| `references/05-refactoring-playbook.md` | 16 transformações concretas com código antes/depois | A cada transformação |
+| `references/05-refactoring-playbook.md` | 18 transformações concretas com código antes/depois | A cada transformação |
 | `references/06-validation-protocol.md` | Spec normativa da validação baseline-then-replay | Fase 3a e sempre que a validação degradar |
 | `scripts/probe.py`, `scripts/probe.mjs` | Implementações de referência do protocolo | Fase 3a, ou como base para gerar outra |
 
@@ -182,7 +182,7 @@ divergência deliberada de idioma entre o artefato e o texto que o descreve.
 
 ### B.2 — O catálogo: o que entrou e por quê
 
-**17 anti-patterns** (o enunciado exige ≥8), extraídos de literatura — Fowler (*Refactoring*),
+**19 anti-patterns** (o enunciado exige ≥8), extraídos de literatura — Fowler (*Refactoring*),
 Feathers (*Working Effectively with Legacy Code*), os princípios SOLID e o OWASP Top 10 — e não dos
 projetos-alvo.
 
@@ -190,8 +190,16 @@ projetos-alvo.
 |---|---|---|
 | **CRITICAL** (4) | AP-01 … AP-04 | Hardcoded Secrets · Injection-Prone Dynamic Query · God Module / God Class · Missing or Bypassable Authorization |
 | **HIGH** (5) | AP-05 … AP-09 | Business Logic in the Delivery Layer · Hard-Wired Dependencies / No Composition Root · Mutable Global State · Unsafe Handling of Credentials · Swallowed or Uncentralized Error Handling |
+| **HIGH** (2, rodada 2) | AP-18, AP-19 | Insecure Runtime Configuration · Known-Vulnerable Dependency |
 | **MEDIUM** (5) | AP-10 … AP-14 | N+1 / Query-Inside-Loop · Missing Boundary Validation · Duplicated Logic · Unbounded Resources and Leaked Handles · Deprecated or End-of-Life API Usage |
 | **LOW** (3) | AP-15 … AP-17 | Magic Values · Misleading Names and Inconsistent Structure · Dead Code and Commented-Out Code |
+
+**AP-18 e AP-19 entraram depois da rodada 1**, e isso é declarado em vez de escondido: as duas
+lacunas apareceram na calibração (configuração de execução insegura e advisories de segurança
+classificados de forma improvisada sob outras entradas). Ambas vêm do OWASP Top 10 —
+*Security Misconfiguration* e *Vulnerable and Outdated Components* — e deveriam ter estado no
+catálogo cego desde o início. A lista de mudanças da rodada 2 foi congelada e commitada antes de
+existir o gabarito ([`docs/round2-changes.md`](docs/round2-changes.md)).
 
 A lógica organizadora é a própria escala de severidade do enunciado, lida como uma escala de
 **natureza do dano**: segurança e destruição total de separação de responsabilidades no topo;
@@ -223,7 +231,7 @@ Três regras transversais do catálogo merecem destaque, porque são o que o man
   findings. O número é o que o código produzir; poucos findings num projeto limpo é um resultado
   correto, não uma falha da auditoria.
 
-O **playbook** espelha o catálogo com **16 transformações** (o enunciado exige ≥8), com exemplos de
+O **playbook** espelha o catálogo com **18 transformações** (o enunciado exige ≥8), com exemplos de
 código antes/depois em **Python, JavaScript/TypeScript, Go, Ruby e PHP** — deliberadamente, porque
 ler a mesma ideia em cinco sintaxes é a prova de que o padrão não é preso a uma stack. Os domínios
 dos exemplos (estoque de armazém, reserva de salas, empréstimo de livros, telemetria de sensores,

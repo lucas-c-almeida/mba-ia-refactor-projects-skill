@@ -1,8 +1,13 @@
 # 02 — Anti-Pattern Catalog
 
-Seventeen entries, drawn from Fowler's *Refactoring*, Feathers' *Working Effectively with Legacy
+Nineteen entries, drawn from Fowler's *Refactoring*, Feathers' *Working Effectively with Legacy
 Code*, the SOLID principles and the OWASP Top 10. Nothing here is specific to a project, a framework
 or an ecosystem.
+
+**Sweep by entry.** Phase 2 walks this catalog one entry at a time, looking for that entry's signals
+across the whole target — source, and the data and scripts that reach the runtime — and records
+each entry's outcome in the report's coverage table, hits or none. A file-by-file reading only
+catches what stands out in each file.
 
 ## How to use this catalog
 
@@ -56,6 +61,11 @@ findings only if the lines differ; they usually do.
 | AP-15 | Magic Values | LOW |
 | AP-16 | Misleading Names and Inconsistent Structure | LOW |
 | AP-17 | Dead Code and Commented-Out Code | LOW |
+| AP-18 | Insecure Runtime Configuration | HIGH |
+| AP-19 | Known-Vulnerable Dependency | HIGH (impact-driven) |
+
+AP-18 and AP-19 come last because they were added after the first calibration round, not because
+they matter less. Their ids are stable; the index is not ordered by severity.
 
 ---
 
@@ -68,6 +78,13 @@ findings only if the lines differ; they usually do.
 - A string literal assigned to, or passed as, an identifier whose name matches
   `(secret|key|token|password|passwd|pwd|credential|api[_-]?key|access[_-]?key|private[_-]?key|dsn|conn(ection)?[_-]?str|auth|bearer|salt|signing)`
   — case-insensitive, in any language — outside an example, fixture or test file.
+- **What counts as "example, fixture or test" is decided by where the data ends up, not by the file
+  name.** A seed script, a migration, a bootstrap routine or a fixture loaded at startup or by a
+  documented setup command writes into the **runtime** datastore: a credential literal there
+  creates a real account with a known password in every environment that runs it. It is in scope.
+  Only data that reaches nothing but a test run is excluded. Credential literals inside data —
+  a row of initial users, an insert statement, a JSON document of default accounts — are found by
+  the value's position (a password or token column or field), not by an identifier name.
 - A connection URL literal carrying inline credentials: a `scheme://user:password@host` shape for
   any scheme.
 - A high-entropy literal (≥20 characters, mixed case and digits, no whitespace) with no obvious
@@ -367,7 +384,10 @@ aggregated, usually with much weaker access control than the database.
 - The same error-to-response mapping repeated in every handler: the same `try`/`catch` shape,
   status-code selection and message formatting copied across the delivery layer.
 - No centralized handler at all: no error middleware, no framework error hook, no top-level boundary.
-  Any unhandled failure reaches the caller as a raw stack trace.
+  Any unhandled failure reaches the caller as a raw stack trace. **Absent code is still behaviour:**
+  when the application registers no handler, the framework's default one runs. Observe what it
+  returns — run the original from the snapshot and send a request that makes it fail — rather than
+  recalling it. If it exposes internals, that is also AP-18.
 - A stack trace, SQL fragment, file path or internal exception message returned in a response body —
   this is also an information leak, and compounds with AP-08.
 - Errors signalled by return convention — a sentinel value, a null, an `{error: "..."}` object —
@@ -576,7 +596,7 @@ declare the skip.
 
 | Source | Query | Covers |
 |---|---|---|
-| **OSV.dev** | `POST https://api.osv.dev/v1/query` with `{"package": {"name": "<pkg>", "ecosystem": "<npm\|PyPI\|Go\|crates.io\|Maven\|RubyGems\|Packagist\|NuGet>"}, "version": "<resolved version>"}` | Security advisories for the exact resolved version. **One API across ecosystems — agnostic by design.** |
+| **OSV.dev** | `POST https://api.osv.dev/v1/query` with `{"package": {"name": "<pkg>", "ecosystem": "<npm\|PyPI\|Go\|crates.io\|Maven\|RubyGems\|Packagist\|NuGet>"}, "version": "<resolved version>"}` | Security advisories for the exact resolved version — reported under **AP-19**, which shares this entry's adapters and evidence rules. **One API across ecosystems — agnostic by design.** |
 | Ecosystem registry | `npm view <pkg>@<ver> deprecated`; `https://pypi.org/pypi/<pkg>/json` → per-release `yanked` and `yanked_reason`, plus `info.yanked`; the equivalent metadata endpoint for other registries | Whether the exact pinned version is deprecated or withdrawn |
 | Native tooling | `npm outdated`, `pip list --outdated`, or the ecosystem's equivalent | Distance from the current release; end-of-life major lines |
 | Official documentation or changelog **for the version in use** | Fetch, last resort | *Language-level* and *framework-level* deprecations, which no registry reports |
@@ -603,9 +623,11 @@ A Tier-D suspicion is a legitimate reason to *run a check*. It is never a legiti
 report. If verification is impossible — no network and no local signal — the correct output is the
 degraded-verification note, not a finding.
 
-**Severity follows impact.** A deprecated package **with a security advisory** escalates to CRITICAL
-or HIGH. An unsupported major line with no upgrade path is HIGH. A soft-deprecated call with a
-drop-in successor and no risk is LOW. Default MEDIUM only when the impact is genuinely unremarkable.
+**Severity follows impact.** An unsupported major line with no upgrade path is HIGH. A
+soft-deprecated call with a drop-in successor and no risk is LOW. Default MEDIUM only when the
+impact is genuinely unremarkable. A package that is deprecated **and** has a security advisory for
+the resolved version is reported once, as AP-19, with the deprecation named in its description —
+the advisory is the dominant impact (see "Overlap" above).
 
 **Every finding in this category must state the modern equivalent** — the specific successor API,
 the maintained replacement package, or the migration path named by the upstream source you cited.
@@ -716,3 +738,104 @@ identified, or it is a documented, intentionally staged extension point.
 **Impact.** Dead code is read, searched, reviewed, migrated and maintained at full cost while
 delivering nothing. It misleads readers about what the system does, and it hides real code in the
 noise.
+
+---
+
+## AP-18 — Insecure Runtime Configuration
+
+**Default severity:** HIGH · **Transformation:** RP-17 · **Source:** OWASP Top 10, *Security
+Misconfiguration*
+
+Distinct from AP-01: that one is a secret in the code; this one is a **setting** that makes the
+running application less safe than its code — usually a development convenience that reaches the
+path production runs.
+
+**Detection signals**
+
+- A framework's debug, development or reload mode switched on by a literal, on the code path the
+  application is started with — not gated by configuration or an environment check. The
+  observable signal is a debug flag set to a true value in the entry point, the application
+  factory or a settings module that production loads.
+- The development server of a framework used as the production server: the entry point starts the
+  framework's built-in server with no production server declared anywhere (no process file, no
+  container command, no documented alternative).
+- A listener bound to every interface (the "any" address of the platform) **in combination with**
+  debug mode or with a diagnostic endpoint. Binding to every interface is normal in containers; the
+  combination is what exposes the debugger to the network.
+- Error output that exposes internals in the mode the application runs in: stack traces, exception
+  messages, driver errors, file paths or configuration in response bodies — whether from the
+  application's own handler or from the framework's default one when none is registered (observe
+  it; see AP-09).
+- A cross-origin policy that trusts every origin **and** allows credentials, or that reflects the
+  request's `Origin` back unconditionally; a wildcard policy applied to the whole application where
+  state-changing routes rely on cookies.
+- Diagnostic, administrative or introspection surfaces reachable without restriction: a debug
+  console, a profiler, an admin route, a metrics endpoint exposing configuration, directory listing.
+- Protective defaults switched off: forgery protection disabled for cookie-authenticated forms,
+  verbose query or request logging enabled unconditionally, secure-cookie flags turned off.
+
+**Escalate to CRITICAL** — the debug mode offers an interactive console or code evaluation and the
+listener is reachable from outside the host: that is remote code execution by design; or the error
+output exposes credentials or configuration.
+
+**De-escalate to MEDIUM** — the setting is confined to an entry point that is demonstrably
+development-only (a separate script the production start path never runs), and the report shows how
+you established that. **De-escalate to LOW** — the permissive cross-origin policy carries no
+credentials and fronts only public, read-only data.
+
+**Impact.** The application is less safe than its code: a correct program is shipped with the door
+its developers used for convenience left open. Debug consoles give an attacker code execution;
+verbose errors map the internals for the next attack; a permissive cross-origin policy lets any
+site act with the user's session.
+
+---
+
+## AP-19 — Known-Vulnerable Dependency
+
+**Default severity:** HIGH, **impact-driven** · **Transformation:** RP-18 · **Source:** OWASP Top
+10, *Vulnerable and Outdated Components*
+
+Distinct from AP-14: a deprecated API is one that will be removed; a vulnerable dependency is one
+with a **published security advisory for the exact version in use**. The two often co-occur and
+are then reported once, here (see AP-14, "Severity follows impact").
+
+**This entry inherits AP-14's founding rule and evidence grading in full.** The model's prior
+knowledge that a version "has a CVE" is Tier D and never reportable. Every finding cites the
+advisory identifier, the source queried and the date of the lookup.
+
+**Detection signals**
+
+- An advisory returned by OSV.dev (or the ecosystem's own audit tool — `npm audit`, `pip-audit`
+  when present in the environment, `bundle audit`, `govulncheck`, the equivalent) for a **direct**
+  dependency at its **resolved** version, from the lockfile or installed metadata.
+- The same, for a **transitive** dependency: report it against the direct dependency that pulls it
+  in, because that is what the project can change.
+- A manifest range that would resolve to a fixed version, while the lockfile pins a vulnerable
+  one: the fix is a lockfile update, and the finding says so.
+- No lockfile at all, so the version installed is whatever resolved that day: the audit cannot be
+  exact. Report it (AP-19 at MEDIUM) and mark the advisory check `UNVERIFIED` for those packages.
+
+**Severity follows the advisory and the reachability.**
+
+- **Escalate to CRITICAL** — the advisory is rated critical or high by its source **and** the
+  vulnerable code path is reachable from the application's surface: the vulnerable function is
+  called, the vulnerable feature is enabled, the input reaches it. Say how you established
+  reachability.
+- **HIGH** (default) — a high or critical advisory whose reachability you could not establish
+  either way.
+- **De-escalate to MEDIUM** — the advisory is moderate; or the vulnerable feature is demonstrably
+  unused (the affected module is never imported, the affected option is never enabled). **LOW** —
+  the package only runs at install or build time, never at run time, and the advisory does not
+  concern that phase.
+
+**Every finding names the fixed version** from the advisory, and the upgrade path: within the same
+major version, or across a major — which decides whether Phase 3 may apply it
+(`04-architecture-guidelines.md` §6, dependency upgrades).
+
+If the lookup cannot run (`--offline`, no network, an unexpected response), this entry is
+`UNVERIFIED` for every package and goes to the degraded-verification block. Never fall back to
+memory.
+
+**Impact.** The vulnerability is public, documented and often already weaponized: attackers read
+the same advisories, and scan for the versions they name. Unlike a flaw in the project's own code,
+this one is found without reading the project at all.

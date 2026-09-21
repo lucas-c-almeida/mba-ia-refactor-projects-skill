@@ -3,7 +3,7 @@
 probe.py -- reference implementation of references/06-validation-protocol.md
             for targets whose runtime is Python.
 
-Python standard library ONLY (urllib, json, argparse). Works on Python 3.8+.
+Python standard library ONLY (urllib, json, re, argparse). Works on Python 3.8+.
 No pip install, ever: the harness must never change the target's dependency set.
 
 What it does
@@ -15,9 +15,12 @@ What it deliberately does NOT do
 --------------------------------
   * It never boots the application. Booting is stack-specific; probing is protocol-pure.
     The agent boots and waits for readiness, then calls this script.
-  * It never compares values -- only status, media type and the recursive SHAPE of the body.
-    Comparing ids, timestamps or ordering would produce a false regression on every run,
-    and a noisy check is worse than no check: it costs the same and you stop reading it.
+  * It never compares raw values -- only status, media type, a small allow-list of contract
+    headers, and the recursive SHAPE of the body. Comparing ids, timestamps or ordering would
+    produce a false regression on every run, and a noisy check is worse than no check: it costs
+    the same and you stop reading it.
+  * It never follows redirects. A redirect is part of the contract; following it would record
+    the target's response instead of the entry's own.
 
 Usage
 -----
@@ -25,32 +28,66 @@ Usage
                           --base-url http://127.0.0.1:8081 \
                           --out reports/baseline.json
 
+  # capture only entries added after the baseline, against the ORIGINAL, into the same file
+  python probe.py capture --surface reports/surface.json --base-url http://127.0.0.1:8081 \
+                          --out reports/baseline.json --only new-entry-a,new-entry-b --merge
+
   python probe.py compare --surface reports/surface.json \
                           --baseline reports/baseline.json \
                           --base-url http://127.0.0.1:8081
 
-  python probe.py compare --surface reports/surface.json \
-                          --baseline reports/baseline.json \
-                          --current reports/after.json
+  python probe.py compare --baseline reports/baseline.json --current reports/after.json
 
 Exit codes: 0 = no regressions, 1 = at least one regression, 2 = usage or I/O error.
 """
 
 import argparse
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 DEFAULT_TIMEOUT = 10.0
+TEXT_LIMIT_BYTES = 4096
 
-# Result states (section 4 of the protocol).
+# Record states (protocol section 3).
+OBSERVED = "OBSERVED"      # the call completed and a response was read
+ERROR = "ERROR"            # the call was made and failed at transport level
+SKIPPED = "SKIPPED"        # the call was never made
+
+# Result states (protocol section 4).
 PASS = "PASS"
 REGRESSION = "REGRESSION"
 PRE_EXISTING_FAILURE = "PRE-EXISTING FAILURE"
 UNVERIFIED = "UNVERIFIED"
+FIXED = "FIXED"
+NOT_FIXED = "NOT FIXED"
+
+# Value masks (protocol section 5.2), applied in this order. ASCII classes only, so that
+# every implementation masks exactly the same characters.
+MASKS = [
+    (re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}"
+                r"(?::[0-9]{2}(?:\.[0-9]+)?)?(?:Z|[+-][0-9]{2}:?[0-9]{2})?"), "<ts>"),
+    (re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
+     "<uuid>"),
+    (re.compile(r"(?<![0-9A-Za-z])[0-9a-fA-F]{16,}(?![0-9A-Za-z])"), "<hex>"),
+    (re.compile(r"[0-9]+"), "<n>"),
+]
+
+# Contract headers (protocol section 5.3). Everything else is transport detail.
+HEADER_EXACT = ("location", "www-authenticate")
+HEADER_PREFIX = "access-control-"
+HEADER_LISTS = ("access-control-allow-methods", "access-control-allow-headers",
+                "access-control-expose-headers")
+
+
+def mask(text):
+    for pattern, placeholder in MASKS:
+        text = pattern.sub(placeholder, text)
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -85,8 +122,6 @@ def shape_of(value):
             return {"type": "array", "items": distinct[0]}
         return {"type": "array", "items": {"oneOf": distinct}}
     if isinstance(value, dict):
-        # sort_keys on dump makes the ordering canonical; building sorted here
-        # keeps the in-memory structure readable too.
         return {
             "type": "object",
             "properties": {key: shape_of(value[key]) for key in sorted(value)},
@@ -94,13 +129,35 @@ def shape_of(value):
     return "unknown"
 
 
+def text_shape(text):
+    """Skeleton of a short text body: distinct non-empty lines, masked, sorted."""
+    lines = set()
+    for line in re.split(r"\r?\n", text):
+        line = line.rstrip(" \t\r\f\v")         # ASCII whitespace only: identical in JS
+        if line:
+            lines.add(mask(line))
+    return {"type": "text", "lines": sorted(lines)}
+
+
 def _canonical(descriptor):
-    """Stable string form of a descriptor, used for dedup and equality."""
-    return json.dumps(descriptor, sort_keys=True, separators=(",", ":"))
+    """Stable string form of a descriptor, used for dedup and equality.
+
+    ensure_ascii=False on purpose: the JS implementation does not escape either, and the
+    sort order of oneOf members must be identical in both.
+    """
+    return json.dumps(descriptor, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
 def shapes_equal(left, right):
     return _canonical(left) == _canonical(right)
+
+
+def _summary(descriptor):
+    if isinstance(descriptor, str):
+        return descriptor
+    if descriptor is None:
+        return "none"
+    return descriptor.get("type", "oneOf" if "oneOf" in descriptor else "?")
 
 
 def shape_diff(baseline, current, path="$"):
@@ -108,23 +165,23 @@ def shape_diff(baseline, current, path="$"):
     Path-addressed differences between two descriptors.
 
     Returns a list of {kind, path, ...} where kind is one of
-    'missing' (in baseline, absent now), 'added' (absent in baseline, present now)
-    or 'typeChanged'.
+    'missing' (in baseline, absent now), 'added' (absent in baseline, present now),
+    'typeChanged', or 'textChanged' (the masked line set of a text body differs).
     """
     diffs = []
 
-    # Leaf vs leaf, or a structural kind change.
-    if isinstance(baseline, str) or isinstance(current, str):
+    if isinstance(baseline, str) or isinstance(current, str) \
+            or baseline is None or current is None:
         if not shapes_equal(baseline, current):
             diffs.append({"kind": "typeChanged", "path": path,
                           "from": _summary(baseline), "to": _summary(current)})
         return diffs
 
-    baseline_kind = baseline.get("type", "oneOf" if "oneOf" in baseline else "?")
-    current_kind = current.get("type", "oneOf" if "oneOf" in current else "?")
+    baseline_kind = _summary(baseline)
+    current_kind = _summary(current)
     if baseline_kind != current_kind:
         diffs.append({"kind": "typeChanged", "path": path,
-                      "from": _summary(baseline), "to": _summary(current)})
+                      "from": baseline_kind, "to": current_kind})
         return diffs
 
     if baseline_kind == "object":
@@ -152,21 +209,49 @@ def shape_diff(baseline, current, path="$"):
             return diffs
         return shape_diff(baseline_items, current_items, path + "[]")
 
+    if baseline_kind == "text":
+        before = set(baseline.get("lines", []))
+        after = set(current.get("lines", []))
+        if before != after:
+            diffs.append({"kind": "textChanged", "path": path,
+                          "removed": sorted(before - after), "added": sorted(after - before)})
+        return diffs
+
     if not shapes_equal(baseline, current):
         diffs.append({"kind": "typeChanged", "path": path,
-                      "from": _summary(baseline), "to": _summary(current)})
+                      "from": baseline_kind, "to": current_kind})
     return diffs
 
 
-def _summary(descriptor):
-    if isinstance(descriptor, str):
-        return descriptor
-    return descriptor.get("type", "oneOf" if "oneOf" in descriptor else "?")
+def headers_diff(baseline, current):
+    """Differences in the contract headers. Skipped when either side did not record them."""
+    if baseline is None or current is None:
+        return []
+    details = []
+    for name in sorted(set(baseline) | set(current)):
+        if name not in current:
+            details.append("headerMissing {0}".format(name))
+        elif name not in baseline:
+            details.append("headerAdded {0}".format(name))
+        elif baseline[name] != current[name]:
+            details.append("headerChanged {0}: {1} -> {2}".format(name, baseline[name],
+                                                                  current[name]))
+    return details
 
 
 # ---------------------------------------------------------------------------
 # Exercising the surface (protocol section 3)
 # ---------------------------------------------------------------------------
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Record the redirect itself; never follow it."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
 
 def normalize_content_type(raw):
     """Media type only -- parameters such as charset are not part of the contract here."""
@@ -175,13 +260,59 @@ def normalize_content_type(raw):
     return raw.split(";")[0].strip().lower()
 
 
+def contract_headers(message):
+    """The allow-listed headers of a response, normalized and masked (protocol 5.3)."""
+    collected = {}
+    cookies = []
+    for name, value in message.items():
+        lowered = name.lower()
+        if lowered == "set-cookie":
+            cookies.append(value)
+        elif lowered in HEADER_EXACT or lowered.startswith(HEADER_PREFIX):
+            collected.setdefault(lowered, []).append(value)
+    result = {}
+    for name, values in collected.items():
+        joined = ", ".join(values)
+        if name in HEADER_LISTS:
+            parts = {part.strip().lower() for part in joined.split(",") if part.strip()}
+            joined = ", ".join(sorted(parts))
+        result[name] = mask(joined.strip())
+    names = {cookie.split("=", 1)[0].strip() for cookie in cookies if "=" in cookie}
+    if names:
+        result["set-cookie"] = ", ".join(sorted(names))
+    return result
+
+
+def _reject_constant(name):
+    # JSON has no NaN/Infinity; Python accepts them by default, JS does not. Refuse them so
+    # both implementations classify the same body the same way.
+    raise ValueError("non-standard JSON constant: " + name)
+
+
+def _body_shape(payload):
+    if not payload:
+        return "empty"
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return {"type": "opaque", "bytes": "present"}
+    try:
+        return shape_of(json.loads(text, parse_constant=_reject_constant))
+    except ValueError:
+        pass
+    if len(payload) <= TEXT_LIMIT_BYTES:
+        return text_shape(text)
+    return {"type": "opaque", "bytes": "present"}
+
+
 def exercise(base_url, entry, timeout):
     """Issue one call and return its recorded result. Never raises."""
     entry_id = entry.get("id") or "{0} {1}".format(entry.get("method"), entry.get("path"))
     method = (entry.get("method") or "GET").upper()
     path = entry.get("path") or "/"
     record = {"id": entry_id, "method": method, "path": path,
-              "state": UNVERIFIED, "status": None, "contentType": None,
+              "kind": entry.get("kind") or "contract", "finding": entry.get("finding"),
+              "state": SKIPPED, "status": None, "contentType": None, "headers": None,
               "shape": None, "error": None}
 
     if entry.get("skip"):
@@ -194,48 +325,45 @@ def exercise(base_url, entry, timeout):
     headers = dict(entry.get("headers") or {})
     if body is not None:
         data = json.dumps(body).encode("utf-8")
-        headers.setdefault("Content-Type", "application/json")
+        if not any(name.lower() == "content-type" for name in headers):
+            headers["Content-Type"] = "application/json"
 
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            status = response.getcode()
-            content_type = response.headers.get("Content-Type")
-            payload = response.read()
-    except urllib.error.HTTPError as err:
-        # A 4xx/5xx is a real, recorded response -- not a transport failure.
-        status = err.code
-        content_type = err.headers.get("Content-Type") if err.headers else None
         try:
-            payload = err.read()
-        except Exception:
-            payload = b""
-    except Exception as err:                      # URLError, timeout, DNS, refused connection
+            with _OPENER.open(request, timeout=timeout) as response:
+                status = response.getcode()
+                message = response.headers
+                payload = response.read()
+        except urllib.error.HTTPError as err:
+            # A 3xx/4xx/5xx is a real, recorded response -- not a transport failure.
+            status = err.code
+            message = err.headers
+            payload = err.read() if err.fp is not None else b""
+    except Exception as err:                      # refused, reset, timeout, truncated body
+        record["state"] = ERROR
         record["error"] = "{0}: {1}".format(type(err).__name__, err)
         return record
 
-    record["state"] = "OBSERVED"
+    record["state"] = OBSERVED
     record["status"] = status
-    record["contentType"] = normalize_content_type(content_type)
-    record["shape"] = _body_shape(payload, record["contentType"])
+    record["contentType"] = normalize_content_type(message.get("Content-Type") if message else None)
+    record["headers"] = contract_headers(message) if message else {}
+    record["shape"] = _body_shape(payload)
     return record
 
 
-def _body_shape(payload, content_type):
-    if not payload:
-        return "empty"
-    if content_type and "json" not in content_type:
-        return {"type": "opaque", "bytes": "present"}
-    try:
-        return shape_of(json.loads(payload.decode("utf-8")))
-    except Exception:
-        # Declared as JSON but unparseable, or an unknown content type that is not JSON.
-        return {"type": "opaque", "bytes": "present"}
+def ordered_entries(surface, only=None):
+    """Contract entries first, security entries last: a hostile call may mutate state."""
+    entries = [e for e in surface.get("entries", []) if only is None or e.get("id") in only]
+    regular = [e for e in entries if (e.get("kind") or "contract") != "security"]
+    hostile = [e for e in entries if (e.get("kind") or "contract") == "security"]
+    return regular + hostile
 
 
-def capture(surface, base_url, timeout):
+def capture(surface, base_url, timeout, only=None):
     results = {}
-    for entry in surface.get("entries", []):
+    for entry in ordered_entries(surface, only):
         record = exercise(base_url, entry, timeout)
         results[record["id"]] = record
     return {
@@ -252,62 +380,109 @@ def capture(surface, base_url, timeout):
 # Comparison (protocol section 4)
 # ---------------------------------------------------------------------------
 
+def _state(record):
+    state = record.get("state")
+    if state == "UNVERIFIED":
+        # Protocol v1 used one state for "skipped" and "transport error" and cannot tell them
+        # apart. Treat it as skipped: the v1 reading, and the one that claims nothing.
+        return SKIPPED
+    return state
+
+
+def _server_error(record):
+    return _state(record) == OBSERVED and (record.get("status") or 0) >= 500
+
+
 def _is_failure(record):
-    """A baseline entry that was already broken: transport error or a server error."""
-    if record.get("state") != "OBSERVED":
-        return True
-    status = record.get("status")
-    return status is not None and status >= 500
+    """Already broken: a transport error or a server error."""
+    return _state(record) == ERROR or _server_error(record)
+
+
+def _rejected(record):
+    return _state(record) == OBSERVED and 400 <= (record.get("status") or 0) < 500
+
+
+def _describe(record):
+    return "transport error" if _state(record) == ERROR else str(record.get("status"))
+
+
+def compare_security(baseline, current):
+    """A hostile entry is expected to change: from accepted (or crashing) to rejected."""
+    if _rejected(baseline):
+        return UNVERIFIED, ["baseline already rejected ({0}): the entry does not demonstrate "
+                            "the finding".format(baseline.get("status"))]
+    if _rejected(current):
+        return FIXED, ["rejected with {0} (baseline: {1})".format(current.get("status"),
+                                                                 _describe(baseline))]
+    if _is_failure(current) and not _is_failure(baseline):
+        return REGRESSION, ["hostile input now fails with {0} (baseline: {1})".format(
+            _describe(current), _describe(baseline))]
+    return NOT_FIXED, ["still not rejected: {0} (baseline: {1})".format(
+        _describe(current), _describe(baseline))]
 
 
 def compare_one(baseline, current):
     """Return (state, details) for one entry."""
-    details = []
-
     if baseline is None:
-        return UNVERIFIED, ["not present in baseline"]
+        return UNVERIFIED, ["not present in baseline: capture it against the original "
+                            "(protocol 4.3)"]
     if current is None:
         return UNVERIFIED, ["not exercised in replay"]
-    if baseline.get("state") != "OBSERVED":
-        return UNVERIFIED, ["baseline unverified: {0}".format(baseline.get("error"))]
-    if current.get("state") != "OBSERVED":
-        if _is_failure(baseline):
-            return PRE_EXISTING_FAILURE, ["failed before and after: {0}".format(current.get("error"))]
-        return REGRESSION, ["call failed after refactoring: {0}".format(current.get("error"))]
+    if _state(baseline) == SKIPPED:
+        return UNVERIFIED, ["skipped in baseline: {0}".format(baseline.get("error"))]
+    if _state(current) == SKIPPED:
+        return UNVERIFIED, ["skipped in replay: {0}".format(current.get("error"))]
 
-    same_status = baseline.get("status") == current.get("status")
-    same_type = baseline.get("contentType") == current.get("contentType")
-    diffs = [] if shapes_equal(baseline.get("shape"), current.get("shape")) else \
-        shape_diff(baseline.get("shape"), current.get("shape"))
+    if (baseline.get("kind") or current.get("kind")) == "security":
+        return compare_security(baseline, current)
 
-    if same_status and same_type and not diffs:
-        # Identical -- but if it was already broken, that is not a success. You neither
-        # fixed it nor broke it, and the report must say exactly that.
-        if _is_failure(baseline):
-            return PRE_EXISTING_FAILURE, [
-                "unchanged failure: status {0}".format(baseline.get("status"))]
-        return PASS, []
+    if _state(baseline) == ERROR:
+        if _is_failure(current):
+            return PRE_EXISTING_FAILURE, ["failed before and after: transport error -> {0}"
+                                          .format(_describe(current))]
+        return PASS, ["improved from transport error"]
+    if _state(current) == ERROR:
+        if _server_error(baseline):
+            return PRE_EXISTING_FAILURE, ["failed before and after: {0} -> transport error"
+                                          .format(baseline.get("status"))]
+        return REGRESSION, ["call failed after refactoring: transport error"]
 
-    if not same_status:
+    details = []
+    if baseline.get("status") != current.get("status"):
         details.append("statusChanged {0} -> {1}".format(baseline.get("status"),
                                                          current.get("status")))
-    if not same_type:
+    if baseline.get("contentType") != current.get("contentType"):
         details.append("contentTypeChanged {0} -> {1}".format(baseline.get("contentType"),
                                                               current.get("contentType")))
-    for diff in diffs:
-        if diff["kind"] == "typeChanged":
-            details.append("typeChanged {0}: {1} -> {2}".format(diff["path"], diff["from"],
-                                                                diff["to"]))
-        else:
-            details.append("{0} {1}".format(diff["kind"], diff["path"]))
+    details.extend(headers_diff(baseline.get("headers"), current.get("headers")))
+    if not shapes_equal(baseline.get("shape"), current.get("shape")):
+        for diff in shape_diff(baseline.get("shape"), current.get("shape")):
+            if diff["kind"] == "typeChanged":
+                details.append("typeChanged {0}: {1} -> {2}".format(diff["path"], diff["from"],
+                                                                    diff["to"]))
+            elif diff["kind"] == "textChanged":
+                details.append("textChanged {0}: -{1} +{2} lines".format(
+                    diff["path"], len(diff["removed"]), len(diff["added"])))
+                details.extend("  - {0}".format(line) for line in diff["removed"][:3])
+                details.extend("  + {0}".format(line) for line in diff["added"][:3])
+            else:
+                details.append("{0} {1}".format(diff["kind"], diff["path"]))
+
+    if not details:
+        # Identical -- but if it was already broken, that is not a success. You neither
+        # fixed it nor broke it, and the report must say exactly that.
+        if _server_error(baseline):
+            return PRE_EXISTING_FAILURE, ["unchanged failure: status {0}".format(
+                baseline.get("status"))]
+        return PASS, []
 
     # Already broken before, still broken in the same way -> neither pass nor regression.
-    if _is_failure(baseline) and baseline.get("status") == current.get("status"):
+    if _server_error(baseline) and baseline.get("status") == current.get("status"):
         return PRE_EXISTING_FAILURE, details
 
     # Improvement is a behaviour change, so it is named rather than hidden -- but it is
     # not a regression.
-    if _is_failure(baseline) and not _is_failure(current):
+    if _server_error(baseline) and not _is_failure(current):
         return PASS, ["improved from {0}".format(baseline.get("status"))] + details
 
     return REGRESSION, details
@@ -334,27 +509,30 @@ def read_json(path):
 
 
 def write_json(path, document):
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(document, handle, indent=2, sort_keys=True)
+    # newline="\n" so the file is byte-identical to the Node implementation's on every OS.
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(document, handle, indent=2, sort_keys=True, ensure_ascii=False)
         handle.write("\n")
 
 
 def print_table(rows):
     width = max([len(row["id"]) for row in rows] + [4])
     for row in rows:
-        line = "  {0:<{1}}  {2}".format(row["id"], width, row["state"])
-        print(line)
+        print("  {0:<{1}}  {2}".format(row["id"], width, row["state"]))
         for detail in row["details"]:
             print("  {0}    - {1}".format(" " * width, detail))
 
 
 def summarize(rows):
-    counts = {PASS: 0, REGRESSION: 0, PRE_EXISTING_FAILURE: 0, UNVERIFIED: 0}
+    counts = {state: 0 for state in (PASS, REGRESSION, PRE_EXISTING_FAILURE, UNVERIFIED,
+                                     FIXED, NOT_FIXED)}
     for row in rows:
-        counts[row["state"]] = counts.get(row["state"], 0) + 1
+        counts[row["state"]] += 1
     print("")
     print("  {0} PASS, {1} REGRESSION, {2} PRE-EXISTING FAILURE, {3} UNVERIFIED".format(
         counts[PASS], counts[REGRESSION], counts[PRE_EXISTING_FAILURE], counts[UNVERIFIED]))
+    if counts[FIXED] or counts[NOT_FIXED]:
+        print("  security: {0} FIXED, {1} NOT FIXED".format(counts[FIXED], counts[NOT_FIXED]))
     return counts
 
 
@@ -368,6 +546,9 @@ def main(argv=None):
     capture_parser.add_argument("--surface", required=True, help="surface inventory JSON")
     capture_parser.add_argument("--base-url", required=True, help="base URL of the running app")
     capture_parser.add_argument("--out", required=True, help="where to write the capture")
+    capture_parser.add_argument("--only", help="comma-separated entry ids to exercise")
+    capture_parser.add_argument("--merge", action="store_true",
+                                help="merge into an existing --out instead of replacing it")
     capture_parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
 
     compare_parser = sub.add_parser("compare", help="diff a current capture against a baseline")
@@ -378,6 +559,10 @@ def main(argv=None):
     compare_parser.add_argument("--out", help="optionally write the current capture here")
     compare_parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
 
+    # Text skeletons carry response content; never let a console codepage crash the report.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     args = parser.parse_args(argv)
     if not args.mode:
         parser.print_help()
@@ -385,13 +570,22 @@ def main(argv=None):
 
     try:
         if args.mode == "capture":
-            surface = read_json(args.surface)
-            document = capture(surface, args.base_url, args.timeout)
+            only = set(args.only.split(",")) if args.only else None
+            document = capture(read_json(args.surface), args.base_url, args.timeout, only)
+            if args.merge:
+                previous = read_json(args.out)
+                previous.setdefault("results", {}).update(document["results"])
+                previous["version"] = PROTOCOL_VERSION
+                document = previous
             write_json(args.out, document)
-            observed = sum(1 for r in document["results"].values() if r["state"] == "OBSERVED")
-            skipped = len(document["results"]) - observed
-            print("captured {0} entries ({1} observed, {2} unverified) -> {3}".format(
-                len(document["results"]), observed, skipped, args.out))
+            states = [r["state"] for r in document["results"].values()]
+            print("captured {0} entries ({1} observed, {2} error, {3} skipped) -> {4}".format(
+                len(states), states.count(OBSERVED), states.count(ERROR),
+                states.count(SKIPPED), args.out))
+            if states.count(ERROR) > 1:
+                print("warning: several transport errors -- if one entry crashed the "
+                      "application, the entries after it failed only because it was down "
+                      "(protocol 3.2)", file=sys.stderr)
             return 0
 
         baseline_doc = read_json(args.baseline)
