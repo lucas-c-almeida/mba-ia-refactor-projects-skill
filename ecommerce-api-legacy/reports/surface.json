@@ -1,0 +1,174 @@
+{
+  "version": 2,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:5211",
+  "entries": [
+    {
+      "id": "get-api-admin-financial-report-initial",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "post-api-checkout-new-user-paid",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "Guilherme",
+        "eml": "gui@fullcycle.com.br",
+        "pwd": "senhaforte",
+        "c_id": 2,
+        "card": "4111222233334444"
+      }
+    },
+    {
+      "id": "post-api-checkout-existing-user-paid",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "Leonan",
+        "eml": "leonan@fullcycle.com.br",
+        "pwd": "whatever",
+        "c_id": 2,
+        "card": "4000000000000002"
+      }
+    },
+    {
+      "id": "post-api-checkout-new-user-without-pwd",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "Maria",
+        "eml": "maria@teste.com",
+        "c_id": 1,
+        "card": "4999888877776666"
+      }
+    },
+    {
+      "id": "post-api-checkout-payment-denied",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "João",
+        "eml": "joao@teste.com",
+        "pwd": "123",
+        "c_id": 1,
+        "card": "5111222233334444"
+      }
+    },
+    {
+      "id": "post-api-checkout-missing-fields",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "Ana"
+      }
+    },
+    {
+      "id": "post-api-checkout-unknown-course",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "Ana",
+        "eml": "ana@teste.com",
+        "pwd": "x",
+        "c_id": 999,
+        "card": "4111222233334444"
+      }
+    },
+    {
+      "id": "get-api-admin-financial-report-after-checkouts",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null
+    },
+    {
+      "id": "delete-api-users-1",
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "body": null
+    },
+    {
+      "id": "get-api-admin-financial-report-after-delete",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null
+    },
+    {
+      "id": "delete-api-users-999-missing",
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "body": null
+    },
+    {
+      "id": "get-api-unknown-route",
+      "method": "GET",
+      "path": "/api/unknown",
+      "body": null
+    },
+    {
+      "id": "post-api-checkout-without-json-body",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": null
+    },
+    {
+      "id": "post-api-checkout-card-wrong-type",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "Eve",
+        "eml": "eve1@teste.com",
+        "pwd": "x",
+        "c_id": 1,
+        "card": 4111
+      },
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "post-api-checkout-pwd-wrong-type",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "Eve",
+        "eml": "eve2@teste.com",
+        "pwd": 123,
+        "c_id": 1,
+        "card": "4111222233334444"
+      },
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "post-api-checkout-email-wrong-type",
+      "method": "POST",
+      "path": "/api/checkout",
+      "body": {
+        "usr": "Eve",
+        "eml": {
+          "$ne": null
+        },
+        "pwd": "x",
+        "c_id": 1,
+        "card": "4111222233334444"
+      },
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    }
+  ]
+}

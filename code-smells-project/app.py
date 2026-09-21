@@ -1,88 +1,88 @@
-from flask import Flask, jsonify, request
+"""Raiz de composição: o único lugar que nomeia implementações concretas.
+
+Carrega a configuração, cria a infraestrutura, monta repositórios e controllers, registra
+rotas e a fronteira de erros. Nada tem efeito colateral na importação.
+"""
+import logging
+
+from flask import Flask
 from flask_cors import CORS
-import controllers
-from database import get_db
 
-app = Flask(__name__)
-app.config["SECRET_KEY"] = "minha-chave-super-secreta-123"
-app.config["DEBUG"] = True
-CORS(app)
+from config.configuracao import carregar_configuracao
+from controllers.pedido_controller import PedidoController
+from controllers.produto_controller import ProdutoController
+from controllers.sistema_controller import AdministracaoController, RelatorioController, SaudeController
+from controllers.usuario_controller import UsuarioController
+from middlewares import sessao_banco, tratamento_erros
+from models import dados_iniciais
+from models.administracao import AdministracaoRepositorio
+from models.banco_de_dados import BancoDeDados, UnidadeDeTrabalho
+from models.notificacao import NotificadorLog
+from models.pedido import PedidoRepositorio
+from models.produto import ProdutoRepositorio
+from models.relatorio import RelatorioRepositorio
+from models.saude import SaudeRepositorio
+from models.usuario import UsuarioRepositorio
+from views import pedidos, produtos, sistema, usuarios
 
-app.add_url_rule("/produtos", "listar_produtos", controllers.listar_produtos, methods=["GET"])
-app.add_url_rule("/produtos/busca", "buscar_produtos", controllers.buscar_produtos, methods=["GET"])
-app.add_url_rule("/produtos/<int:id>", "buscar_produto", controllers.buscar_produto, methods=["GET"])
-app.add_url_rule("/produtos", "criar_produto", controllers.criar_produto, methods=["POST"])
-app.add_url_rule("/produtos/<int:id>", "atualizar_produto", controllers.atualizar_produto, methods=["PUT"])
-app.add_url_rule("/produtos/<int:id>", "deletar_produto", controllers.deletar_produto, methods=["DELETE"])
+logger = logging.getLogger(__name__)
 
-app.add_url_rule("/usuarios", "listar_usuarios", controllers.listar_usuarios, methods=["GET"])
-app.add_url_rule("/usuarios/<int:id>", "buscar_usuario", controllers.buscar_usuario, methods=["GET"])
-app.add_url_rule("/usuarios", "criar_usuario", controllers.criar_usuario, methods=["POST"])
-app.add_url_rule("/login", "login", controllers.login, methods=["POST"])
 
-app.add_url_rule("/pedidos", "criar_pedido", controllers.criar_pedido, methods=["POST"])
-app.add_url_rule("/pedidos", "listar_todos_pedidos", controllers.listar_todos_pedidos, methods=["GET"])
-app.add_url_rule("/pedidos/usuario/<int:usuario_id>", "listar_pedidos_usuario", controllers.listar_pedidos_usuario, methods=["GET"])
-app.add_url_rule("/pedidos/<int:pedido_id>/status", "atualizar_status_pedido", controllers.atualizar_status_pedido, methods=["PUT"])
-
-app.add_url_rule("/relatorios/vendas", "relatorio_vendas", controllers.relatorio_vendas, methods=["GET"])
-
-app.add_url_rule("/health", "health_check", controllers.health_check, methods=["GET"])
-
-@app.route("/")
-def index():
-    return jsonify({
-        "mensagem": "Bem-vindo à API da Loja",
-        "versao": "1.0.0",
-        "endpoints": {
-            "produtos": "/produtos",
-            "usuarios": "/usuarios",
-            "pedidos": "/pedidos",
-            "login": "/login",
-            "relatorios": "/relatorios/vendas",
-            "health": "/health"
-        }
-    })
-
-@app.route("/admin/reset-db", methods=["POST"])
-def reset_database():
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("DELETE FROM itens_pedido")
-    cursor.execute("DELETE FROM pedidos")
-    cursor.execute("DELETE FROM produtos")
-    cursor.execute("DELETE FROM usuarios")
-    db.commit()
-    print("!!! BANCO DE DADOS RESETADO !!!")
-    return jsonify({"mensagem": "Banco de dados resetado", "sucesso": True}), 200
-
-@app.route("/admin/query", methods=["POST"])
-def executar_query():
-    dados = request.get_json()
-    query = dados.get("sql", "")
-    if not query:
-        return jsonify({"erro": "Query não informada"}), 400
-
-    db = get_db()
-    cursor = db.cursor()
+def inicializar_banco(banco):
+    """Cria o esquema, carrega os exemplos no primeiro boot e converte senhas legadas."""
+    conexao = banco.conectar()
     try:
-        cursor.execute(query)
-        if query.strip().upper().startswith("SELECT"):
-            rows = cursor.fetchall()
-            result = [dict(row) for row in rows]
-            return jsonify({"dados": result, "sucesso": True}), 200
-        else:
-            db.commit()
-            return jsonify({"mensagem": "Query executada", "sucesso": True}), 200
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
+        banco.criar_esquema(conexao)
+        provedor = lambda: conexao  # noqa: E731 — conexão única, só durante a inicialização
+        repositorio_usuarios = UsuarioRepositorio(provedor)
+        with UnidadeDeTrabalho(provedor)():
+            dados_iniciais.carregar_se_vazio(conexao, repositorio_usuarios)
+            migradas = repositorio_usuarios.migrar_senhas_em_claro()
+        if migradas:
+            logger.warning("%d senha(s) em claro convertida(s) para hash", migradas)
+    finally:
+        conexao.close()
+
+
+def criar_app(configuracao=None):
+    configuracao = configuracao or carregar_configuracao()
+
+    app = Flask(__name__)
+    app.config["SECRET_KEY"] = configuracao.chave_secreta
+    app.config["DEBUG"] = configuracao.debug
+    # "*" preserva exatamente a política padrão anterior; outra lista restringe as origens.
+    origens = "*" if configuracao.origens_cors == ("*",) else list(configuracao.origens_cors)
+    CORS(app, origins=origens)
+
+    banco = BancoDeDados(configuracao.caminho_banco)
+    inicializar_banco(banco)
+
+    conexao = sessao_banco.registrar(app, banco)
+    transacao = UnidadeDeTrabalho(conexao)
+
+    repositorio_produtos = ProdutoRepositorio(conexao)
+    repositorio_pedidos = PedidoRepositorio(conexao)
+
+    produtos.registrar(app, ProdutoController(repositorio_produtos, transacao))
+    usuarios.registrar(app, UsuarioController(UsuarioRepositorio(conexao), transacao))
+    pedidos.registrar(
+        app,
+        PedidoController(repositorio_pedidos, repositorio_produtos, NotificadorLog(), transacao),
+        RelatorioController(RelatorioRepositorio(conexao)),
+    )
+    sistema.registrar(
+        app,
+        SaudeController(SaudeRepositorio(conexao)),
+        AdministracaoController(AdministracaoRepositorio(conexao), transacao),
+        configuracao,
+    )
+    tratamento_erros.registrar(app)
+    return app
+
 
 if __name__ == "__main__":
-
-    get_db()
-    print("=" * 50)
-    print("SERVIDOR INICIADO")
-    print("Rodando em http://localhost:5000")
-    print("=" * 50)
-
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    configuracao = carregar_configuracao()
+    aplicacao = criar_app(configuracao)
+    logger.info("SERVIDOR INICIADO em http://%s:%s", configuracao.host, configuracao.porta)
+    aplicacao.run(host=configuracao.host, port=configuracao.porta, debug=configuracao.debug)

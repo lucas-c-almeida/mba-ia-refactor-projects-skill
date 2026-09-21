@@ -1,0 +1,72 @@
+  delete-produto-11                       PASS
+  delete-produto-inexistente              PASS
+  get-health                              PASS
+  get-pedidos                             PASS
+  get-pedidos-usuario-2                   PASS
+  get-pedidos-usuario-sem-pedidos         PASS
+  get-produto-1                           PASS
+  get-produto-inexistente                 PASS
+  get-produtos                            PASS
+  get-produtos-busca-aspas                REGRESSION
+                                            - typeChanged $.dados[]: empty -> object
+  get-produtos-busca-filtros              PASS
+  get-produtos-busca-preco-invalido       PASS
+                                            - improved from 500
+                                            - statusChanged 500 -> 400
+  get-produtos-busca-termo                PASS
+  get-produtos-cors                       PASS
+  get-relatorio-vendas                    PASS
+  get-root                                PASS
+  get-rota-inexistente                    PASS
+  get-usuario-1                           PASS
+  get-usuario-inexistente                 PASS
+  get-usuarios                            PASS
+  options-produtos-preflight              PASS
+  post-admin-query-select                 PASS
+  post-admin-reset-db                     PASS
+  post-login                              PASS
+  post-login-incompleto                   PASS
+  post-login-sem-corpo                    PASS
+                                            - improved from 500
+                                            - statusChanged 500 -> 400
+  post-login-senha-errada                 PASS
+  post-pedido                             PASS
+  post-pedido-estoque-insuficiente        PASS
+  post-pedido-produto-inexistente         PASS
+  post-pedido-sem-itens                   PASS
+  post-pedido-sem-usuario                 PASS
+  post-produto                            PASS
+  post-produto-apostrofo                  PASS
+                                            - improved from 500
+                                            - statusChanged 500 -> 201
+                                            - missing $.erro
+                                            - added $.dados
+                                            - added $.mensagem
+                                            - added $.sucesso
+  post-produto-categoria-invalida         PASS
+  post-produto-corpo-vazio                PASS
+  post-produto-preco-negativo             PASS
+  post-produto-preco-texto                PASS
+                                            - improved from 500
+                                            - statusChanged 500 -> 400
+  post-produto-sem-nome                   PASS
+  post-usuario                            PASS
+  post-usuario-incompleto                 PASS
+  put-pedido-status                       PASS
+  put-pedido-status-invalido              PASS
+  put-produto-1                           PASS
+  put-produto-inexistente                 PASS
+  put-produto-sem-preco                   PASS
+  sec-login-injection                     FIXED
+                                            - rejected with 401 (baseline: 200)
+  sec-pedido-item-sem-quantidade          FIXED
+                                            - rejected with 400 (baseline: 500)
+  sec-pedido-quantidade-negativa          FIXED
+                                            - rejected with 400 (baseline: 201)
+  sec-put-produto-categoria-desconhecida  FIXED
+                                            - rejected with 400 (baseline: 200)
+  sec-put-produto-nome-curto              FIXED
+                                            - rejected with 400 (baseline: 200)
+
+  45 PASS, 1 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+  security: 5 FIXED, 0 NOT FIXED

@@ -1,0 +1,970 @@
+{
+  "version": 2,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:5222",
+  "entries": [
+    {
+      "id": "get-index",
+      "method": "GET",
+      "path": "/",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "get-health",
+      "method": "GET",
+      "path": "/health",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "list-tasks",
+      "method": "GET",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "get-task-1",
+      "method": "GET",
+      "path": "/tasks/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "get-task-missing",
+      "method": "GET",
+      "path": "/tasks/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "search-tasks-q",
+      "method": "GET",
+      "path": "/tasks/search?q=Refatorar",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "search-tasks-filters",
+      "method": "GET",
+      "path": "/tasks/search?status=pending&priority=1&user_id=1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "search-tasks-empty",
+      "method": "GET",
+      "path": "/tasks/search?q=zzzz-no-match",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "task-stats",
+      "method": "GET",
+      "path": "/tasks/stats",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "list-users",
+      "method": "GET",
+      "path": "/users",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "get-user-1",
+      "method": "GET",
+      "path": "/users/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "get-user-missing",
+      "method": "GET",
+      "path": "/users/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "get-user-1-tasks",
+      "method": "GET",
+      "path": "/users/1/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "get-user-missing-tasks",
+      "method": "GET",
+      "path": "/users/9999/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "report-summary",
+      "method": "GET",
+      "path": "/reports/summary",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "report-user-1",
+      "method": "GET",
+      "path": "/reports/user/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "report-user-missing",
+      "method": "GET",
+      "path": "/reports/user/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "list-categories",
+      "method": "GET",
+      "path": "/categories",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "list-users-cross-origin",
+      "method": "GET",
+      "path": "/users",
+      "headers": {
+        "Accept": "application/json",
+        "Origin": "http://client.example"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "preflight-create-task",
+      "method": "OPTIONS",
+      "path": "/tasks",
+      "headers": {
+        "Origin": "http://client.example",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Nova task de teste",
+        "description": "d",
+        "priority": 2,
+        "user_id": 1,
+        "category_id": 1,
+        "due_date": "2030-01-01",
+        "tags": [
+          "a",
+          "b"
+        ]
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-empty-object",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {},
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-no-body",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-missing-title",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "description": "x"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-short-title",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "ab"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-bad-status",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Valid title",
+        "status": "bogus"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-bad-priority",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Valid title",
+        "priority": 9
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-unknown-user",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Valid title",
+        "user_id": 9999
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-unknown-category",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Valid title",
+        "category_id": 9999
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-task-bad-date",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Valid title",
+        "due_date": "01/01/2030"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-task-1",
+      "method": "PUT",
+      "path": "/tasks/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "status": "in_progress",
+        "priority": 2,
+        "tags": "x,y",
+        "due_date": "2031-05-05"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-task-1-clear-date",
+      "method": "PUT",
+      "path": "/tasks/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "due_date": null,
+        "user_id": null
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-task-bad-status",
+      "method": "PUT",
+      "path": "/tasks/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "status": "bogus"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-task-short-title",
+      "method": "PUT",
+      "path": "/tasks/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "ab"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-task-missing",
+      "method": "PUT",
+      "path": "/tasks/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Whatever"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-user",
+      "method": "POST",
+      "path": "/users",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "Ana Teste",
+        "email": "ana@email.com",
+        "password": "secret1"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-user-duplicate-email",
+      "method": "POST",
+      "path": "/users",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "Dup",
+        "email": "joao@email.com",
+        "password": "secret1"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-user-bad-email",
+      "method": "POST",
+      "path": "/users",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "Bad",
+        "email": "not-an-email",
+        "password": "secret1"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-user-missing-password",
+      "method": "POST",
+      "path": "/users",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "NoPwd",
+        "email": "nopwd@email.com"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-user-short-password",
+      "method": "POST",
+      "path": "/users",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "Short",
+        "email": "short@email.com",
+        "password": "123"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-user-bad-role",
+      "method": "POST",
+      "path": "/users",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "Role",
+        "email": "role@email.com",
+        "password": "secret1",
+        "role": "root"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-user-2",
+      "method": "PUT",
+      "path": "/users/2",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "Maria S."
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-user-bad-role",
+      "method": "PUT",
+      "path": "/users/2",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "role": "root"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-user-duplicate-email",
+      "method": "PUT",
+      "path": "/users/2",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "joao@email.com"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-user-missing",
+      "method": "PUT",
+      "path": "/users/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "x"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "login-ok",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "joao@email.com",
+        "password": "1234"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "login-wrong-password",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "joao@email.com",
+        "password": "wrong"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "login-unknown-user",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "ghost@email.com",
+        "password": "x"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "login-missing-fields",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "joao@email.com"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-category",
+      "method": "POST",
+      "path": "/categories",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "QA",
+        "description": "Testes",
+        "color": "#123456"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "create-category-missing-name",
+      "method": "POST",
+      "path": "/categories",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "description": "x"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-category-1",
+      "method": "PUT",
+      "path": "/categories/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "description": "Atualizada"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "update-category-missing",
+      "method": "PUT",
+      "path": "/categories/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": "x"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "delete-created-task",
+      "method": "DELETE",
+      "path": "/tasks/11",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "delete-task-missing",
+      "method": "DELETE",
+      "path": "/tasks/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "delete-created-category",
+      "method": "DELETE",
+      "path": "/categories/5",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "delete-category-missing",
+      "method": "DELETE",
+      "path": "/categories/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "delete-created-user",
+      "method": "DELETE",
+      "path": "/users/4",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "delete-user-missing",
+      "method": "DELETE",
+      "path": "/users/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "sec-create-task-priority-string",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Sec task",
+        "priority": "high"
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-create-task-title-number",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": 12345
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-update-task-priority-string",
+      "method": "PUT",
+      "path": "/tasks/2",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "priority": "x"
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-search-priority-nonnumeric",
+      "method": "GET",
+      "path": "/tasks/search?priority=abc",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-search-user-nonnumeric",
+      "method": "GET",
+      "path": "/tasks/search?user_id=abc",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-update-category-non-object",
+      "method": "PUT",
+      "path": "/categories/2",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": 5,
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-update-user-active-string",
+      "method": "PUT",
+      "path": "/users/3",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "active": "yes"
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-create-task-tags-number",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Sec tags",
+        "tags": 123
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-create-task-description-object",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Sec desc",
+        "description": {
+          "a": 1
+        }
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-create-task-user-id-object",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "title": "Sec user",
+        "user_id": {
+          "id": 1
+        }
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-create-task-body-list",
+      "method": "POST",
+      "path": "/tasks",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": [
+        1
+      ],
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-create-category-name-object",
+      "method": "POST",
+      "path": "/categories",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": {
+          "x": 1
+        }
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-update-user-name-list",
+      "method": "PUT",
+      "path": "/users/3",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "name": [
+          "x"
+        ]
+      },
+      "skip": false,
+      "skipReason": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    }
+  ]
+}
