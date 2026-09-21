@@ -1,0 +1,893 @@
+{
+  "baseUrl": "http://127.0.0.1:5101",
+  "capturedAt": "2026-09-21T03:10:28Z",
+  "results": {
+    "DELETE /produtos/11": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "DELETE /produtos/11",
+      "method": "DELETE",
+      "path": "/produtos/11",
+      "shape": {
+        "properties": {
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "DELETE /produtos/9999": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "DELETE /produtos/9999",
+      "method": "DELETE",
+      "path": "/produtos/9999",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "GET /": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /",
+      "method": "GET",
+      "path": "/",
+      "shape": {
+        "properties": {
+          "endpoints": {
+            "properties": {
+              "health": "string",
+              "login": "string",
+              "pedidos": "string",
+              "produtos": "string",
+              "relatorios": "string",
+              "usuarios": "string"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "versao": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /health": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /health",
+      "method": "GET",
+      "path": "/health",
+      "shape": {
+        "properties": {
+          "ambiente": "string",
+          "counts": {
+            "properties": {
+              "pedidos": "number",
+              "produtos": "number",
+              "usuarios": "number"
+            },
+            "type": "object"
+          },
+          "database": "string",
+          "db_path": "string",
+          "debug": "boolean",
+          "secret_key": "string",
+          "status": "string",
+          "versao": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /pedidos": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /pedidos",
+      "method": "GET",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "criado_em": "string",
+                "id": "number",
+                "itens": {
+                  "items": {
+                    "properties": {
+                      "preco_unitario": "number",
+                      "produto_id": "number",
+                      "produto_nome": "string",
+                      "quantidade": "number"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": "string",
+                "total": "number",
+                "usuario_id": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /pedidos/usuario/2": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /pedidos/usuario/2",
+      "method": "GET",
+      "path": "/pedidos/usuario/2",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "criado_em": "string",
+                "id": "number",
+                "itens": {
+                  "items": {
+                    "properties": {
+                      "preco_unitario": "number",
+                      "produto_id": "number",
+                      "produto_nome": "string",
+                      "quantidade": "number"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": "string",
+                "total": "number",
+                "usuario_id": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /pedidos/usuario/2 empty": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /pedidos/usuario/2 empty",
+      "method": "GET",
+      "path": "/pedidos/usuario/2",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": "empty",
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /produtos": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /produtos",
+      "method": "GET",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "ativo": "number",
+                "categoria": "string",
+                "criado_em": "string",
+                "descricao": "string",
+                "estoque": "number",
+                "id": "number",
+                "nome": "string",
+                "preco": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /produtos after-reset": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /produtos after-reset",
+      "method": "GET",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": "empty",
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /produtos/1": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /produtos/1",
+      "method": "GET",
+      "path": "/produtos/1",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "ativo": "number",
+              "categoria": "string",
+              "criado_em": "string",
+              "descricao": "string",
+              "estoque": "number",
+              "id": "number",
+              "nome": "string",
+              "preco": "number"
+            },
+            "type": "object"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /produtos/9999": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /produtos/9999",
+      "method": "GET",
+      "path": "/produtos/9999",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "GET /produtos/busca?categoria=informatica&preco_min=50&preco_max=500": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /produtos/busca?categoria=informatica&preco_min=50&preco_max=500",
+      "method": "GET",
+      "path": "/produtos/busca?categoria=informatica&preco_min=50&preco_max=500",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "ativo": "number",
+                "categoria": "string",
+                "criado_em": "string",
+                "descricao": "string",
+                "estoque": "number",
+                "id": "number",
+                "nome": "string",
+                "preco": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean",
+          "total": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /produtos/busca?preco_min=abc": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /produtos/busca?preco_min=abc",
+      "method": "GET",
+      "path": "/produtos/busca?preco_min=abc",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 500
+    },
+    "GET /produtos/busca?q=Mouse": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /produtos/busca?q=Mouse",
+      "method": "GET",
+      "path": "/produtos/busca?q=Mouse",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "ativo": "number",
+                "categoria": "string",
+                "criado_em": "string",
+                "descricao": "string",
+                "estoque": "number",
+                "id": "number",
+                "nome": "string",
+                "preco": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean",
+          "total": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /relatorios/vendas": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /relatorios/vendas",
+      "method": "GET",
+      "path": "/relatorios/vendas",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "desconto_aplicavel": "number",
+              "faturamento_bruto": "number",
+              "faturamento_liquido": "number",
+              "pedidos_aprovados": "number",
+              "pedidos_cancelados": "number",
+              "pedidos_pendentes": "number",
+              "ticket_medio": "number",
+              "total_pedidos": "number"
+            },
+            "type": "object"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /usuarios": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /usuarios",
+      "method": "GET",
+      "path": "/usuarios",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "criado_em": "string",
+                "email": "string",
+                "id": "number",
+                "nome": "string",
+                "senha": "string",
+                "tipo": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /usuarios/1": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /usuarios/1",
+      "method": "GET",
+      "path": "/usuarios/1",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "criado_em": "string",
+              "email": "string",
+              "id": "number",
+              "nome": "string",
+              "senha": "string",
+              "tipo": "string"
+            },
+            "type": "object"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /usuarios/9999": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /usuarios/9999",
+      "method": "GET",
+      "path": "/usuarios/9999",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "GET unknown-route 404": {
+      "contentType": "text/html",
+      "error": null,
+      "id": "GET unknown-route 404",
+      "method": "GET",
+      "path": "/rota-inexistente",
+      "shape": {
+        "bytes": "present",
+        "type": "opaque"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "POST /admin/query missing-sql": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /admin/query missing-sql",
+      "method": "POST",
+      "path": "/admin/query",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /admin/query select": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /admin/query select",
+      "method": "POST",
+      "path": "/admin/query",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "n": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "POST /admin/reset-db (last; throwaway DB)": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /admin/reset-db (last; throwaway DB)",
+      "method": "POST",
+      "path": "/admin/reset-db",
+      "shape": {
+        "properties": {
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "POST /login created-user": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /login created-user",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "email": "string",
+              "id": "number",
+              "nome": "string",
+              "tipo": "string"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "POST /login missing-fields": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /login missing-fields",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /login valid": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /login valid",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "email": "string",
+              "id": "number",
+              "nome": "string",
+              "tipo": "string"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "POST /login wrong-password": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /login wrong-password",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 401
+    },
+    "POST /pedidos empty-items": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /pedidos empty-items",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /pedidos insufficient-stock": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /pedidos insufficient-stock",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /pedidos item-missing-quantidade": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /pedidos item-missing-quantidade",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 500
+    },
+    "POST /pedidos missing-usuario": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /pedidos missing-usuario",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /pedidos unknown-product": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /pedidos unknown-product",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /pedidos valid": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /pedidos valid",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "pedido_id": "number",
+              "total": "number"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "POST /produtos bad-categoria": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /produtos bad-categoria",
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /produtos missing-nome": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /produtos missing-nome",
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /produtos negative-preco": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /produtos negative-preco",
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /produtos valid": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /produtos valid",
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "id": "number"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "POST /usuarios missing-fields": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /usuarios missing-fields",
+      "method": "POST",
+      "path": "/usuarios",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /usuarios valid": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /usuarios valid",
+      "method": "POST",
+      "path": "/usuarios",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "id": "number"
+            },
+            "type": "object"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "PUT /pedidos/1/status invalid": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "PUT /pedidos/1/status invalid",
+      "method": "PUT",
+      "path": "/pedidos/1/status",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "PUT /pedidos/1/status valid": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "PUT /pedidos/1/status valid",
+      "method": "PUT",
+      "path": "/pedidos/1/status",
+      "shape": {
+        "properties": {
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "PUT /produtos/1 missing-preco": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "PUT /produtos/1 missing-preco",
+      "method": "PUT",
+      "path": "/produtos/1",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "PUT /produtos/1 valid": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "PUT /produtos/1 valid",
+      "method": "PUT",
+      "path": "/produtos/1",
+      "shape": {
+        "properties": {
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "PUT /produtos/9999 not-found": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "PUT /produtos/9999 not-found",
+      "method": "PUT",
+      "path": "/produtos/9999",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    }
+  },
+  "version": 1
+}

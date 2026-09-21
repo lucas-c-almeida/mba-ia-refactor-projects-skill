@@ -189,12 +189,12 @@ A árvore acima é a exigida pelo enunciado. Nossas decisões produzem artefatos
 **não** substituem nada dela e ficam **ancorados na raiz do repositório**:
 
 ```
-instructions.md          # enunciado original, preservado intacto (era README.md)
-CLAUDE.md                # esta especificação viva
-docs/decisions.md        # registro ADR das decisões, com alternativas e custos
-runs/p<N>-iter<K>.md     # transcript de cada rodada                      (D3)
-evals/rubric.md          # rubrica de avaliação                           (D8)
-evals/run-p<N>-iter<K>.md# scorecard preenchido por rodada                (D8)
+instructions.md                 # enunciado original, preservado intacto (era README.md)
+CLAUDE.md                       # esta especificação viva
+docs/decisions.md               # registro ADR das decisões, com alternativas e custos
+runs/<projeto>-iter<K>.md       # transcript de cada rodada                (D3)
+evals/rubric.md                 # rubrica de avaliação                           (D8)
+evals/run-<projeto>-iter<K>.md  # scorecard preenchido por rodada          (D8)
 ```
 
 Dentro de cada projeto-alvo, a skill gera `<alvo>/reports/audit-*.md` (D5); a entrega copia o
@@ -254,16 +254,28 @@ Cada execução da skill num projeto é uma **rodada**, e toda rodada é isolada
 | Eixo | Mecanismo | Contra o quê protege |
 |---|---|---|
 | Contexto | Sessão nova do Claude por projeto (nunca os 3 na mesma) | Contaminação: o agente chegar no projeto 2 já "sabendo" o que achar |
-| Código | `git tag run/p<N>/iter<K>` antes de cada rodada | Rodada não repetível; impossibilidade de re-testar após ajustar a skill |
-| Evidência | Transcript salvo em `runs/p<N>-iter<K>.md` | Perder o *porquê* de uma regressão quando a sessão fecha |
+| Código | `git tag run/<projeto>/iter<K>` antes de cada rodada | Rodada não repetível; impossibilidade de re-testar após ajustar a skill |
+| Evidência | Transcript salvo em `runs/<projeto>-iter<K>.md` | Perder o *porquê* de uma regressão quando a sessão fecha |
+
+`<projeto>` é o nome do diretório do projeto-alvo (`code-smells-project`, `ecommerce-api-legacy`,
+`task-manager-api`), não um índice `p<N>`. **Por quê:** as tags são publicadas no remoto e precisam
+se explicar sozinhas; `p2` só tem significado para quem conhece a ordem do enunciado. O índice
+`project-N` fica restrito aos entregáveis que o enunciado nomeia assim (`reports/audit-project-N.md`).
 
 ```bash
-git tag run/p2/iter1
+git tag run/ecommerce-api-legacy/iter1
 claude                                   # sessão NOVA, contexto zerado
 > /refactor-arch ecommerce-api-legacy
-# ajustou a skill? volta ao ponto e roda de novo:
-git reset --hard run/p2/iter1
+# ajustou a skill? volta ao ponto e roda de novo — só o diretório do alvo:
+git checkout run/ecommerce-api-legacy/iter1 -- ecommerce-api-legacy
 ```
+
+**Rodadas em paralelo:** o eixo de contexto também é satisfeito com um **subagente por projeto**
+(cada subagente começa com contexto próprio), inclusive em paralelo na mesma árvore. Nesse caso,
+cada subagente escreve só no próprio alvo, usa uma porta distinta para baseline/replay e não executa
+git; tags e commits ficam com a sessão orquestradora. Como as tags das rodadas paralelas apontam para
+o mesmo commit, o reset é por diretório (`git checkout <tag> -- <projeto>`), nunca `git reset --hard`,
+que desfaria também as rodadas dos outros projetos.
 
 **Por quê o eixo de contexto é o mais importante:** é o único invisível. Um repositório sujo
 denuncia a falta de reset; uma sessão contaminada produz um resultado que *parece* ótimo. Rodar os
@@ -391,7 +403,7 @@ com argumento. Decidir *por* o time o que quebrar não é papel de uma ferrament
 
 ### D8 — Medição: **scorecard formal com métricas de generalização** ✅ decidido
 
-`evals/rubric.md` define a rubrica; cada rodada produz `evals/run-p<N>-iter<K>.md`.
+`evals/rubric.md` define a rubrica; cada rodada produz `evals/run-<projeto>-iter<K>.md`.
 
 Métricas, e o que cada uma responde:
 

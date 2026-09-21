@@ -1,0 +1,1264 @@
+{
+  "baseUrl": "http://127.0.0.1:5103",
+  "capturedAt": "2026-09-21T03:23:24Z",
+  "results": {
+    "delete-category-created": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "delete-category-created",
+      "method": "DELETE",
+      "path": "/categories/5",
+      "shape": {
+        "properties": {
+          "message": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "delete-category-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "delete-category-missing",
+      "method": "DELETE",
+      "path": "/categories/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "delete-task-created": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "delete-task-created",
+      "method": "DELETE",
+      "path": "/tasks/11",
+      "shape": {
+        "properties": {
+          "message": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "delete-task-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "delete-task-missing",
+      "method": "DELETE",
+      "path": "/tasks/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "delete-user-created": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "delete-user-created",
+      "method": "DELETE",
+      "path": "/users/4",
+      "shape": {
+        "properties": {
+          "message": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "delete-user-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "delete-user-missing",
+      "method": "DELETE",
+      "path": "/users/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-categories": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-categories",
+      "method": "GET",
+      "path": "/categories",
+      "shape": {
+        "items": {
+          "properties": {
+            "color": "string",
+            "created_at": "string",
+            "description": "string",
+            "id": "number",
+            "name": "string",
+            "task_count": "number"
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-health": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-health",
+      "method": "GET",
+      "path": "/health",
+      "shape": {
+        "properties": {
+          "status": "string",
+          "timestamp": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-report-summary": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-report-summary",
+      "method": "GET",
+      "path": "/reports/summary",
+      "shape": {
+        "properties": {
+          "generated_at": "string",
+          "overdue": {
+            "properties": {
+              "count": "number",
+              "tasks": {
+                "items": {
+                  "properties": {
+                    "days_overdue": "number",
+                    "due_date": "string",
+                    "id": "number",
+                    "title": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "overview": {
+            "properties": {
+              "total_categories": "number",
+              "total_tasks": "number",
+              "total_users": "number"
+            },
+            "type": "object"
+          },
+          "recent_activity": {
+            "properties": {
+              "tasks_completed_last_7_days": "number",
+              "tasks_created_last_7_days": "number"
+            },
+            "type": "object"
+          },
+          "tasks_by_priority": {
+            "properties": {
+              "critical": "number",
+              "high": "number",
+              "low": "number",
+              "medium": "number",
+              "minimal": "number"
+            },
+            "type": "object"
+          },
+          "tasks_by_status": {
+            "properties": {
+              "cancelled": "number",
+              "done": "number",
+              "in_progress": "number",
+              "pending": "number"
+            },
+            "type": "object"
+          },
+          "user_productivity": {
+            "items": {
+              "properties": {
+                "completed_tasks": "number",
+                "completion_rate": "number",
+                "total_tasks": "number",
+                "user_id": "number",
+                "user_name": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-report-user-1": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-report-user-1",
+      "method": "GET",
+      "path": "/reports/user/1",
+      "shape": {
+        "properties": {
+          "statistics": {
+            "properties": {
+              "cancelled": "number",
+              "completion_rate": "number",
+              "done": "number",
+              "high_priority": "number",
+              "in_progress": "number",
+              "overdue": "number",
+              "pending": "number",
+              "total_tasks": "number"
+            },
+            "type": "object"
+          },
+          "user": {
+            "properties": {
+              "email": "string",
+              "id": "number",
+              "name": "string"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-report-user-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-report-user-missing",
+      "method": "GET",
+      "path": "/reports/user/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-root": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-root",
+      "method": "GET",
+      "path": "/",
+      "shape": {
+        "properties": {
+          "message": "string",
+          "version": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-task-1": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-task-1",
+      "method": "GET",
+      "path": "/tasks/1",
+      "shape": {
+        "properties": {
+          "category_id": "number",
+          "created_at": "string",
+          "description": "string",
+          "due_date": "string",
+          "id": "number",
+          "overdue": "boolean",
+          "priority": "number",
+          "status": "string",
+          "tags": {
+            "items": "empty",
+            "type": "array"
+          },
+          "title": "string",
+          "updated_at": "string",
+          "user_id": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-task-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-task-missing",
+      "method": "GET",
+      "path": "/tasks/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-task-stats": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-task-stats",
+      "method": "GET",
+      "path": "/tasks/stats",
+      "shape": {
+        "properties": {
+          "cancelled": "number",
+          "completion_rate": "number",
+          "done": "number",
+          "in_progress": "number",
+          "overdue": "number",
+          "pending": "number",
+          "total": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-tasks": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-tasks",
+      "method": "GET",
+      "path": "/tasks",
+      "shape": {
+        "items": {
+          "oneOf": [
+            {
+              "properties": {
+                "category_id": "number",
+                "category_name": "string",
+                "created_at": "string",
+                "description": "string",
+                "due_date": "null",
+                "id": "number",
+                "overdue": "boolean",
+                "priority": "number",
+                "status": "string",
+                "tags": {
+                  "items": "empty",
+                  "type": "array"
+                },
+                "title": "string",
+                "updated_at": "string",
+                "user_id": "number",
+                "user_name": "string"
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "category_id": "number",
+                "category_name": "string",
+                "created_at": "string",
+                "description": "string",
+                "due_date": "null",
+                "id": "number",
+                "overdue": "boolean",
+                "priority": "number",
+                "status": "string",
+                "tags": {
+                  "items": "string",
+                  "type": "array"
+                },
+                "title": "string",
+                "updated_at": "string",
+                "user_id": "number",
+                "user_name": "string"
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "category_id": "number",
+                "category_name": "string",
+                "created_at": "string",
+                "description": "string",
+                "due_date": "string",
+                "id": "number",
+                "overdue": "boolean",
+                "priority": "number",
+                "status": "string",
+                "tags": {
+                  "items": "empty",
+                  "type": "array"
+                },
+                "title": "string",
+                "updated_at": "string",
+                "user_id": "number",
+                "user_name": "string"
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-user-1": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-user-1",
+      "method": "GET",
+      "path": "/users/1",
+      "shape": {
+        "properties": {
+          "active": "boolean",
+          "created_at": "string",
+          "email": "string",
+          "id": "number",
+          "name": "string",
+          "password": "string",
+          "role": "string",
+          "tasks": {
+            "items": {
+              "oneOf": [
+                {
+                  "properties": {
+                    "category_id": "number",
+                    "created_at": "string",
+                    "description": "string",
+                    "due_date": "null",
+                    "id": "number",
+                    "priority": "number",
+                    "status": "string",
+                    "tags": {
+                      "items": "string",
+                      "type": "array"
+                    },
+                    "title": "string",
+                    "updated_at": "string",
+                    "user_id": "number"
+                  },
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "category_id": "number",
+                    "created_at": "string",
+                    "description": "string",
+                    "due_date": "string",
+                    "id": "number",
+                    "priority": "number",
+                    "status": "string",
+                    "tags": {
+                      "items": "empty",
+                      "type": "array"
+                    },
+                    "title": "string",
+                    "updated_at": "string",
+                    "user_id": "number"
+                  },
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "category_id": "number",
+                    "created_at": "string",
+                    "description": "string",
+                    "due_date": "string",
+                    "id": "number",
+                    "priority": "number",
+                    "status": "string",
+                    "tags": {
+                      "items": "string",
+                      "type": "array"
+                    },
+                    "title": "string",
+                    "updated_at": "string",
+                    "user_id": "number"
+                  },
+                  "type": "object"
+                }
+              ]
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-user-1-tasks": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-user-1-tasks",
+      "method": "GET",
+      "path": "/users/1/tasks",
+      "shape": {
+        "items": {
+          "oneOf": [
+            {
+              "properties": {
+                "created_at": "string",
+                "description": "string",
+                "due_date": "null",
+                "id": "number",
+                "overdue": "boolean",
+                "priority": "number",
+                "status": "string",
+                "title": "string"
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "created_at": "string",
+                "description": "string",
+                "due_date": "string",
+                "id": "number",
+                "overdue": "boolean",
+                "priority": "number",
+                "status": "string",
+                "title": "string"
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-user-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-user-missing",
+      "method": "GET",
+      "path": "/users/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-user-missing-tasks": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-user-missing-tasks",
+      "method": "GET",
+      "path": "/users/9999/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-users": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "get-users",
+      "method": "GET",
+      "path": "/users",
+      "shape": {
+        "items": {
+          "properties": {
+            "active": "boolean",
+            "created_at": "string",
+            "email": "string",
+            "id": "number",
+            "name": "string",
+            "role": "string",
+            "task_count": "number"
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "login-missing-fields": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "login-missing-fields",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "login-ok": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "login-ok",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "message": "string",
+          "token": "string",
+          "user": {
+            "properties": {
+              "active": "boolean",
+              "created_at": "string",
+              "email": "string",
+              "id": "number",
+              "name": "string",
+              "password": "string",
+              "role": "string"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "login-ok-new-user": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "login-ok-new-user",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "message": "string",
+          "token": "string",
+          "user": {
+            "properties": {
+              "active": "boolean",
+              "created_at": "string",
+              "email": "string",
+              "id": "number",
+              "name": "string",
+              "password": "string",
+              "role": "string"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "login-unknown": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "login-unknown",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 401
+    },
+    "login-wrong-password": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "login-wrong-password",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 401
+    },
+    "post-category": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-category",
+      "method": "POST",
+      "path": "/categories",
+      "shape": {
+        "properties": {
+          "color": "string",
+          "created_at": "string",
+          "description": "string",
+          "id": "number",
+          "name": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "post-category-missing-name": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-category-missing-name",
+      "method": "POST",
+      "path": "/categories",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-task": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-task",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "category_id": "number",
+          "created_at": "string",
+          "description": "string",
+          "due_date": "string",
+          "id": "number",
+          "priority": "number",
+          "status": "string",
+          "tags": {
+            "items": "string",
+            "type": "array"
+          },
+          "title": "string",
+          "updated_at": "string",
+          "user_id": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "post-task-bad-date": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-task-bad-date",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-task-bad-priority-range": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-task-bad-priority-range",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-task-bad-priority-type": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-task-bad-priority-type",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-task-bad-status": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-task-bad-status",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-task-empty-body": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-task-empty-body",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-task-missing-user": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-task-missing-user",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "post-task-no-json": {
+      "contentType": "text/html",
+      "error": null,
+      "id": "post-task-no-json",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "bytes": "present",
+        "type": "opaque"
+      },
+      "state": "OBSERVED",
+      "status": 415
+    },
+    "post-task-short-title": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-task-short-title",
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-user": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-user",
+      "method": "POST",
+      "path": "/users",
+      "shape": {
+        "properties": {
+          "active": "boolean",
+          "created_at": "string",
+          "email": "string",
+          "id": "number",
+          "name": "string",
+          "password": "string",
+          "role": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "post-user-bad-email": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-user-bad-email",
+      "method": "POST",
+      "path": "/users",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-user-bad-role": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-user-bad-role",
+      "method": "POST",
+      "path": "/users",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-user-duplicate": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-user-duplicate",
+      "method": "POST",
+      "path": "/users",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 409
+    },
+    "post-user-missing-name": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-user-missing-name",
+      "method": "POST",
+      "path": "/users",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-user-short-password": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "post-user-short-password",
+      "method": "POST",
+      "path": "/users",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "put-category-1": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-category-1",
+      "method": "PUT",
+      "path": "/categories/1",
+      "shape": {
+        "properties": {
+          "color": "string",
+          "created_at": "string",
+          "description": "string",
+          "id": "number",
+          "name": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "put-category-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-category-missing",
+      "method": "PUT",
+      "path": "/categories/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "put-task-1": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-task-1",
+      "method": "PUT",
+      "path": "/tasks/1",
+      "shape": {
+        "properties": {
+          "category_id": "number",
+          "created_at": "string",
+          "description": "string",
+          "due_date": "string",
+          "id": "number",
+          "priority": "number",
+          "status": "string",
+          "tags": {
+            "items": "string",
+            "type": "array"
+          },
+          "title": "string",
+          "updated_at": "string",
+          "user_id": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "put-task-bad-status": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-task-bad-status",
+      "method": "PUT",
+      "path": "/tasks/1",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "put-task-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-task-missing",
+      "method": "PUT",
+      "path": "/tasks/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "put-task-title-not-string": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-task-title-not-string",
+      "method": "PUT",
+      "path": "/tasks/1",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "put-user-2": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-user-2",
+      "method": "PUT",
+      "path": "/users/2",
+      "shape": {
+        "properties": {
+          "active": "boolean",
+          "created_at": "string",
+          "email": "string",
+          "id": "number",
+          "name": "string",
+          "password": "string",
+          "role": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "put-user-email-conflict": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-user-email-conflict",
+      "method": "PUT",
+      "path": "/users/2",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 409
+    },
+    "put-user-missing": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "put-user-missing",
+      "method": "PUT",
+      "path": "/users/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "search-tasks": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "search-tasks",
+      "method": "GET",
+      "path": "/tasks/search?q=a&status=pending&priority=1&user_id=1",
+      "shape": {
+        "items": {
+          "properties": {
+            "category_id": "number",
+            "created_at": "string",
+            "description": "string",
+            "due_date": "string",
+            "id": "number",
+            "priority": "number",
+            "status": "string",
+            "tags": {
+              "items": "empty",
+              "type": "array"
+            },
+            "title": "string",
+            "updated_at": "string",
+            "user_id": "number"
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "search-tasks-bad-priority": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "search-tasks-bad-priority",
+      "method": "GET",
+      "path": "/tasks/search?priority=abc",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "search-tasks-empty": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "search-tasks-empty",
+      "method": "GET",
+      "path": "/tasks/search",
+      "shape": {
+        "items": {
+          "oneOf": [
+            {
+              "properties": {
+                "category_id": "number",
+                "created_at": "string",
+                "description": "string",
+                "due_date": "null",
+                "id": "number",
+                "priority": "number",
+                "status": "string",
+                "tags": {
+                  "items": "empty",
+                  "type": "array"
+                },
+                "title": "string",
+                "updated_at": "string",
+                "user_id": "number"
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "category_id": "number",
+                "created_at": "string",
+                "description": "string",
+                "due_date": "null",
+                "id": "number",
+                "priority": "number",
+                "status": "string",
+                "tags": {
+                  "items": "string",
+                  "type": "array"
+                },
+                "title": "string",
+                "updated_at": "string",
+                "user_id": "number"
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "category_id": "number",
+                "created_at": "string",
+                "description": "string",
+                "due_date": "string",
+                "id": "number",
+                "priority": "number",
+                "status": "string",
+                "tags": {
+                  "items": "empty",
+                  "type": "array"
+                },
+                "title": "string",
+                "updated_at": "string",
+                "user_id": "number"
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    }
+  },
+  "version": 1
+}

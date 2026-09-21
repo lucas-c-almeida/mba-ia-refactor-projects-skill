@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:5101",
+  "entries": [
+    {
+      "id": "SEC login-sql-injection",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "admin@loja.com' --",
+        "senha": "qualquer"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "SEC search-sql-injection",
+      "method": "GET",
+      "path": "/produtos/busca?q=%27%20OR%201%3D1%20--",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "SEC order-negative-quantity",
+      "method": "POST",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "usuario_id": 2,
+        "itens": [
+          {
+            "produto_id": 2,
+            "quantidade": -5
+          }
+        ]
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "SEC order-produto-id-string",
+      "method": "POST",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "usuario_id": 2,
+        "itens": [
+          {
+            "produto_id": "2 OR 1=1",
+            "quantidade": 1
+          }
+        ]
+      },
+      "skip": false,
+      "skipReason": null
+    }
+  ]
+}

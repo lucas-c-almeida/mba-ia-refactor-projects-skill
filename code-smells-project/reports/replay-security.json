@@ -1,0 +1,73 @@
+{
+  "baseUrl": "http://127.0.0.1:5101",
+  "capturedAt": "2026-09-21T03:22:15Z",
+  "results": {
+    "SEC login-sql-injection": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "SEC login-sql-injection",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 401
+    },
+    "SEC order-negative-quantity": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "SEC order-negative-quantity",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "SEC order-produto-id-string": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "SEC order-produto-id-string",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "SEC search-sql-injection": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "SEC search-sql-injection",
+      "method": "GET",
+      "path": "/produtos/busca?q=%27%20OR%201%3D1%20--",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": "empty",
+            "type": "array"
+          },
+          "sucesso": "boolean",
+          "total": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    }
+  },
+  "version": 1
+}

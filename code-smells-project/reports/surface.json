@@ -1,0 +1,580 @@
+{
+  "version": 1,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:5101",
+  "entries": [
+    {
+      "id": "GET /",
+      "method": "GET",
+      "path": "/",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /health",
+      "method": "GET",
+      "path": "/health",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /produtos",
+      "method": "GET",
+      "path": "/produtos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /produtos/busca?q=Mouse",
+      "method": "GET",
+      "path": "/produtos/busca?q=Mouse",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /produtos/busca?categoria=informatica&preco_min=50&preco_max=500",
+      "method": "GET",
+      "path": "/produtos/busca?categoria=informatica&preco_min=50&preco_max=500",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /produtos/busca?preco_min=abc",
+      "method": "GET",
+      "path": "/produtos/busca?preco_min=abc",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /produtos/1",
+      "method": "GET",
+      "path": "/produtos/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /produtos/9999",
+      "method": "GET",
+      "path": "/produtos/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /produtos valid",
+      "method": "POST",
+      "path": "/produtos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "nome": "Produto Teste",
+        "descricao": "desc",
+        "preco": 10.5,
+        "estoque": 5,
+        "categoria": "livros"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /produtos missing-nome",
+      "method": "POST",
+      "path": "/produtos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "preco": 10,
+        "estoque": 1
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /produtos bad-categoria",
+      "method": "POST",
+      "path": "/produtos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "nome": "X Teste",
+        "preco": 10,
+        "estoque": 1,
+        "categoria": "invalida"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /produtos negative-preco",
+      "method": "POST",
+      "path": "/produtos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "nome": "X Teste",
+        "preco": -1,
+        "estoque": 1
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "PUT /produtos/1 valid",
+      "method": "PUT",
+      "path": "/produtos/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "nome": "Notebook Gamer",
+        "descricao": "Notebook potente para jogos",
+        "preco": 5999.99,
+        "estoque": 10,
+        "categoria": "informatica"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "PUT /produtos/9999 not-found",
+      "method": "PUT",
+      "path": "/produtos/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "nome": "A",
+        "preco": 1,
+        "estoque": 1
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "PUT /produtos/1 missing-preco",
+      "method": "PUT",
+      "path": "/produtos/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "nome": "Notebook"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "DELETE /produtos/11",
+      "method": "DELETE",
+      "path": "/produtos/11",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "DELETE /produtos/9999",
+      "method": "DELETE",
+      "path": "/produtos/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /usuarios",
+      "method": "GET",
+      "path": "/usuarios",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /usuarios/1",
+      "method": "GET",
+      "path": "/usuarios/1",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /usuarios/9999",
+      "method": "GET",
+      "path": "/usuarios/9999",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /usuarios valid",
+      "method": "POST",
+      "path": "/usuarios",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "nome": "Teste",
+        "email": "teste@email.com",
+        "senha": "s3nha"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /usuarios missing-fields",
+      "method": "POST",
+      "path": "/usuarios",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "nome": "Teste"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /login valid",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "admin@loja.com",
+        "senha": "admin123"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /login wrong-password",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "admin@loja.com",
+        "senha": "errada"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /login created-user",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": "teste@email.com",
+        "senha": "s3nha"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /login missing-fields",
+      "method": "POST",
+      "path": "/login",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "email": ""
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /pedidos/usuario/2 empty",
+      "method": "GET",
+      "path": "/pedidos/usuario/2",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /pedidos valid",
+      "method": "POST",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "usuario_id": 2,
+        "itens": [
+          {
+            "produto_id": 2,
+            "quantidade": 1
+          },
+          {
+            "produto_id": 3,
+            "quantidade": 2
+          }
+        ]
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /pedidos insufficient-stock",
+      "method": "POST",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "usuario_id": 2,
+        "itens": [
+          {
+            "produto_id": 6,
+            "quantidade": 999
+          }
+        ]
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /pedidos unknown-product",
+      "method": "POST",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "usuario_id": 2,
+        "itens": [
+          {
+            "produto_id": 9999,
+            "quantidade": 1
+          }
+        ]
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /pedidos empty-items",
+      "method": "POST",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "usuario_id": 2,
+        "itens": []
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /pedidos missing-usuario",
+      "method": "POST",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "itens": [
+          {
+            "produto_id": 2,
+            "quantidade": 1
+          }
+        ]
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /pedidos item-missing-quantidade",
+      "method": "POST",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "usuario_id": 2,
+        "itens": [
+          {
+            "produto_id": 2
+          }
+        ]
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /pedidos",
+      "method": "GET",
+      "path": "/pedidos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /pedidos/usuario/2",
+      "method": "GET",
+      "path": "/pedidos/usuario/2",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "PUT /pedidos/1/status valid",
+      "method": "PUT",
+      "path": "/pedidos/1/status",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "status": "aprovado"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "PUT /pedidos/1/status invalid",
+      "method": "PUT",
+      "path": "/pedidos/1/status",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "status": "xyz"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /relatorios/vendas",
+      "method": "GET",
+      "path": "/relatorios/vendas",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /admin/query select",
+      "method": "POST",
+      "path": "/admin/query",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "sql": "SELECT COUNT(*) AS n FROM produtos"
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /admin/query missing-sql",
+      "method": "POST",
+      "path": "/admin/query",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": {
+        "sql": ""
+      },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET unknown-route 404",
+      "method": "GET",
+      "path": "/rota-inexistente",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "POST /admin/reset-db (last; throwaway DB)",
+      "method": "POST",
+      "path": "/admin/reset-db",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "GET /produtos after-reset",
+      "method": "GET",
+      "path": "/produtos",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    }
+  ]
+}

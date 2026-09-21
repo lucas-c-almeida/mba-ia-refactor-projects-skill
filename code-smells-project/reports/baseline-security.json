@@ -1,0 +1,93 @@
+{
+  "baseUrl": "http://127.0.0.1:5101",
+  "capturedAt": "2026-09-21T03:10:32Z",
+  "results": {
+    "SEC login-sql-injection": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "SEC login-sql-injection",
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "email": "string",
+              "id": "number",
+              "nome": "string",
+              "tipo": "string"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "SEC order-negative-quantity": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "SEC order-negative-quantity",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "pedido_id": "number",
+              "total": "number"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "SEC order-produto-id-string": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "SEC order-produto-id-string",
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "pedido_id": "number",
+              "total": "number"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "SEC search-sql-injection": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "SEC search-sql-injection",
+      "method": "GET",
+      "path": "/produtos/busca?q=%27%20OR%201%3D1%20--",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 500
+    }
+  },
+  "version": 1
+}

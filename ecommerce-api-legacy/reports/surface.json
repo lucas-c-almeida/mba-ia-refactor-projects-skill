@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:5102",
+  "entries": [
+    { "id": "GET /api/admin/financial-report (seed state)", "method": "GET", "path": "/api/admin/financial-report", "headers": {}, "body": null, "skip": false, "skipReason": null },
+    { "id": "POST /api/checkout (new user, approved card)", "method": "POST", "path": "/api/checkout", "headers": { "Content-Type": "application/json" }, "body": { "usr": "Guilherme", "eml": "gui@fullcycle.com.br", "pwd": "senhaforte", "c_id": 2, "card": "4111222233334444" }, "skip": false, "skipReason": null },
+    { "id": "POST /api/checkout (existing user, no pwd)", "method": "POST", "path": "/api/checkout", "headers": { "Content-Type": "application/json" }, "body": { "usr": "Leonan", "eml": "leonan@fullcycle.com.br", "c_id": 2, "card": "4000000000000002" }, "skip": false, "skipReason": null },
+    { "id": "POST /api/checkout (new user, no pwd)", "method": "POST", "path": "/api/checkout", "headers": { "Content-Type": "application/json" }, "body": { "usr": "Ana", "eml": "ana@teste.com", "c_id": 1, "card": "4999999999999999" }, "skip": false, "skipReason": null },
+    { "id": "POST /api/checkout (denied card)", "method": "POST", "path": "/api/checkout", "headers": { "Content-Type": "application/json" }, "body": { "usr": "Joao", "eml": "joao@teste.com", "pwd": "123", "c_id": 1, "card": "5111222233334444" }, "skip": false, "skipReason": null },
+    { "id": "POST /api/checkout (missing fields)", "method": "POST", "path": "/api/checkout", "headers": { "Content-Type": "application/json" }, "body": { "usr": "X" }, "skip": false, "skipReason": null },
+    { "id": "POST /api/checkout (unknown course)", "method": "POST", "path": "/api/checkout", "headers": { "Content-Type": "application/json" }, "body": { "usr": "X", "eml": "x@teste.com", "c_id": 999, "card": "4111" }, "skip": false, "skipReason": null },
+    { "id": "GET /api/admin/financial-report (after checkouts)", "method": "GET", "path": "/api/admin/financial-report", "headers": {}, "body": null, "skip": false, "skipReason": null },
+    { "id": "DELETE /api/users/:id (existing)", "method": "DELETE", "path": "/api/users/1", "headers": {}, "body": null, "skip": false, "skipReason": null },
+    { "id": "DELETE /api/users/:id (nonexistent)", "method": "DELETE", "path": "/api/users/9999", "headers": {}, "body": null, "skip": false, "skipReason": null },
+    { "id": "GET /api/admin/financial-report (after delete)", "method": "GET", "path": "/api/admin/financial-report", "headers": {}, "body": null, "skip": false, "skipReason": null },
+    { "id": "POST /api/checkout (non-string card, last: crashes original)", "method": "POST", "path": "/api/checkout", "headers": { "Content-Type": "application/json" }, "body": { "usr": "Z", "eml": "z@teste.com", "c_id": 1, "card": 4111222233334444 }, "skip": false, "skipReason": null }
+  ]
+}

@@ -220,7 +220,7 @@ em três eixos:
 | Eixo | Mecanismo | Contra o quê protege |
 |---|---|---|
 | Contexto | Sessão nova do agente por projeto (nunca os três na mesma) | O agente chegar no projeto seguinte já "sabendo" o que achar |
-| Código | Tag git antes de cada rodada (`run/p<N>/iter<K>`) | Rodada não repetível; impossibilidade de re-testar após ajustar a skill |
+| Código | Tag git antes de cada rodada (`run/<projeto>/iter<K>`) | Rodada não repetível; impossibilidade de re-testar após ajustar a skill |
 | Evidência | Transcript salvo por rodada | Perder o *porquê* de uma regressão quando a sessão fecha |
 
 **Justificativa.** O eixo de contexto é o mais importante justamente por ser **o único

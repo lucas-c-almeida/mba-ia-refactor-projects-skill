@@ -1,0 +1,235 @@
+{
+  "baseUrl": "http://127.0.0.1:5102",
+  "capturedAt": "2026-09-21T03:17:35Z",
+  "results": {
+    "DELETE /api/users/:id (existing)": {
+      "contentType": "text/html",
+      "error": null,
+      "id": "DELETE /api/users/:id (existing)",
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "shape": {
+        "bytes": "present",
+        "type": "opaque"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "DELETE /api/users/:id (nonexistent)": {
+      "contentType": "text/html",
+      "error": null,
+      "id": "DELETE /api/users/:id (nonexistent)",
+      "method": "DELETE",
+      "path": "/api/users/9999",
+      "shape": {
+        "bytes": "present",
+        "type": "opaque"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /api/admin/financial-report (after checkouts)": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /api/admin/financial-report (after checkouts)",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /api/admin/financial-report (after delete)": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /api/admin/financial-report (after delete)",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "GET /api/admin/financial-report (seed state)": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "GET /api/admin/financial-report (seed state)",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "oneOf": [
+            {
+              "properties": {
+                "course": "string",
+                "revenue": "number",
+                "students": {
+                  "items": "empty",
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "course": "string",
+                "revenue": "number",
+                "students": {
+                  "items": {
+                    "properties": {
+                      "paid": "number",
+                      "student": "string"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "POST /api/checkout (denied card)": {
+      "contentType": "text/html",
+      "error": null,
+      "id": "POST /api/checkout (denied card)",
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "bytes": "present",
+        "type": "opaque"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /api/checkout (existing user, no pwd)": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /api/checkout (existing user, no pwd)",
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "POST /api/checkout (missing fields)": {
+      "contentType": "text/html",
+      "error": null,
+      "id": "POST /api/checkout (missing fields)",
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "bytes": "present",
+        "type": "opaque"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /api/checkout (new user, approved card)": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /api/checkout (new user, approved card)",
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "POST /api/checkout (new user, no pwd)": {
+      "contentType": "application/json",
+      "error": null,
+      "id": "POST /api/checkout (new user, no pwd)",
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "POST /api/checkout (non-string card, last: crashes original)": {
+      "contentType": "text/html",
+      "error": null,
+      "id": "POST /api/checkout (non-string card, last: crashes original)",
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "bytes": "present",
+        "type": "opaque"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "POST /api/checkout (unknown course)": {
+      "contentType": "text/html",
+      "error": null,
+      "id": "POST /api/checkout (unknown course)",
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "bytes": "present",
+        "type": "opaque"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    }
+  },
+  "version": 1
+}
