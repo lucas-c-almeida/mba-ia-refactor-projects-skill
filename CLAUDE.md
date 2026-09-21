@@ -197,7 +197,7 @@ evals/rubric.md          # rubrica de avaliação                           (D8)
 evals/run-p<N>-iter<K>.md# scorecard preenchido por rodada                (D8)
 reports/round<K>-report.md # relatório consolidado de cada rodada
 docs/round<K>-changes.md # lista de mudanças congelada antes da rodada K   (D12, enfraquecida)
-docs/gabarito-prompt.md  # prompt da sessão cega que produz a análise manual (D12)
+docs/gabarito.md         # análise manual (gabarito, D12); cópia na seção A do README
 tests/probe-conformance/ # teste de conformidade entre probe.py e probe.mjs (D6.3)
 ```
 
@@ -683,7 +683,7 @@ só se o replay cobrir o que muda. Senão, proposta. O protocolo passa a compara
 ## 9. Perguntas em aberto
 
 Nenhuma. D1–D18 decididas. Rodada 2: mudanças da skill aplicadas em `feat/round2`, aguardando
-o gabarito (sessão cega, `docs/gabarito-prompt.md`) e a execução da rodada.
+a execução da rodada. Gabarito pronto em `docs/gabarito.md` (seção A do README).
 
 ---
 
