@@ -31,6 +31,9 @@ import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from proc_check import check_proc  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCRIPTS = os.path.join(ROOT, ".claude", "skills", "refactor-arch", "scripts")
 PROBES = {
@@ -99,7 +102,32 @@ FIXTURES = {
         "before": (200, J, {"n": 1}),
         "after": (200, J, {"n": 2}),
     },
+    ("GET", "/crash2"): {     # a second baseline error: the merge run must not re-count it (R2-11)
+        "before": "crash",
+        "after": (200, J, {"ok": True}),
+    },
+    ("GET", "/search"): {     # benign sibling of the neutralized entries (R2-5)
+        "before": (200, J, [{"id": 1, "name": "a"}]),
+        "after": (200, J, [{"id": 3, "name": "c"}]),
+    },
+    ("GET", "/search-hostile"): {  # broke the query before; now treated as data, no match
+        "before": (500, J, {"error": "syntax error"}),
+        "after": (200, J, []),
+    },
+    ("GET", "/search-already"): {  # already behaved like the benign entry: demonstrates nothing
+        "before": (200, J, [{"id": 1, "name": "a"}]),
+        "after": (200, J, [{"id": 1, "name": "a"}]),
+    },
+    ("POST", "/raw"): {       # malformed body, sent verbatim (R2-5); the server checks the bytes
+        "before": lambda body: (500, J, {"error": "crash"}) if body == RAW else (200, J, {}),
+        "after": lambda body: (400, J, {"error": "bad json"}) if body == RAW else (200, J, {}),
+    },
+    ("DELETE", "/purge"): {   # destructive: runs alone, merged in (R2-5)
+        "before": (204, {}, ""),
+        "after": (204, {}, ""),
+    },
 }
+RAW = '{"a": '
 
 SURFACE = {
     "version": 2,
@@ -125,6 +153,15 @@ SURFACE = {
         {"id": "get-skipped", "method": "GET", "path": "/items", "skip": True,
          "skipReason": "fixture: skipped on purpose"},
         {"id": "get-late", "method": "GET", "path": "/late"},
+        {"id": "get-crash2", "method": "GET", "path": "/crash2"},
+        {"id": "search", "method": "GET", "path": "/search"},
+        {"id": "search-hostile", "method": "GET", "path": "/search-hostile", "kind": "security",
+         "finding": "AP-02", "expect": "neutralized", "like": "search"},
+        {"id": "search-already", "method": "GET", "path": "/search-already", "kind": "security",
+         "finding": "AP-02", "expect": "neutralized", "like": "search"},
+        {"id": "raw-hostile", "method": "POST", "path": "/raw", "rawBody": '{"a": ',
+         "kind": "security", "finding": "AP-11", "expect": "rejected"},
+        {"id": "purge", "method": "DELETE", "path": "/purge", "destructive": True},
     ],
 }
 
@@ -144,6 +181,12 @@ EXPECTED = {
     "hostile-unfixed": "NOT FIXED",
     "get-skipped": "UNVERIFIED",
     "get-late": "PASS",
+    "get-crash2": "PASS",
+    "search": "PASS",
+    "search-hostile": "FIXED",
+    "search-already": "UNVERIFIED",
+    "raw-hostile": "FIXED",
+    "purge": "PASS",
 }
 
 
@@ -156,8 +199,7 @@ def make_handler(mode):
 
         def _serve(self):
             length = int(self.headers.get("Content-Length") or 0)
-            if length:
-                self.rfile.read(length)
+            received = self.rfile.read(length).decode("utf-8", "replace") if length else ""
             spec = FIXTURES.get((self.command, self.path.split("?")[0]))
             if spec is None:
                 self.send_response(404)
@@ -165,6 +207,8 @@ def make_handler(mode):
                 self.end_headers()
                 return
             response = spec[mode]
+            if callable(response):
+                response = response(received)
             if response == "crash":
                 self.close_connection = True
                 self.connection.shutdown(socket.SHUT_RDWR)
@@ -233,25 +277,57 @@ def main():
     surface = os.path.join(work, "surface.json")
     with open(surface, "w", encoding="utf-8") as handle:
         json.dump(SURFACE, handle)
-    all_but_late = ",".join(e["id"] for e in SURFACE["entries"] if e["id"] != "get-late")
+    first_pass = ",".join(e["id"] for e in SURFACE["entries"]
+                          if e["id"] != "get-late" and not e.get("destructive"))
 
     outputs = {}
+    merge_lines = {}
     try:
         for impl in PROBES:
             base = os.path.join(work, "base-{0}.json".format(impl))
             cur = os.path.join(work, "cur-{0}.json".format(impl))
             code, _, err = run(impl, "capture", "--surface", surface, "--base-url", before_url,
-                               "--out", base, "--only", all_but_late)
+                               "--out", base, "--only", first_pass)
             if code != 0:
                 failures.append("{0}: capture failed ({1}): {2}".format(impl, code, err))
                 continue
-            code, _, err = run(impl, "capture", "--surface", surface, "--base-url", before_url,
-                               "--out", base, "--only", "get-late", "--merge")
+            # The file now holds two transport errors. A merge that captures one healthy entry
+            # must report ITS run, and must not warn about errors it did not produce (R2-11).
+            code, out, err = run(impl, "capture", "--surface", surface, "--base-url", before_url,
+                                 "--out", base, "--only", "get-late", "--merge")
             if code != 0:
                 failures.append("{0}: merge capture failed ({1}): {2}".format(impl, code, err))
                 continue
-            code, out, err = run(impl, "compare", "--surface", surface, "--baseline", base,
-                                 "--base-url", after_url, "--out", cur)
+            if "warning" in err:
+                failures.append("{0}: merge run warned about errors it did not capture: {1}"
+                                .format(impl, err.strip()))
+            merge_lines[impl] = out.replace(base, "<out>")
+            # A destructive entry may not share a run with anything else (protocol 2.2).
+            code, _, _ = run(impl, "capture", "--surface", surface, "--base-url", before_url,
+                             "--out", os.path.join(work, "refused.json"),
+                             "--only", "purge,get-items")
+            if code != 2:
+                failures.append("{0}: destructive entry mixed with others: expected exit 2, "
+                                "got {1}".format(impl, code))
+            code, _, err = run(impl, "capture", "--surface", surface, "--base-url", before_url,
+                               "--out", base, "--only", "purge", "--merge")
+            if code != 0:
+                failures.append("{0}: destructive capture failed ({1}): {2}".format(impl, code,
+                                                                                   err))
+                continue
+            # A full live run leaves the destructive entry out, and says so.
+            code, _, err = run(impl, "compare", "--surface", surface, "--baseline", base,
+                               "--base-url", after_url, "--out", cur)
+            if "destructive" not in err:
+                failures.append("{0}: full run did not note the destructive entry it left out"
+                                .format(impl))
+            code, _, err = run(impl, "capture", "--surface", surface, "--base-url", after_url,
+                               "--out", cur, "--only", "purge", "--merge")
+            if code != 0:
+                failures.append("{0}: destructive replay failed ({1}): {2}".format(impl, code,
+                                                                                  err))
+                continue
+            code, out, err = run(impl, "compare", "--baseline", base, "--current", cur)
             outputs[impl] = {"base": base, "cur": cur, "code": code, "out": out, "err": err}
     finally:
         before.shutdown()
@@ -270,6 +346,13 @@ def main():
             failures.append("exit codes differ: py {0}, node {1}".format(py["code"], node["code"]))
         if py["code"] != 1:
             failures.append("expected exit 1 (regressions present), got {0}".format(py["code"]))
+        if merge_lines.get("py") != merge_lines.get("node"):
+            failures.append("merge capture output differs: {0!r} vs {1!r}".format(
+                merge_lines.get("py"), merge_lines.get("node")))
+        elif not (merge_lines.get("py") or "").startswith("captured 1 entries now "
+                                                         "(1 observed, 0 error, 0 skipped)"):
+            failures.append("merge capture must count only its own run: {0!r}".format(
+                merge_lines.get("py")))
 
         # Cross-implementation: a capture from one must be comparable by the other.
         _, cross_out, _ = run("py", "compare", "--baseline", node["base"], "--current", py["cur"])
@@ -284,13 +367,16 @@ def main():
 
         print(py["out"])
 
+    failures.extend(check_proc())
+
     if failures:
         print("CONFORMANCE FAILED ({0}):".format(len(failures)))
         for failure in failures:
             print("  - " + failure)
         print("work dir kept for inspection: " + work)
         return 1
-    print("CONFORMANCE OK -- both probes agree on {0} fixtures".format(len(EXPECTED)))
+    print("CONFORMANCE OK -- both probes agree on {0} fixtures; both proc tools stop only "
+          "what they started".format(len(EXPECTED)))
     return 0
 
 

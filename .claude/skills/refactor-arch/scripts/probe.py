@@ -38,6 +38,10 @@ Usage
 
   python probe.py compare --baseline reports/baseline.json --current reports/after.json
 
+  # a destructive entry runs alone, on its own fresh boot, merged into the capture
+  python probe.py capture --surface reports/surface.json --base-url http://127.0.0.1:8081 \
+                          --out reports/baseline.json --only purge-archive --merge
+
 Exit codes: 0 = no regressions, 1 = at least one regression, 2 = usage or I/O error.
 """
 
@@ -49,7 +53,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 DEFAULT_TIMEOUT = 10.0
 TEXT_LIMIT_BYTES = 4096
 
@@ -312,6 +316,8 @@ def exercise(base_url, entry, timeout):
     path = entry.get("path") or "/"
     record = {"id": entry_id, "method": method, "path": path,
               "kind": entry.get("kind") or "contract", "finding": entry.get("finding"),
+              "expect": entry.get("expect"), "like": entry.get("like"),
+              "destructive": bool(entry.get("destructive")),
               "state": SKIPPED, "status": None, "contentType": None, "headers": None,
               "shape": None, "error": None}
 
@@ -321,12 +327,16 @@ def exercise(base_url, entry, timeout):
 
     url = base_url.rstrip("/") + path
     body = entry.get("body")
+    raw_body = entry.get("rawBody")
     data = None
     headers = dict(entry.get("headers") or {})
-    if body is not None:
+    if raw_body is not None:
+        # Sent byte for byte: the point is a body the application's parser has not seen.
+        data = raw_body.encode("utf-8")
+    elif body is not None:
         data = json.dumps(body).encode("utf-8")
-        if not any(name.lower() == "content-type" for name in headers):
-            headers["Content-Type"] = "application/json"
+    if data is not None and not any(name.lower() == "content-type" for name in headers):
+        headers["Content-Type"] = "application/json"
 
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
@@ -354,11 +364,29 @@ def exercise(base_url, entry, timeout):
 
 
 def ordered_entries(surface, only=None):
-    """Contract entries first, security entries last: a hostile call may mutate state."""
+    """
+    Contract entries first, security entries last: a hostile call may mutate state.
+
+    A destructive entry is exercised only when --only names it and nothing else (protocol
+    section 2.2): it runs alone, on its own fresh boot, so that what it destroys cannot reach
+    any other entry.
+    """
     entries = [e for e in surface.get("entries", []) if only is None or e.get("id") in only]
+    destructive = [e for e in entries if e.get("destructive")]
+    if destructive:
+        if only is None:
+            entries = [e for e in entries if not e.get("destructive")]
+        elif len(entries) > 1:
+            raise ValueError("a destructive entry must be captured alone (--only <its id>), "
+                             "on its own fresh boot (protocol section 2.2): "
+                             + ",".join(sorted(e.get("id") for e in destructive)))
     regular = [e for e in entries if (e.get("kind") or "contract") != "security"]
     hostile = [e for e in entries if (e.get("kind") or "contract") == "security"]
     return regular + hostile
+
+
+def destructive_ids(surface):
+    return sorted(e.get("id") for e in surface.get("entries", []) if e.get("destructive"))
 
 
 def capture(surface, base_url, timeout, only=None):
@@ -406,6 +434,58 @@ def _describe(record):
     return "transport error" if _state(record) == ERROR else str(record.get("status"))
 
 
+def shapes_compatible(left, right):
+    """
+    Shape equality, except that an empty array matches any array. Used only to compare an
+    entry with a DIFFERENT entry (its benign sibling), whose collection may be empty while
+    this one's is not -- a data difference, not a behaviour difference.
+    """
+    if shapes_equal(left, right):
+        return True
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    if left.get("type") == "array" and right.get("type") == "array":
+        if left.get("items") == "empty" or right.get("items") == "empty":
+            return True
+        return shapes_compatible(left.get("items"), right.get("items"))
+    if left.get("type") == "object" and right.get("type") == "object":
+        a, b = left.get("properties", {}), right.get("properties", {})
+        return set(a) == set(b) and all(shapes_compatible(a[k], b[k]) for k in a)
+    return False
+
+
+def _behaves_like(record, sibling):
+    """An ordinary, non-error answer indistinguishable in shape from the benign sibling's."""
+    return (_state(record) == OBSERVED and _state(sibling) == OBSERVED
+            and (record.get("status") or 0) < 400
+            and record.get("status") == sibling.get("status")
+            and record.get("contentType") == sibling.get("contentType")
+            and shapes_compatible(record.get("shape"), sibling.get("shape")))
+
+
+def compare_neutralized(baseline, current, like_id, like_baseline, like_current):
+    """
+    A hostile entry whose fix changes the answer without rejecting it: the input is now
+    treated as data. Fixed when it behaves like its benign sibling (protocol section 2.1).
+    """
+    if not like_id:
+        return UNVERIFIED, ["expect 'neutralized' needs 'like': the id of a benign sibling entry"]
+    if like_baseline is None or like_current is None \
+            or _state(like_baseline) != OBSERVED or _state(like_current) != OBSERVED:
+        return UNVERIFIED, ["benign sibling '{0}' was not observed in both runs".format(like_id)]
+    if _behaves_like(baseline, like_baseline):
+        return UNVERIFIED, ["baseline already behaved like '{0}': the entry does not "
+                            "demonstrate the finding".format(like_id)]
+    if _behaves_like(current, like_current):
+        return FIXED, ["now behaves like '{0}' (baseline: {1})".format(like_id,
+                                                                      _describe(baseline))]
+    if _is_failure(current) and not _is_failure(baseline):
+        return REGRESSION, ["hostile input now fails with {0} (baseline: {1})".format(
+            _describe(current), _describe(baseline))]
+    return NOT_FIXED, ["still does not behave like '{0}': {1} (baseline: {2})".format(
+        like_id, _describe(current), _describe(baseline))]
+
+
 def compare_security(baseline, current):
     """A hostile entry is expected to change: from accepted (or crashing) to rejected."""
     if _rejected(baseline):
@@ -421,12 +501,15 @@ def compare_security(baseline, current):
         _describe(current), _describe(baseline))]
 
 
-def compare_one(baseline, current):
+def compare_one(baseline, current, baseline_results=None, current_results=None):
     """Return (state, details) for one entry."""
     if baseline is None:
         return UNVERIFIED, ["not present in baseline: capture it against the original "
-                            "(protocol 4.3)"]
+                            "(protocol section 4.3)"]
     if current is None:
+        if baseline.get("destructive"):
+            return UNVERIFIED, ["not exercised in replay: destructive, capture it alone "
+                                "with --only --merge (protocol section 2.2)"]
         return UNVERIFIED, ["not exercised in replay"]
     if _state(baseline) == SKIPPED:
         return UNVERIFIED, ["skipped in baseline: {0}".format(baseline.get("error"))]
@@ -434,6 +517,11 @@ def compare_one(baseline, current):
         return UNVERIFIED, ["skipped in replay: {0}".format(current.get("error"))]
 
     if (baseline.get("kind") or current.get("kind")) == "security":
+        if (baseline.get("expect") or current.get("expect")) == "neutralized":
+            like_id = baseline.get("like") or current.get("like")
+            return compare_neutralized(baseline, current, like_id,
+                                       (baseline_results or {}).get(like_id),
+                                       (current_results or {}).get(like_id))
         return compare_security(baseline, current)
 
     if _state(baseline) == ERROR:
@@ -494,7 +582,8 @@ def compare(baseline_doc, current_doc):
     rows = []
     for entry_id in sorted(set(baseline_results) | set(current_results)):
         state, details = compare_one(baseline_results.get(entry_id),
-                                     current_results.get(entry_id))
+                                     current_results.get(entry_id),
+                                     baseline_results, current_results)
         rows.append({"id": entry_id, "state": state, "details": details})
     return rows
 
@@ -536,6 +625,16 @@ def summarize(rows):
     return counts
 
 
+def _note_destructive(surface, only):
+    if only is not None:
+        return
+    pending = destructive_ids(surface)
+    if pending:
+        print("note: {0} destructive entries not exercised: {1} -- capture each alone, on a "
+              "fresh boot, with --only <id> --merge (protocol section 2.2)".format(
+                  len(pending), ",".join(pending)), file=sys.stderr)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Baseline-then-replay surface probe (see 06-validation-protocol.md). "
@@ -571,30 +670,36 @@ def main(argv=None):
     try:
         if args.mode == "capture":
             only = set(args.only.split(",")) if args.only else None
-            document = capture(read_json(args.surface), args.base_url, args.timeout, only)
+            surface = read_json(args.surface)
+            document = capture(surface, args.base_url, args.timeout, only)
+            # Counted before merging: the numbers describe THIS run, not the whole file.
+            states = [r["state"] for r in document["results"].values()]
             if args.merge:
                 previous = read_json(args.out)
                 previous.setdefault("results", {}).update(document["results"])
                 previous["version"] = PROTOCOL_VERSION
                 document = previous
             write_json(args.out, document)
-            states = [r["state"] for r in document["results"].values()]
-            print("captured {0} entries ({1} observed, {2} error, {3} skipped) -> {4}".format(
-                len(states), states.count(OBSERVED), states.count(ERROR),
-                states.count(SKIPPED), args.out))
+            print("captured {0} entries now ({1} observed, {2} error, {3} skipped); "
+                  "{4} in file -> {5}".format(len(states), states.count(OBSERVED),
+                                              states.count(ERROR), states.count(SKIPPED),
+                                              len(document["results"]), args.out))
             if states.count(ERROR) > 1:
-                print("warning: several transport errors -- if one entry crashed the "
-                      "application, the entries after it failed only because it was down "
-                      "(protocol 3.2)", file=sys.stderr)
+                print("warning: several transport errors in this run -- if one entry crashed "
+                      "the application, the entries after it failed only because it was down "
+                      "(protocol section 3.1)", file=sys.stderr)
+            _note_destructive(surface, only)
             return 0
 
         baseline_doc = read_json(args.baseline)
         if args.current:
             current_doc = read_json(args.current)
         elif args.base_url and args.surface:
-            current_doc = capture(read_json(args.surface), args.base_url, args.timeout)
+            surface = read_json(args.surface)
+            current_doc = capture(surface, args.base_url, args.timeout)
             if args.out:
                 write_json(args.out, current_doc)
+            _note_destructive(surface, None)
         else:
             print("compare needs either --current, or both --base-url and --surface",
                   file=sys.stderr)

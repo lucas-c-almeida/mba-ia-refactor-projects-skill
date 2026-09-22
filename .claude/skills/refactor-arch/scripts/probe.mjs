@@ -41,13 +41,17 @@
  *
  *   node probe.mjs compare --baseline reports/baseline.json --current reports/after.json
  *
+ *   # a destructive entry runs alone, on its own fresh boot, merged into the capture
+ *   node probe.mjs capture --surface reports/surface.json --base-url http://127.0.0.1:8081 \
+ *                          --out reports/baseline.json --only purge-archive --merge
+ *
  * Exit codes: 0 = no regressions, 1 = at least one regression, 2 = usage or I/O error.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
 
-const PROTOCOL_VERSION = 2;
+const PROTOCOL_VERSION = 3;
 const DEFAULT_TIMEOUT_SECONDS = 10;
 const TEXT_LIMIT_BYTES = 4096;
 
@@ -312,6 +316,7 @@ async function exercise(baseUrl, entry, timeoutSeconds) {
   const path = entry.path ?? '/';
   const record = {
     id, method, path, kind: entry.kind ?? 'contract', finding: entry.finding ?? null,
+    expect: entry.expect ?? null, like: entry.like ?? null, destructive: Boolean(entry.destructive),
     state: SKIPPED, status: null, contentType: null, headers: null, shape: null, error: null,
   };
 
@@ -322,11 +327,14 @@ async function exercise(baseUrl, entry, timeoutSeconds) {
 
   const headers = { ...(entry.headers ?? {}) };
   let body;
-  if (entry.body !== undefined && entry.body !== null) {
+  if (entry.rawBody !== undefined && entry.rawBody !== null) {
+    // Sent byte for byte: the point is a body the application's parser has not seen.
+    body = entry.rawBody;
+  } else if (entry.body !== undefined && entry.body !== null) {
     body = JSON.stringify(entry.body);
-    if (!Object.keys(headers).some((h) => h.toLowerCase() === 'content-type')) {
-      headers['Content-Type'] = 'application/json';
-    }
+  }
+  if (body !== undefined && !Object.keys(headers).some((h) => h.toLowerCase() === 'content-type')) {
+    headers['Content-Type'] = 'application/json';
   }
 
   // A harness must never hang: a hung probe is indistinguishable from a broken app.
@@ -351,12 +359,31 @@ async function exercise(baseUrl, entry, timeoutSeconds) {
   return record;
 }
 
-/** Contract entries first, security entries last: a hostile call may mutate state. */
+/**
+ * Contract entries first, security entries last: a hostile call may mutate state.
+ *
+ * A destructive entry is exercised only when --only names it and nothing else (protocol
+ * section 2.2): it runs alone, on its own fresh boot, so that what it destroys cannot reach
+ * any other entry.
+ */
 function orderedEntries(surface, only) {
-  const entries = (surface.entries ?? []).filter((e) => !only || only.has(e.id));
+  let entries = (surface.entries ?? []).filter((e) => !only || only.has(e.id));
+  const destructive = entries.filter((e) => e.destructive);
+  if (destructive.length) {
+    if (!only) {
+      entries = entries.filter((e) => !e.destructive);
+    } else if (entries.length > 1) {
+      throw new Error('a destructive entry must be captured alone (--only <its id>), '
+        + 'on its own fresh boot (protocol section 2.2): '
+        + destructive.map((e) => e.id).sort(byCodePoint).join(','));
+    }
+  }
   const isSecurity = (e) => (e.kind ?? 'contract') === 'security';
   return [...entries.filter((e) => !isSecurity(e)), ...entries.filter(isSecurity)];
 }
+
+const destructiveIds = (surface) => (surface.entries ?? [])
+  .filter((e) => e.destructive).map((e) => e.id).sort(byCodePoint);
 
 async function capture(surface, baseUrl, timeoutSeconds, only) {
   const results = {};
@@ -389,6 +416,70 @@ const rejected = (record) => stateOf(record) === OBSERVED
   && (record.status ?? 0) >= 400 && (record.status ?? 0) < 500;
 const describe = (record) => (stateOf(record) === ERROR ? 'transport error' : String(record.status));
 
+/**
+ * Shape equality, except that an empty array matches any array. Used only to compare an
+ * entry with a DIFFERENT entry (its benign sibling), whose collection may be empty while
+ * this one's is not -- a data difference, not a behaviour difference.
+ */
+function shapesCompatible(left, right) {
+  if (shapesEqual(left, right)) return true;
+  const isObj = (d) => d !== null && typeof d === 'object';
+  if (!isObj(left) || !isObj(right)) return false;
+  if (left.type === 'array' && right.type === 'array') {
+    if (left.items === 'empty' || right.items === 'empty') return true;
+    return shapesCompatible(left.items, right.items);
+  }
+  if (left.type === 'object' && right.type === 'object') {
+    const a = left.properties ?? {};
+    const b = right.properties ?? {};
+    const keysA = Object.keys(a).sort(byCodePoint);
+    const keysB = Object.keys(b).sort(byCodePoint);
+    return keysA.length === keysB.length && keysA.every((k, i) => k === keysB[i])
+      && keysA.every((k) => shapesCompatible(a[k], b[k]));
+  }
+  return false;
+}
+
+/** An ordinary, non-error answer indistinguishable in shape from the benign sibling's. */
+const behavesLike = (record, sibling) => stateOf(record) === OBSERVED && stateOf(sibling) === OBSERVED
+  && (record.status ?? 0) < 400
+  && record.status === sibling.status
+  && record.contentType === sibling.contentType
+  && shapesCompatible(record.shape, sibling.shape);
+
+/**
+ * A hostile entry whose fix changes the answer without rejecting it: the input is now
+ * treated as data. Fixed when it behaves like its benign sibling (protocol section 2.1).
+ */
+function compareNeutralized(baseline, current, likeId, likeBaseline, likeCurrent) {
+  if (!likeId) {
+    return { state: UNVERIFIED, details: ["expect 'neutralized' needs 'like': the id of a benign sibling entry"] };
+  }
+  if (!likeBaseline || !likeCurrent
+      || stateOf(likeBaseline) !== OBSERVED || stateOf(likeCurrent) !== OBSERVED) {
+    return { state: UNVERIFIED, details: [`benign sibling '${likeId}' was not observed in both runs`] };
+  }
+  if (behavesLike(baseline, likeBaseline)) {
+    return {
+      state: UNVERIFIED,
+      details: [`baseline already behaved like '${likeId}': the entry does not demonstrate the finding`],
+    };
+  }
+  if (behavesLike(current, likeCurrent)) {
+    return { state: FIXED, details: [`now behaves like '${likeId}' (baseline: ${describe(baseline)})`] };
+  }
+  if (isFailure(current) && !isFailure(baseline)) {
+    return {
+      state: REGRESSION,
+      details: [`hostile input now fails with ${describe(current)} (baseline: ${describe(baseline)})`],
+    };
+  }
+  return {
+    state: NOT_FIXED,
+    details: [`still does not behave like '${likeId}': ${describe(current)} (baseline: ${describe(baseline)})`],
+  };
+}
+
 /** A hostile entry is expected to change: from accepted (or crashing) to rejected. */
 function compareSecurity(baseline, current) {
   if (rejected(baseline)) {
@@ -412,14 +503,21 @@ function compareSecurity(baseline, current) {
   };
 }
 
-function compareOne(baseline, current) {
+function compareOne(baseline, current, baselineResults = {}, currentResults = {}) {
   if (!baseline) {
     return {
       state: UNVERIFIED,
-      details: ['not present in baseline: capture it against the original (protocol 4.3)'],
+      details: ['not present in baseline: capture it against the original (protocol section 4.3)'],
     };
   }
-  if (!current) return { state: UNVERIFIED, details: ['not exercised in replay'] };
+  if (!current) {
+    return baseline.destructive
+      ? {
+        state: UNVERIFIED,
+        details: ['not exercised in replay: destructive, capture it alone with --only --merge (protocol section 2.2)'],
+      }
+      : { state: UNVERIFIED, details: ['not exercised in replay'] };
+  }
   if (stateOf(baseline) === SKIPPED) {
     return { state: UNVERIFIED, details: [`skipped in baseline: ${baseline.error}`] };
   }
@@ -427,7 +525,14 @@ function compareOne(baseline, current) {
     return { state: UNVERIFIED, details: [`skipped in replay: ${current.error}`] };
   }
 
-  if ((baseline.kind ?? current.kind) === 'security') return compareSecurity(baseline, current);
+  if ((baseline.kind ?? current.kind) === 'security') {
+    if ((baseline.expect ?? current.expect) === 'neutralized') {
+      const likeId = baseline.like ?? current.like;
+      return compareNeutralized(baseline, current, likeId,
+        likeId ? baselineResults[likeId] : undefined, likeId ? currentResults[likeId] : undefined);
+    }
+    return compareSecurity(baseline, current);
+  }
 
   if (stateOf(baseline) === ERROR) {
     return isFailure(current)
@@ -486,7 +591,9 @@ function compare(baselineDoc, currentDoc) {
   const currentResults = currentDoc.results ?? {};
   const ids = [...new Set([...Object.keys(baselineResults), ...Object.keys(currentResults)])]
     .sort(byCodePoint);
-  return ids.map((id) => ({ id, ...compareOne(baselineResults[id], currentResults[id]) }));
+  return ids.map((id) => ({
+    id, ...compareOne(baselineResults[id], currentResults[id], baselineResults, currentResults),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -535,6 +642,15 @@ function summarize(rows) {
   return counts;
 }
 
+function noteDestructive(surface, only) {
+  if (only) return;
+  const pending = destructiveIds(surface);
+  if (pending.length) {
+    console.error(`note: ${pending.length} destructive entries not exercised: ${pending.join(',')} `
+      + '-- capture each alone, on a fresh boot, with --only <id> --merge (protocol section 2.2)');
+  }
+}
+
 const USAGE = `Baseline-then-replay surface probe (see 06-validation-protocol.md).
 This script never boots the application.
 
@@ -560,7 +676,11 @@ async function main() {
         return 2;
       }
       const only = typeof options.only === 'string' ? new Set(options.only.split(',')) : null;
-      let document = await capture(readJson(options.surface), options['base-url'], timeout, only);
+      const surface = readJson(options.surface);
+      let document = await capture(surface, options['base-url'], timeout, only);
+      // Counted before merging: the numbers describe THIS run, not the whole file.
+      const states = Object.values(document.results).map((r) => r.state);
+      const count = (s) => states.filter((x) => x === s).length;
       if (options.merge) {
         const previous = readJson(options.out);
         previous.results = { ...(previous.results ?? {}), ...document.results };
@@ -568,14 +688,15 @@ async function main() {
         document = previous;
       }
       writeJson(options.out, document);
-      const states = Object.values(document.results).map((r) => r.state);
-      const count = (s) => states.filter((x) => x === s).length;
-      console.log(`captured ${states.length} entries (${count(OBSERVED)} observed, `
-        + `${count(ERROR)} error, ${count(SKIPPED)} skipped) -> ${options.out}`);
+      console.log(`captured ${states.length} entries now (${count(OBSERVED)} observed, `
+        + `${count(ERROR)} error, ${count(SKIPPED)} skipped); `
+        + `${Object.keys(document.results).length} in file -> ${options.out}`);
       if (count(ERROR) > 1) {
-        console.error('warning: several transport errors -- if one entry crashed the application, '
-          + 'the entries after it failed only because it was down (protocol 3.2)');
+        console.error('warning: several transport errors in this run -- if one entry crashed '
+          + 'the application, the entries after it failed only because it was down '
+          + '(protocol section 3.1)');
       }
+      noteDestructive(surface, only);
       return 0;
     }
 
@@ -589,8 +710,10 @@ async function main() {
     if (options.current) {
       currentDoc = readJson(options.current);
     } else if (options['base-url'] && options.surface) {
-      currentDoc = await capture(readJson(options.surface), options['base-url'], timeout, null);
+      const surface = readJson(options.surface);
+      currentDoc = await capture(surface, options['base-url'], timeout, null);
       if (options.out) writeJson(options.out, currentDoc);
+      noteDestructive(surface, null);
     } else {
       console.error('compare needs either --current, or both --base-url and --surface');
       return 2;
