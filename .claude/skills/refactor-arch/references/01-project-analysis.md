@@ -144,8 +144,20 @@ Then handle what boot needs:
 - **Configuration.** If required environment variables are missing, look for a `.env.example`,
   `.env.sample`, a settings template or the defaults in code. Use placeholder values for the
   capture run and record that you did. Never invent a credential for a real external service.
-- **Port.** Prefer an explicitly assigned, free, non-default port so a developer's already-running
-  instance is not mistaken for yours. Pass it the way the app expects.
+- **Port.** Record how the port is set: an override the code already reads (flag, environment
+  variable, settings key), or a value fixed in source. A fixed port is not a reason to edit the
+  original — `06-validation-protocol.md` §1.2 gives the order to follow. Prefer a free, non-default
+  port where an override exists, so a developer's already-running instance is not mistaken for
+  yours.
+- **Runtime environment.** If the target's runtime is present but the dependencies the target
+  **declares** are not installed, install exactly those — from the lockfile when there is one, at
+  the resolved versions — into an isolated location that is not part of the target: a virtual
+  environment or dependency directory inside the snapshot's run copy, or one that `.gitignore`
+  already excludes. Record in the report what was installed, where and from which file. This is not
+  "adding a dependency": the dependency set is the one the project already declares. **Adding** a
+  package the project does not declare — for the harness, for convenience, to make boot work —
+  stays forbidden. If the declared dependencies cannot be installed (no network, a resolution
+  failure), the baseline is `UNVERIFIED`; declare it.
 - **Readiness.** Do not assume the process is ready when it is launched. Poll a cheap surface entry —
   or the process's own readiness/health entry if one exists — until it answers, with a bounded
   timeout. For a CLI or library, readiness is trivially true after the runtime starts.
@@ -157,7 +169,8 @@ Then handle what boot needs:
   capture a baseline — that is already a modification, and it destroys the comparison.
 
 Record the exact boot command, its working directory, environment and port in the Phase 1 output —
-Phase 3 replays it twice.
+Phase 3 replays it twice. Also record whether the working tree has uncommitted changes: the
+snapshot copies the tree as found, and the report should say what the audit read.
 
 ## 7. Database and schema detection
 

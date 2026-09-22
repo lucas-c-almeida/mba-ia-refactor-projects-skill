@@ -32,6 +32,8 @@ Files:   <N> analyzed | ~<L> lines of code
 Date:    <YYYY-MM-DD HH:MM>
 Mode:    <full | --offline>
 Confirmation: <pending human review | human-confirmed: y | human-confirmed: CRITICAL+HIGH only | --yes (auto-approved, not human-reviewed)>
+Tree:    <clean at <commit> | uncommitted changes present — the audit read the working tree as found>
+Runtime: <as found | installed the declared dependencies from <file> into <location outside the target>>
 
 ## Summary
 CRITICAL: <n> | HIGH: <n> | MEDIUM: <n> | LOW: <n>
@@ -57,12 +59,24 @@ Contract: <safe | contract-changing: what a client would observe differently>
 ### [LOW] <...>
 ...
 
-## Deprecated API Verification
-<One line per checked item. Every entry cites evidence tier and, for tiers B and C, source + date.>
+## Catalog Coverage
+<One row per catalog entry, every entry, including those with no hit. This is how a reader tells
+"looked and found nothing" from "never looked".>
 
-| Item | Version in use | Evidence tier | Source | Looked up | Result |
-|---|---|---|---|---|---|
-| <package or API> | <resolved version> | <A/B/C> | <runtime warning / registry / advisory / docs URL> | <YYYY-MM-DD or "n/a — local"> | <finding id, or "no issue found"> |
+| Entry | Result |
+|---|---|
+| AP-01 | <n finding(s): ids of the findings above> |
+| AP-02 | <none — what was checked, in a few words> |
+| ... | ... |
+| AP-19 | <n finding(s), or none, or UNVERIFIED — reason> |
+
+## Dependency and Deprecated API Verification
+<One line per checked item, for AP-14 (deprecation) and AP-19 (advisories). Every entry cites
+evidence tier and, for tiers B and C, source + date.>
+
+| Item | Version in use | Check | Evidence tier | Source | Looked up | Result |
+|---|---|---|---|---|---|---|
+| <package or API> | <resolved version> | <deprecation / advisory> | <A/B/C> | <runtime warning / registry / advisory id / docs URL> | <YYYY-MM-DD or "n/a — local"> | <finding id, or "no issue found"> |
 
 <If any check could not be completed, list it here as UNVERIFIED and repeat it in the
 Verification Coverage block below.>
@@ -144,6 +158,10 @@ Situations that require it:
 | No JSON-capable runtime for the harness | Floor mode; only status/exit-code parity is comparable — response shapes unverified |
 | A surface entry could not be exercised safely or deterministically | Name the entry and the reason; it counts as `UNVERIFIED`, not as a pass |
 | A part of the tree could not be read | Name it and say it was not audited |
+| The declared dependencies could not be installed, or the snapshot could not be created | The original could not run: Tier-A deprecation evidence, the baseline and every behavioural check are unverified |
+| The harness was generated for an unshipped ecosystem | Validation ran on code that has not passed the shipped probes' conformance test |
+| A baseline from protocol version 1 was compared | Contract headers were not compared; transport errors in that baseline read as skipped |
+| A text body exceeded the skeleton limit | Its content was compared as `opaque` — only its presence |
 
 Each line names **the check**, **why it did not run**, and **what is therefore unverified**.
 A labelled gap is honest. An unlabelled one is indistinguishable from success.
@@ -199,7 +217,8 @@ PHASE 3: REFACTORING COMPLETE
 ## Validation
   ✓ Application boots without errors
   ✓ Public surface replayed: <P> PASS, <R> REGRESSION, <F> PRE-EXISTING FAILURE, <U> UNVERIFIED
-  ✓ Findings resolved: <n>/<total>  (<k> proposed, not applied)
+    Security entries: <X> FIXED, <Y> NOT FIXED
+  ✓ Findings resolved: <r>/<total>  (<p> proposed, <u> unresolved)
   <re-audit line>
 
 ## Proposed, Not Applied
@@ -210,9 +229,24 @@ PHASE 3: REFACTORING COMPLETE
 ================================
 ```
 
-`✓` only for something you observed to pass. `✗` for a genuine failure. A surface entry that failed
-identically before and after the refactoring is `PRE-EXISTING FAILURE` — neither a pass nor a
-regression.
+`✓` only for something you observed to pass. `✗` for a genuine failure. `○` for a true statement
+that is not a success. A surface entry that failed before and after the refactoring is
+`PRE-EXISTING FAILURE` — neither a pass nor a regression.
+
+**The findings line has exactly three buckets, and they add up.** Every Phase 2 finding is in one:
+
+- `resolved` — all of it is gone, and the re-audit agrees;
+- `proposed` — it sits under `PROPOSED, NOT APPLIED`, declined by the contract gate;
+- `unresolved` — anything else.
+
+There is no "partially resolved". A finding with any part remaining is not resolved: it is
+`unresolved`, or `proposed` when what remains is exactly what the contract gate held back, and its
+entry in the final report says which part was fixed and which was not. `<r> + <p> + <u>` equals
+`<total>`. The line is `✓` only when `<r>` equals `<total>`; otherwise `○`.
+
+The `Security entries` line appears only when the surface inventory has security entries. A
+`NOT FIXED` there on a finding counted as `resolved` is a contradiction: move the finding to
+`unresolved`.
 
 ---
 
@@ -241,6 +275,10 @@ Rules that make the line mean something:
   a decision that was made on purpose and explained; the first is a transformation that failed or a
   problem the refactoring introduced. Collapsing them into one number hides the only one that
   needs action.
+- **Every `unresolved` re-audit finding carries its origin**, listed under the Phase 3 block:
+  `failed` (a Phase 2 finding the refactoring did not fully eliminate), `introduced` (created by
+  the refactoring) or `missed-in-phase-2` (present in the original, absent from the Phase 2
+  report). The last one measures the audit, not the refactoring; keep it visible and separate.
 - **A partial re-audit never produces the first form**, whatever it found. Reduced coverage cannot
   support a claim about absence. `--offline` disables the live deprecated-API lookup, so any
   offline run is partial by definition.

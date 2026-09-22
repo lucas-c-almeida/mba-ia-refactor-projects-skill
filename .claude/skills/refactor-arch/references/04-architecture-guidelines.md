@@ -190,8 +190,10 @@ observes is **not applied**. It is recorded under `PROPOSED, NOT APPLIED` with i
 - changing a field's type, or its serialization format;
 - making a previously optional parameter required, or removing an accepted parameter;
 - changing pagination, ordering or default filtering semantics that a client may depend on;
-- tightening validation so that previously accepted requests are now rejected;
-- changing the error response shape.
+- rejecting requests that legitimate clients send today — new authentication, or validation
+  stricter than what those clients satisfy (see the legitimate-use test below);
+- changing the error response shape;
+- a dependency upgrade that changes observable behaviour the replay cannot cover (see below).
 
 **Does not count (applied):**
 
@@ -202,17 +204,33 @@ observes is **not applied**. It is recorded under `PROPOSED, NOT APPLIED` with i
 - renaming an internal identifier, file or module not part of the public surface;
 - replacing a magic value with a named constant;
 - centralizing error handling **while preserving the observable status codes and body shapes**;
-- adding a missing authorization check — with one caveat, below;
+- a new rejection that passes the legitimate-use test below;
 - deleting dead code;
 - replacing a deprecated API with its documented equivalent, when the observable behaviour is the
-  same.
+  same;
+- a dependency upgrade within the same major version.
 
-**The security caveat.** Adding a missing authorization check (AP-04) changes what an *illegitimate*
-client observes, which is the point. It is applied. But if you cannot determine who the legitimate
-principals are without guessing, do not invent a policy: apply what you can prove (for example,
-scoping a lookup to the authenticated principal, which is unambiguous) and propose the rest. Apply
-the same reasoning to tightened validation: reject what is unambiguously invalid; propose rules that
-require a product decision.
+**The legitimate-use test — authorization and validation.** A fix that makes the application reject
+a request is decided by one question: *who gets the new rejection?*
+
+| Situation | Who is rejected | Decision |
+|---|---|---|
+| The application has **no identity model**: no login, no session, no token. Every client is anonymous. | Every current client, legitimate ones included — none of them sends credentials, because none exist | **Contract-changing.** Propose: the identity model, who the principals are, and the policy. Nothing can separate a good caller from a bad one without a product decision. |
+| The application **already identifies callers**, but an operation does not check that the caller may act on the resource (a missing ownership or role check). | Only a caller acting on someone else's resource or above their role | **Safe.** Apply: scope the lookup to the verified principal and enforce the policy on the operation (RP-04). |
+| A **value no legitimate client sends**: invalid on its face, whatever the product decides — an injection payload, a malformed identifier, a value of the wrong type, an unknown enumerated value, a value that breaks an invariant the domain already states (a period that ends before it starts). | Only illegitimate or broken requests | **Safe.** Apply it (RP-02, RP-11), and cover it with a security entry in the surface inventory (`06-validation-protocol.md` §2.1). |
+| A **rule that requires a product decision**: a maximum, a format stricter than what clients send today, a newly required field. | Possibly legitimate clients | **Contract-changing.** Propose it. |
+
+This is the same reasoning that makes parameterizing a query safe: it changes only what an
+illegitimate request observes. The decision depends on facts you can read in the code — whether an
+identity model exists, whether the value could come from a legitimate client — never on a guess
+about who the principals are. When those facts are ambiguous, propose.
+
+**Dependency upgrades.** A patch or minor upgrade within the same major version is safe. A major
+upgrade, or one whose changelog announces a behaviour change, is safe **only** if the replay
+exercises the behaviour that changes — the contract headers of `06-validation-protocol.md` §5.3
+included, so cross-origin and cookie behaviour can be checked. If the changed behaviour is outside
+what the replay covers, propose the upgrade and name what would have to be verified. A security
+advisory raises the finding's severity; it does not waive this rule.
 
 **Why the gate exists.** "Nothing broke" is only a verifiable claim if the contract was preserved
 (see `06-validation-protocol.md`). Deciding on the team's behalf what may break is not an automated

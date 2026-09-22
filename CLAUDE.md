@@ -194,10 +194,17 @@ instructions.md                # enunciado original, preservado intacto (era REA
 CLAUDE.md                      # esta especificação viva
 docs/decisions.md              # registro ADR das decisões, com alternativas e custos
 docs/rounds/round<K>-report.md # relatório consolidado de cada rodada
+docs/rounds/round<K>-changes.md# lista de mudanças congelada antes da rodada K (D12, enfraquecida)
 docs/runs/p<N>-iter<K>.md      # transcript de cada rodada                 (D3)
 docs/evals/rubric.md           # rubrica de avaliação                      (D8)
 docs/evals/run-p<N>-iter<K>.md # scorecard preenchido por rodada           (D8)
+docs/gabarito.md               # análise manual (gabarito, D12); cópia na seção A do README
+tests/probe-conformance/       # teste de conformidade entre os probes (D6.3) — exceção: fica na raiz
 ```
+
+O teste de conformidade fica **fora** da skill de propósito: é ferramenta de manutenção de quem
+escreve a skill, não algo que a skill leva para dentro do alvo. Rode-o sempre que um dos probes ou
+o `06-validation-protocol.md` mudar: `python tests/probe-conformance/run.py`.
 
 Dentro de cada projeto-alvo, a skill gera `<alvo>/reports/audit-*.md` (D5); a entrega copia o
 `audit-latest.md` de cada um para `reports/audit-project-N.md` na raiz.
@@ -628,11 +635,56 @@ três casos, então o avaliador reconhece o padrão sem que nada seja afirmado s
 **Arquivos afetados:** `SKILL.md` §3d e bloco de saída da Fase 3;
 `references/03-report-template.md` §"The re-audit line"; `README.md` §B, Desafio 4.
 
+**D14.1 — Emenda da rodada 2.** (a) `Findings resolved` tem exatamente três baldes, que somam o
+total: `resolved`, `proposed`, `unresolved`. **Não existe "parcial".** Um finding com qualquer
+parte restante é `unresolved` (ou `proposed`, se o resto é o que o gate segurou), e a descrição diz
+o que foi e o que não foi corrigido. (b) Cada `unresolved` da re-auditoria carrega sua origem:
+`failed`, `introduced` ou `missed-in-phase-2`. A última mede o recall da Fase 2, não a refatoração.
+
+---
+
+### Decisões da rodada 2 (D15–D18)
+
+> Tomadas depois de ler `docs/rounds/round1-report.md` e antes do gabarito, sem ler o código dos
+> projetos. Lista congelada em `docs/rounds/round2-changes.md` antes de qualquer edição. ADRs completos
+> em `docs/decisions.md`.
+
+### D15 — Autorização e validação: **teste do uso legítimo** ✅ decidido
+
+Pergunta que decide: *quem recebe a nova rejeição?* Sem modelo de identidade, todo cliente atual
+receberia o `401`: é mudança de contrato e vira proposta. Com identidade, mas sem checagem de dono
+ou papel, só o uso ilegítimo é rejeitado: é seguro e é aplicado. Valor inválido em si mesmo é
+rejeitado; regra que exige decisão de produto é proposta. Na dúvida, propõe. É a regra da D7 para
+SQL injection escrita por extenso. Resolve a contradição entre `SKILL.md` e guidelines §6/RP-04
+(problema #6).
+
+### D16 — O original roda de um **snapshot intocado**, fora do alvo ✅ decidido
+
+No início da Fase 2, o alvo é copiado para um diretório temporário. Toda execução do **original**
+(deprecation na Fase 2, baseline, captura tardia) roda numa cópia nova desse snapshot. A aplicação
+refatorada roda no alvo. A regra de escrita da D5/D10 fica absoluta, e artefatos de runtime nunca
+tocam o alvo antes do gate. Porta: override existente → porta nativa em sequência → launcher fora
+da árvore. O original nunca é editado. Resolve os problemas #1, #3 e #12.
+
+### D17 — **Entradas de segurança** na superfície ✅ decidido
+
+`kind: "security"`, com `finding: "AP-xx"` obrigatório e `expect: "rejected"`. Resultados:
+`FIXED` / `NOT FIXED` / `REGRESSION` / `UNVERIFIED`. Nunca viram `REGRESSION` só por mudar de
+status. Rodam depois das entradas de contrato. `NOT FIXED` num finding contado como resolvido move
+o finding para `unresolved`. Resolve o problema #9.
+
+### D18 — Upgrade de dependência versus contrato ✅ decidido
+
+Patch ou minor dentro da major: seguro. Major, ou changelog com mudança de comportamento: seguro
+só se o replay cobrir o que muda. Senão, proposta. O protocolo passa a comparar headers de contrato
+(`Location`, `WWW-Authenticate`, `Access-Control-*`, nomes de `Set-Cookie`). Resolve o problema #10.
+
 ---
 
 ## 9. Perguntas em aberto
 
-Nenhuma. D1–D14 decididas. Skill escrita e congelada, aguardando commit.
+Nenhuma. D1–D18 decididas. Rodada 2: mudanças da skill aplicadas em `feat/round2`, aguardando
+o gabarito (sessão cega, `docs/gabarito-prompt.md`) e a execução da rodada.
 
 ---
 
