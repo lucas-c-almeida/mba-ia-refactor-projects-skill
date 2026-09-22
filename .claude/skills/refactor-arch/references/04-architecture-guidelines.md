@@ -192,8 +192,13 @@ observes is **not applied**. It is recorded under `PROPOSED, NOT APPLIED` with i
 - changing pagination, ordering or default filtering semantics that a client may depend on;
 - rejecting requests that legitimate clients send today — new authentication, or validation
   stricter than what those clients satisfy (see the legitimate-use test below);
-- changing the error response shape;
-- a dependency upgrade that changes observable behaviour the replay cannot cover (see below).
+- changing the status or the body shape of an error the application produces **on purpose** — one
+  its own code raises and formats (see "The error contract" below);
+- removing a field that leaks a secret, rather than masking its value;
+- a dependency upgrade that changes observable behaviour the replay cannot cover (see below);
+- a fix that needs a **runtime dependency the application does not have today** — a production
+  server, a new library, a replacement package: whoever deploys the application must now install
+  something else.
 
 **Does not count (applied):**
 
@@ -204,6 +209,10 @@ observes is **not applied**. It is recorded under `PROPOSED, NOT APPLIED` with i
 - renaming an internal identifier, file or module not part of the public surface;
 - replacing a magic value with a named constant;
 - centralizing error handling **while preserving the observable status codes and body shapes**;
+- replacing the framework's **default** error output — what answers when nothing handled the
+  error — with the centralized handler, keeping the status code;
+- masking the value of a leaked secret or credential (a password hash, a key, a token) while
+  keeping the field and its type: no legitimate client reads a secret back;
 - a new rejection that passes the legitimate-use test below;
 - deleting dead code;
 - replacing a deprecated API with its documented equivalent, when the observable behaviour is the
@@ -225,12 +234,26 @@ illegitimate request observes. The decision depends on facts you can read in the
 identity model exists, whether the value could come from a legitimate client — never on a guess
 about who the principals are. When those facts are ambiguous, propose.
 
+**The error contract.** Clients program against the errors an application **means** to produce: a
+`404` with a documented body, a validation error listing the fields. Those are contract, status and
+shape alike. Nobody programs against the page a framework prints when nothing handled an
+exception — its body is an accident, often a leak (catalog AP-18). The observable test is who
+produced the body: the application's own handler, or the framework's default. Replace the
+default freely, keeping its status; change the application's own error responses only through a
+proposal.
+
+**Findings the audit missed.** A `missed-in-phase-2` item found by the re-audit goes through this
+gate like any other: if its fix is contract-changing, or needs a product decision, it is
+proposed — not forced into `unresolved`.
+
 **Dependency upgrades.** A patch or minor upgrade within the same major version is safe. A major
 upgrade, or one whose changelog announces a behaviour change, is safe **only** if the replay
 exercises the behaviour that changes — the contract headers of `06-validation-protocol.md` §5.3
 included, so cross-origin and cookie behaviour can be checked. If the changed behaviour is outside
 what the replay covers, propose the upgrade and name what would have to be verified. A security
-advisory raises the finding's severity; it does not waive this rule.
+advisory raises the finding's severity; it does not waive this rule. The same rule decides a fix
+that exists only on a later major line: it is applied when the replay covers the change, and
+proposed when it does not — never proposed by default (RP-18).
 
 **Why the gate exists.** "Nothing broke" is only a verifiable claim if the contract was preserved
 (see `06-validation-protocol.md`). Deciding on the team's behalf what may break is not an automated

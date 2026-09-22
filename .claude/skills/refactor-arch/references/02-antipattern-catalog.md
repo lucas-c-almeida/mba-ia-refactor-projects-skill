@@ -40,6 +40,20 @@ and mention the others in `Description` rather than filing near-duplicates on th
 that is a God Module (AP-03) containing a hardcoded secret (AP-01) and an injection (AP-02) is three
 findings only if the lines differ; they usually do.
 
+**AP-03 or AP-05 — one finding per module, decided in this order.** Both entries describe a module
+that mixes delivery, rules and persistence, and without a rule the same module yields one finding
+or two, at HIGH or at CRITICAL, depending on which entry was read first.
+
+1. The module holds **several unrelated domain concepts**, or exceeds the AP-03 size threshold
+   while mixing two or more responsibility categories → **AP-03**. The mixed handlers are named in
+   its `Description:`; no separate AP-05 on the same module.
+2. Otherwise — one domain concept, below the threshold, handlers carrying rules or persistence →
+   **AP-05**, at its own severity. It is not a God Module and is not escalated as one.
+3. AP-05 findings in **other** modules are filed normally, even when one module already has AP-03.
+
+The rule keeps the count stable across runs: the same code produces the same number of findings
+whichever entry the sweep reaches first.
+
 ### Index
 
 | Id | Name | Default |
@@ -182,9 +196,9 @@ one occurrence can be terminal for the whole system.
 place every request passes through, making every change a global risk; it has no tests because it
 cannot be instantiated without a database and a server.
 
-**De-escalate to HIGH** — the responsibilities are mixed but the module is small and the concepts
-are genuinely one (a compact script whose whole purpose is one job). **De-escalate to MEDIUM** — the
-module is long but single-responsibility, and the real complaint is size.
+**Not AP-03** — the responsibilities are mixed but the module is small and holds one domain concept:
+that is AP-05, by the precedence rule above. **De-escalate to MEDIUM** — the module is long but
+single-responsibility, and the real complaint is size.
 
 **Impact.** Nothing can be tested in isolation, because instantiating any part drags in all of it.
 Every change has a blast radius covering the whole file. Concurrent work collides constantly. This is
@@ -249,9 +263,10 @@ distinguishable from legitimate use.
 - A "service" or "controller" layer that exists but is a pass-through, while the logic stayed in the
   handler — nominal layering (see `01-project-analysis.md` §4).
 
-**Escalate to CRITICAL** — the handler also performs persistence and formatting, making the file a
-God Module (AP-03); or the duplicated rule has already diverged between its copies, so the system
-behaves differently depending on which door you enter.
+**Escalate to CRITICAL** — the duplicated rule has already diverged between its copies, so the
+system behaves differently depending on which door you enter. A module that also qualifies as a
+God Module is filed as AP-03 instead, not as an escalated AP-05 (see the precedence rule under
+*How to use this catalog*).
 
 **De-escalate to MEDIUM** — the logic in the handler is genuinely delivery-level: input coercion,
 content negotiation, pagination parameter parsing, status-code selection. That belongs there.
@@ -626,12 +641,18 @@ degraded-verification note, not a finding.
 **Severity follows impact.** An unsupported major line with no upgrade path is HIGH. A
 soft-deprecated call with a drop-in successor and no risk is LOW. Default MEDIUM only when the
 impact is genuinely unremarkable. A package that is deprecated **and** has a security advisory for
-the resolved version is reported once, as AP-19, with the deprecation named in its description —
-the advisory is the dominant impact (see "Overlap" above).
+the resolved version is reported **once**: under whichever entry has the higher severity after
+applying its own rules, naming the other in the description; AP-19 on a tie. An advisory usually
+dominates — but one that concerns only install or build time (AP-19 at LOW) does not outrank a
+runtime deprecation with no upgrade path.
 
 **Every finding in this category must state the modern equivalent** — the specific successor API,
 the maintained replacement package, or the migration path named by the upstream source you cited.
-"Stop using it" without a named replacement is not a recommendation.
+"Stop using it" without a named replacement is not a recommendation. When the upstream source
+names **no** successor, say exactly that — `no successor named upstream (<source>, <date>)` — and
+recommend evaluating maintained alternatives. Never supply a successor from memory: that is Tier D.
+Replacing a package with one the project does not use today is a new dependency, and Phase 3
+proposes it rather than applying it.
 
 **Impact.** A deprecated API is removed on a schedule the project does not control: the failure
 arrives at the next routine upgrade, and by then the migration is urgent instead of planned. An
@@ -812,8 +833,14 @@ advisory identifier, the source queried and the date of the lookup.
   in, because that is what the project can change.
 - A manifest range that would resolve to a fixed version, while the lockfile pins a vulnerable
   one: the fix is a lockfile update, and the finding says so.
-- No lockfile at all, so the version installed is whatever resolved that day: the audit cannot be
-  exact. Report it (AP-19 at MEDIUM) and mark the advisory check `UNVERIFIED` for those packages.
+- No lockfile, and the manifest declares **ranges**: the version installed is whatever resolves that
+  day, so the audit cannot be exact. Report it (AP-19 at MEDIUM) and mark the advisory check
+  `UNVERIFIED` for those packages — unless the run installed them, in which case query the versions
+  actually installed (read from the environment's installed metadata), and say that the result
+  holds for that installation date only.
+- No lockfile, but every dependency pinned to an **exact** version: the manifest is the lock for
+  direct dependencies. Query those versions; transitive ones are then read from the installed
+  metadata, as above. Some ecosystems have no native lock command; that is not itself a finding.
 
 **Severity follows the advisory and the reachability.**
 
@@ -824,13 +851,17 @@ advisory identifier, the source queried and the date of the lookup.
 - **HIGH** (default) — a high or critical advisory whose reachability you could not establish
   either way.
 - **De-escalate to MEDIUM** — the advisory is moderate; or the vulnerable feature is demonstrably
-  unused (the affected module is never imported, the affected option is never enabled). **LOW** —
-  the package only runs at install or build time, never at run time, and the advisory does not
-  concern that phase.
+  unused (the affected module is never imported, the affected option is never enabled).
+- **LOW** — the advisory is rated low by its source, in a package that runs at run time; or the
+  package only runs at install or build time, never at run time, and the advisory does not concern
+  that phase.
 
-**Every finding names the fixed version** from the advisory, and the upgrade path: within the same
-major version, or across a major — which decides whether Phase 3 may apply it
-(`04-architecture-guidelines.md` §6, dependency upgrades).
+**Every finding names the fix** from the advisory: the lowest fixed version, **and any
+configuration the fix needs to take effect**. Some fixes ship disabled, behind an option the
+application must turn on; an upgrade without that option leaves the vulnerability in place, and
+the finding must say so. Name the upgrade path too — within the same major version, or across a
+major — which decides whether Phase 3 may apply it (`04-architecture-guidelines.md` §6, dependency
+upgrades).
 
 If the lookup cannot run (`--offline`, no network, an unexpected response), this entry is
 `UNVERIFIED` for every package and goes to the degraded-verification block. Never fall back to
