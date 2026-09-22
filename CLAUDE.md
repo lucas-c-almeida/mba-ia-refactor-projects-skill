@@ -681,10 +681,49 @@ só se o replay cobrir o que muda. Senão, proposta. O protocolo passa a compara
 
 ---
 
+### Decisões da rodada 3 (D19–D23)
+
+> Tomadas depois de ler `docs/rounds/round2-report.md` **e o gabarito**. O autor já não está cego
+> para os alvos; a contaminação é declarada em `docs/rounds/round3-changes.md`, congelada antes de
+> qualquer edição. ADRs completos em `docs/decisions.md`.
+
+### D19 — Isolamento de execução: **container primeiro, modo host declarado** ✅ decidido
+
+Com runtime de container, toda execução (original e refatorada) roda num container descartável,
+nomeado `refactor-arch-<alvo>-<run>`; o probe roda dentro dele; encerrar é remover aquele container
+pelo nome. Sem container: modo host via `proc` (D20), declarado `Isolation: reduced (host)`. Nos
+dois modos, é proibido encerrar por nome, imagem ou padrão, e todo start/stop entra no
+`## Execution Log`; ação fora do log é incidente. Emenda à D16: a aplicação refatorada também roda
+de uma cópia, e o snapshot só é apagado depois da re-auditoria. Resolve R2-1, R2-2 e R2-3.
+
+### D20 — Ferramenta de ciclo de vida **separada do probe** ✅ decidido
+
+`scripts/proc.{py,mjs}` executam o argv que o agente derivou, gravam PID e hora de início, esperam a
+porta e encerram só a árvore registrada, conferindo a identidade do PID. Emenda à D6.1: o agente
+decide *o que* rodar; o `proc` é dono do *tempo de vida*; o probe continua sem subir nada.
+
+### D21 — Entrada de segurança **neutralizada** ✅ decidido
+
+`expect: "neutralized"` com `like: <id benigno>`: `FIXED` quando o replay responde sem erro e com o
+shape da entrada benigna irmã. Nunca `REGRESSION` só por mudar. Resolve R2-5.
+
+### D22 — O **contrato de erro** ✅ decidido
+
+Contrato é o status e o shape dos erros **intencionais**; a página padrão do framework não é.
+Mascarar segredo mantendo campo e tipo é seguro (D15). Correção que exige dependência de runtime
+nova é proposta. Resolve R2-7.
+
+### D23 — **Laço de correção limitado** ✅ decidido
+
+Um replay completo obrigatório; no máximo duas passadas de re-auditoria, ambas no relatório;
+`missed-in-phase-2` corrigido na Fase 3 é contado à parte. Resolve R2-10.
+
+---
+
 ## 9. Perguntas em aberto
 
-Nenhuma. D1–D18 decididas. Rodada 2: mudanças da skill aplicadas em `feat/round2`, aguardando
-a execução da rodada. Gabarito pronto em `docs/gabarito.md` (seção A do README).
+Nenhuma. D1–D23 decididas. Rodada 3: lista de mudanças congelada em
+`docs/rounds/round3-changes.md`; implementação em `feat/round3`.
 
 ---
 
