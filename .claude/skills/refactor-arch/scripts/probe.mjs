@@ -16,12 +16,14 @@
  * --------------------------------
  *   - It never boots the application. Booting is stack-specific; probing is protocol-pure.
  *     The agent boots and waits for readiness, then calls this script.
- *   - It never compares values -- only status, media type and the recursive SHAPE of the body.
- *     Comparing ids, timestamps or ordering would produce a false regression on every run,
- *     and a noisy check is worse than no check: it costs the same and you stop reading it.
+ *   - It never compares raw values -- only status, media type, a small allow-list of contract
+ *     headers, and the recursive SHAPE of the body. Comparing ids, timestamps or ordering would
+ *     produce a false regression on every run, and a noisy check is worse than no check.
+ *   - It never follows redirects. A redirect is part of the contract.
  *
- * Output is byte-compatible with probe.py: keys sorted, two-space indent. A baseline
- * captured by either implementation can be compared by the other.
+ * Output is byte-compatible with probe.py: keys sorted by code point, two-space indent, LF.
+ * A baseline captured by either implementation can be compared by the other; the shared
+ * conformance test (tests/probe-conformance at the repository root) holds them to that.
  *
  * Usage
  * -----
@@ -29,11 +31,19 @@
  *                          --base-url http://127.0.0.1:8081 \
  *                          --out reports/baseline.json
  *
+ *   # capture only entries added after the baseline, against the ORIGINAL, into the same file
+ *   node probe.mjs capture --surface reports/surface.json --base-url http://127.0.0.1:8081 \
+ *                          --out reports/baseline.json --only new-entry-a,new-entry-b --merge
+ *
  *   node probe.mjs compare --surface reports/surface.json \
  *                          --baseline reports/baseline.json \
  *                          --base-url http://127.0.0.1:8081
  *
  *   node probe.mjs compare --baseline reports/baseline.json --current reports/after.json
+ *
+ *   # a destructive entry runs alone, on its own fresh boot, merged into the capture
+ *   node probe.mjs capture --surface reports/surface.json --base-url http://127.0.0.1:8081 \
+ *                          --out reports/baseline.json --only purge-archive --merge
  *
  * Exit codes: 0 = no regressions, 1 = at least one regression, 2 = usage or I/O error.
  */
@@ -41,14 +51,74 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
 
-const PROTOCOL_VERSION = 1;
+const PROTOCOL_VERSION = 3;
 const DEFAULT_TIMEOUT_SECONDS = 10;
+const TEXT_LIMIT_BYTES = 4096;
+
+// Record states (section 3 of the protocol).
+const OBSERVED = 'OBSERVED';   // the call completed and a response was read
+const ERROR = 'ERROR';         // the call was made and failed at transport level
+const SKIPPED = 'SKIPPED';     // the call was never made
 
 // Result states (section 4 of the protocol).
 const PASS = 'PASS';
 const REGRESSION = 'REGRESSION';
 const PRE_EXISTING_FAILURE = 'PRE-EXISTING FAILURE';
 const UNVERIFIED = 'UNVERIFIED';
+const FIXED = 'FIXED';
+const NOT_FIXED = 'NOT FIXED';
+
+// Value masks (protocol section 5.2), applied in this order. ASCII classes only, so that
+// every implementation masks exactly the same characters.
+const MASKS = [
+  [/[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}(?::[0-9]{2}(?:\.[0-9]+)?)?(?:Z|[+-][0-9]{2}:?[0-9]{2})?/g, '<ts>'],
+  [/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, '<uuid>'],
+  [/(?<![0-9A-Za-z])[0-9a-fA-F]{16,}(?![0-9A-Za-z])/g, '<hex>'],
+  [/[0-9]+/g, '<n>'],
+];
+
+// Contract headers (protocol section 5.3). Everything else is transport detail.
+const HEADER_EXACT = new Set(['location', 'www-authenticate']);
+const HEADER_PREFIX = 'access-control-';
+const HEADER_LISTS = new Set([
+  'access-control-allow-methods', 'access-control-allow-headers', 'access-control-expose-headers',
+]);
+
+const mask = (text) => MASKS.reduce((acc, [pattern, placeholder]) => acc.replace(pattern, placeholder), text);
+
+// ---------------------------------------------------------------------------
+// Canonical serialization
+//
+// Python sorts strings by code point; JS sorts by UTF-16 unit, and JS objects put
+// integer-like keys first whatever their insertion order. Both would break byte
+// compatibility, so ordering and serialization are done by hand.
+// ---------------------------------------------------------------------------
+
+function byCodePoint(a, b) {
+  const x = Array.from(a, (c) => c.codePointAt(0));
+  const y = Array.from(b, (c) => c.codePointAt(0));
+  for (let i = 0; i < Math.min(x.length, y.length); i += 1) {
+    if (x[i] !== y[i]) return x[i] - y[i];
+  }
+  return x.length - y.length;
+}
+
+function serialize(value, indent = 0, level = 0) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value ?? null);
+  const pad = indent ? `\n${' '.repeat(indent * (level + 1))}` : '';
+  const end = indent ? `\n${' '.repeat(indent * level)}` : '';
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '[]';
+    return `[${value.map((v) => pad + serialize(v, indent, level + 1)).join(',')}${end}]`;
+  }
+  const keys = Object.keys(value).sort(byCodePoint);
+  if (keys.length === 0) return '{}';
+  const sep = indent ? ': ' : ':';
+  return `{${keys.map((k) => pad + JSON.stringify(k) + sep + serialize(value[k], indent, level + 1)).join(',')}${end}}`;
+}
+
+const canonical = (descriptor) => serialize(descriptor);
+const shapesEqual = (a, b) => canonical(a) === canonical(b);
 
 // ---------------------------------------------------------------------------
 // Shape descriptor (protocol section 5)
@@ -74,47 +144,46 @@ function shapeOf(value) {
       const descriptor = shapeOf(element);
       seen.set(canonical(descriptor), descriptor);
     }
-    const distinct = [...seen.keys()].sort().map((key) => seen.get(key));
+    const distinct = [...seen.keys()].sort(byCodePoint).map((key) => seen.get(key));
     return distinct.length === 1
       ? { type: 'array', items: distinct[0] }
       : { type: 'array', items: { oneOf: distinct } };
   }
 
   if (kind === 'object') {
-    const properties = {};
-    for (const key of Object.keys(value).sort()) properties[key] = shapeOf(value[key]);
+    // Null prototype: a body key named "__proto__" must stay an ordinary key.
+    const properties = Object.create(null);
+    for (const key of Object.keys(value)) properties[key] = shapeOf(value[key]);
     return { type: 'object', properties };
   }
   return 'unknown';
 }
 
-/** Deep key-sorted clone: makes JSON.stringify deterministic and matches probe.py. */
-function sortKeysDeep(value) {
-  if (Array.isArray(value)) return value.map(sortKeysDeep);
-  if (value && typeof value === 'object') {
-    const out = {};
-    for (const key of Object.keys(value).sort()) out[key] = sortKeysDeep(value[key]);
-    return out;
+/** Skeleton of a short text body: distinct non-empty lines, masked, sorted. */
+function textShape(text) {
+  const lines = new Set();
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/[ \t\r\f\v]+$/, '');   // ASCII whitespace only: identical in Python
+    if (line) lines.add(mask(line));
   }
-  return value;
+  return { type: 'text', lines: [...lines].sort(byCodePoint) };
 }
 
-const canonical = (descriptor) => JSON.stringify(sortKeysDeep(descriptor));
-const shapesEqual = (a, b) => canonical(a) === canonical(b);
-
-const summary = (descriptor) =>
-  typeof descriptor === 'string'
-    ? descriptor
-    : (descriptor?.type ?? (descriptor && 'oneOf' in descriptor ? 'oneOf' : '?'));
+const summary = (descriptor) => {
+  if (typeof descriptor === 'string') return descriptor;
+  if (descriptor === null || descriptor === undefined) return 'none';
+  return descriptor.type ?? ('oneOf' in descriptor ? 'oneOf' : '?');
+};
 
 /**
  * Path-addressed differences between two descriptors.
- * Each diff is {kind, path, ...} with kind in {missing, added, typeChanged}.
+ * Each diff is {kind, path, ...} with kind in {missing, added, typeChanged, textChanged}.
  */
 function shapeDiff(baseline, current, path = '$') {
   const diffs = [];
 
-  if (typeof baseline === 'string' || typeof current === 'string') {
+  if (typeof baseline === 'string' || typeof current === 'string'
+      || baseline === null || baseline === undefined || current === null || current === undefined) {
     if (!shapesEqual(baseline, current)) {
       diffs.push({ kind: 'typeChanged', path, from: summary(baseline), to: summary(current) });
     }
@@ -131,14 +200,15 @@ function shapeDiff(baseline, current, path = '$') {
   if (baselineKind === 'object') {
     const before = baseline.properties ?? {};
     const after = current.properties ?? {};
-    for (const key of Object.keys(before).sort()) {
-      if (!(key in after)) diffs.push({ kind: 'missing', path: `${path}.${key}` });
+    const has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
+    for (const key of Object.keys(before).sort(byCodePoint)) {
+      if (!has(after, key)) diffs.push({ kind: 'missing', path: `${path}.${key}` });
     }
-    for (const key of Object.keys(after).sort()) {
-      if (!(key in before)) diffs.push({ kind: 'added', path: `${path}.${key}` });
+    for (const key of Object.keys(after).sort(byCodePoint)) {
+      if (!has(before, key)) diffs.push({ kind: 'added', path: `${path}.${key}` });
     }
-    for (const key of Object.keys(before).sort()) {
-      if (key in after) diffs.push(...shapeDiff(before[key], after[key], `${path}.${key}`));
+    for (const key of Object.keys(before).sort(byCodePoint)) {
+      if (has(after, key)) diffs.push(...shapeDiff(before[key], after[key], `${path}.${key}`));
     }
     return diffs;
   }
@@ -159,10 +229,34 @@ function shapeDiff(baseline, current, path = '$') {
     return shapeDiff(before, after, `${path}[]`);
   }
 
+  if (baselineKind === 'text') {
+    const before = new Set(baseline.lines ?? []);
+    const after = new Set(current.lines ?? []);
+    const removed = [...before].filter((l) => !after.has(l)).sort(byCodePoint);
+    const added = [...after].filter((l) => !before.has(l)).sort(byCodePoint);
+    if (removed.length || added.length) diffs.push({ kind: 'textChanged', path, removed, added });
+    return diffs;
+  }
+
   if (!shapesEqual(baseline, current)) {
     diffs.push({ kind: 'typeChanged', path, from: baselineKind, to: currentKind });
   }
   return diffs;
+}
+
+/** Differences in the contract headers. Skipped when either side did not record them. */
+function headersDiff(baseline, current) {
+  if (!baseline || !current) return [];
+  const details = [];
+  const names = [...new Set([...Object.keys(baseline), ...Object.keys(current)])].sort(byCodePoint);
+  for (const name of names) {
+    if (!(name in current)) details.push(`headerMissing ${name}`);
+    else if (!(name in baseline)) details.push(`headerAdded ${name}`);
+    else if (baseline[name] !== current[name]) {
+      details.push(`headerChanged ${name}: ${baseline[name]} -> ${current[name]}`);
+    }
+  }
+  return details;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,13 +266,58 @@ function shapeDiff(baseline, current, path = '$') {
 /** Media type only -- parameters such as charset are not part of the contract here. */
 const normalizeContentType = (raw) => (raw ? raw.split(';')[0].trim().toLowerCase() : null);
 
+/** The allow-listed headers of a response, normalized and masked (protocol 5.3). */
+function contractHeaders(headers) {
+  const collected = new Map();
+  for (const [name, value] of headers) {
+    if (name === 'set-cookie') continue;
+    if (HEADER_EXACT.has(name) || name.startsWith(HEADER_PREFIX)) {
+      collected.set(name, [...(collected.get(name) ?? []), value]);
+    }
+  }
+  const result = {};
+  for (const [name, values] of collected) {
+    let joined = values.join(', ');
+    if (HEADER_LISTS.has(name)) {
+      const parts = new Set(joined.split(',').map((p) => p.trim().toLowerCase()).filter(Boolean));
+      joined = [...parts].sort(byCodePoint).join(', ');
+    }
+    result[name] = mask(joined.trim());
+  }
+  const cookies = typeof headers.getSetCookie === 'function'
+    ? headers.getSetCookie()
+    : (headers.get('set-cookie') ?? '').split(/,(?=\s*[^;,=\s]+=)/).filter(Boolean);
+  const names = new Set(cookies.filter((c) => c.includes('=')).map((c) => c.split('=')[0].trim()));
+  if (names.size) result['set-cookie'] = [...names].sort(byCodePoint).join(', ');
+  return result;
+}
+
+function bodyShape(bytes) {
+  if (bytes.byteLength === 0) return 'empty';
+  let text;
+  try {
+    // fatal: reject invalid UTF-8 as Python's strict decode does; ignoreBOM: keep it, as Python does.
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  } catch {
+    return { type: 'opaque', bytes: 'present' };
+  }
+  try {
+    return shapeOf(JSON.parse(text));
+  } catch {
+    // Not JSON (or declared JSON but unparseable): fall through to the text skeleton.
+  }
+  if (bytes.byteLength <= TEXT_LIMIT_BYTES) return textShape(text);
+  return { type: 'opaque', bytes: 'present' };
+}
+
 async function exercise(baseUrl, entry, timeoutSeconds) {
   const id = entry.id ?? `${entry.method} ${entry.path}`;
   const method = (entry.method ?? 'GET').toUpperCase();
   const path = entry.path ?? '/';
   const record = {
-    id, method, path,
-    state: UNVERIFIED, status: null, contentType: null, shape: null, error: null,
+    id, method, path, kind: entry.kind ?? 'contract', finding: entry.finding ?? null,
+    expect: entry.expect ?? null, like: entry.like ?? null, destructive: Boolean(entry.destructive),
+    state: SKIPPED, status: null, contentType: null, headers: null, shape: null, error: null,
   };
 
   if (entry.skip) {
@@ -188,11 +327,14 @@ async function exercise(baseUrl, entry, timeoutSeconds) {
 
   const headers = { ...(entry.headers ?? {}) };
   let body;
-  if (entry.body !== undefined && entry.body !== null) {
+  if (entry.rawBody !== undefined && entry.rawBody !== null) {
+    // Sent byte for byte: the point is a body the application's parser has not seen.
+    body = entry.rawBody;
+  } else if (entry.body !== undefined && entry.body !== null) {
     body = JSON.stringify(entry.body);
-    if (!Object.keys(headers).some((h) => h.toLowerCase() === 'content-type')) {
-      headers['Content-Type'] = 'application/json';
-    }
+  }
+  if (body !== undefined && !Object.keys(headers).some((h) => h.toLowerCase() === 'content-type')) {
+    headers['Content-Type'] = 'application/json';
   }
 
   // A harness must never hang: a hung probe is indistinguishable from a broken app.
@@ -202,36 +344,52 @@ async function exercise(baseUrl, entry, timeoutSeconds) {
     const response = await fetch(baseUrl.replace(/\/+$/, '') + path, {
       method, headers, body, signal: controller.signal, redirect: 'manual',
     });
-    const contentType = normalizeContentType(response.headers.get('content-type'));
-    const text = await response.text();
-    record.state = 'OBSERVED';
-    record.status = response.status;   // a 4xx/5xx is a real response, not a transport failure
-    record.contentType = contentType;
-    record.shape = bodyShape(text, contentType);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    record.state = OBSERVED;
+    record.status = response.status;   // a 3xx/4xx/5xx is a real response, not a transport failure
+    record.contentType = normalizeContentType(response.headers.get('content-type'));
+    record.headers = contractHeaders(response.headers);
+    record.shape = bodyShape(bytes);
   } catch (err) {
-    record.error = `${err.name}: ${err.message}`;
+    record.state = ERROR;             // refused, reset, timeout, truncated body
+    record.error = `${err.name}: ${err.cause?.code ?? err.message}`;
   } finally {
     clearTimeout(timer);
   }
   return record;
 }
 
-function bodyShape(text, contentType) {
-  if (!text) return 'empty';
-  if (contentType && !contentType.includes('json')) return { type: 'opaque', bytes: 'present' };
-  try {
-    return shapeOf(JSON.parse(text));
-  } catch {
-    // Declared as JSON but unparseable, or an unknown content type that is not JSON.
-    return { type: 'opaque', bytes: 'present' };
+/**
+ * Contract entries first, security entries last: a hostile call may mutate state.
+ *
+ * A destructive entry is exercised only when --only names it and nothing else (protocol
+ * section 2.2): it runs alone, on its own fresh boot, so that what it destroys cannot reach
+ * any other entry.
+ */
+function orderedEntries(surface, only) {
+  let entries = (surface.entries ?? []).filter((e) => !only || only.has(e.id));
+  const destructive = entries.filter((e) => e.destructive);
+  if (destructive.length) {
+    if (!only) {
+      entries = entries.filter((e) => !e.destructive);
+    } else if (entries.length > 1) {
+      throw new Error('a destructive entry must be captured alone (--only <its id>), '
+        + 'on its own fresh boot (protocol section 2.2): '
+        + destructive.map((e) => e.id).sort(byCodePoint).join(','));
+    }
   }
+  const isSecurity = (e) => (e.kind ?? 'contract') === 'security';
+  return [...entries.filter((e) => !isSecurity(e)), ...entries.filter(isSecurity)];
 }
 
-async function capture(surface, baseUrl, timeoutSeconds) {
+const destructiveIds = (surface) => (surface.entries ?? [])
+  .filter((e) => e.destructive).map((e) => e.id).sort(byCodePoint);
+
+async function capture(surface, baseUrl, timeoutSeconds, only) {
   const results = {};
   // Sequential on purpose: concurrency would change the application's observable
   // ordering and load, and the baseline must be reproducible.
-  for (const entry of surface.entries ?? []) {
+  for (const entry of orderedEntries(surface, only)) {
     const record = await exercise(baseUrl, entry, timeoutSeconds);
     results[record.id] = record;
   }
@@ -247,51 +405,182 @@ async function capture(surface, baseUrl, timeoutSeconds) {
 // Comparison (protocol section 4)
 // ---------------------------------------------------------------------------
 
-/** A baseline entry that was already broken: transport error or a server error. */
-const isFailure = (record) =>
-  record.state !== 'OBSERVED' || (record.status !== null && record.status >= 500);
+/**
+ * Protocol v1 used one state, UNVERIFIED, for "skipped" and "transport error" and cannot
+ * tell them apart. Treat it as skipped: the v1 reading, and the one that claims nothing.
+ */
+const stateOf = (record) => (record.state === 'UNVERIFIED' ? SKIPPED : record.state);
+const serverError = (record) => stateOf(record) === OBSERVED && (record.status ?? 0) >= 500;
+const isFailure = (record) => stateOf(record) === ERROR || serverError(record);
+const rejected = (record) => stateOf(record) === OBSERVED
+  && (record.status ?? 0) >= 400 && (record.status ?? 0) < 500;
+const describe = (record) => (stateOf(record) === ERROR ? 'transport error' : String(record.status));
 
-function compareOne(baseline, current) {
-  if (!baseline) return { state: UNVERIFIED, details: ['not present in baseline'] };
-  if (!current) return { state: UNVERIFIED, details: ['not exercised in replay'] };
-  if (baseline.state !== 'OBSERVED') {
-    return { state: UNVERIFIED, details: [`baseline unverified: ${baseline.error}`] };
+/**
+ * Shape equality, except that an empty array matches any array. Used only to compare an
+ * entry with a DIFFERENT entry (its benign sibling), whose collection may be empty while
+ * this one's is not -- a data difference, not a behaviour difference.
+ */
+function shapesCompatible(left, right) {
+  if (shapesEqual(left, right)) return true;
+  const isObj = (d) => d !== null && typeof d === 'object';
+  if (!isObj(left) || !isObj(right)) return false;
+  if (left.type === 'array' && right.type === 'array') {
+    if (left.items === 'empty' || right.items === 'empty') return true;
+    return shapesCompatible(left.items, right.items);
   }
-  if (current.state !== 'OBSERVED') {
-    return isFailure(baseline)
-      ? { state: PRE_EXISTING_FAILURE, details: [`failed before and after: ${current.error}`] }
-      : { state: REGRESSION, details: [`call failed after refactoring: ${current.error}`] };
+  if (left.type === 'object' && right.type === 'object') {
+    const a = left.properties ?? {};
+    const b = right.properties ?? {};
+    const keysA = Object.keys(a).sort(byCodePoint);
+    const keysB = Object.keys(b).sort(byCodePoint);
+    return keysA.length === keysB.length && keysA.every((k, i) => k === keysB[i])
+      && keysA.every((k) => shapesCompatible(a[k], b[k]));
+  }
+  return false;
+}
+
+/** An ordinary, non-error answer indistinguishable in shape from the benign sibling's. */
+const behavesLike = (record, sibling) => stateOf(record) === OBSERVED && stateOf(sibling) === OBSERVED
+  && (record.status ?? 0) < 400
+  && record.status === sibling.status
+  && record.contentType === sibling.contentType
+  && shapesCompatible(record.shape, sibling.shape);
+
+/**
+ * A hostile entry whose fix changes the answer without rejecting it: the input is now
+ * treated as data. Fixed when it behaves like its benign sibling (protocol section 2.1).
+ */
+function compareNeutralized(baseline, current, likeId, likeBaseline, likeCurrent) {
+  if (!likeId) {
+    return { state: UNVERIFIED, details: ["expect 'neutralized' needs 'like': the id of a benign sibling entry"] };
+  }
+  if (!likeBaseline || !likeCurrent
+      || stateOf(likeBaseline) !== OBSERVED || stateOf(likeCurrent) !== OBSERVED) {
+    return { state: UNVERIFIED, details: [`benign sibling '${likeId}' was not observed in both runs`] };
+  }
+  if (behavesLike(baseline, likeBaseline)) {
+    return {
+      state: UNVERIFIED,
+      details: [`baseline already behaved like '${likeId}': the entry does not demonstrate the finding`],
+    };
+  }
+  if (behavesLike(current, likeCurrent)) {
+    return { state: FIXED, details: [`now behaves like '${likeId}' (baseline: ${describe(baseline)})`] };
+  }
+  if (isFailure(current) && !isFailure(baseline)) {
+    return {
+      state: REGRESSION,
+      details: [`hostile input now fails with ${describe(current)} (baseline: ${describe(baseline)})`],
+    };
+  }
+  return {
+    state: NOT_FIXED,
+    details: [`still does not behave like '${likeId}': ${describe(current)} (baseline: ${describe(baseline)})`],
+  };
+}
+
+/** A hostile entry is expected to change: from accepted (or crashing) to rejected. */
+function compareSecurity(baseline, current) {
+  if (rejected(baseline)) {
+    return {
+      state: UNVERIFIED,
+      details: [`baseline already rejected (${baseline.status}): the entry does not demonstrate the finding`],
+    };
+  }
+  if (rejected(current)) {
+    return { state: FIXED, details: [`rejected with ${current.status} (baseline: ${describe(baseline)})`] };
+  }
+  if (isFailure(current) && !isFailure(baseline)) {
+    return {
+      state: REGRESSION,
+      details: [`hostile input now fails with ${describe(current)} (baseline: ${describe(baseline)})`],
+    };
+  }
+  return {
+    state: NOT_FIXED,
+    details: [`still not rejected: ${describe(current)} (baseline: ${describe(baseline)})`],
+  };
+}
+
+function compareOne(baseline, current, baselineResults = {}, currentResults = {}) {
+  if (!baseline) {
+    return {
+      state: UNVERIFIED,
+      details: ['not present in baseline: capture it against the original (protocol section 4.3)'],
+    };
+  }
+  if (!current) {
+    return baseline.destructive
+      ? {
+        state: UNVERIFIED,
+        details: ['not exercised in replay: destructive, capture it alone with --only --merge (protocol section 2.2)'],
+      }
+      : { state: UNVERIFIED, details: ['not exercised in replay'] };
+  }
+  if (stateOf(baseline) === SKIPPED) {
+    return { state: UNVERIFIED, details: [`skipped in baseline: ${baseline.error}`] };
+  }
+  if (stateOf(current) === SKIPPED) {
+    return { state: UNVERIFIED, details: [`skipped in replay: ${current.error}`] };
   }
 
-  const sameStatus = baseline.status === current.status;
-  const sameType = baseline.contentType === current.contentType;
-  const diffs = shapesEqual(baseline.shape, current.shape)
-    ? [] : shapeDiff(baseline.shape, current.shape);
+  if ((baseline.kind ?? current.kind) === 'security') {
+    if ((baseline.expect ?? current.expect) === 'neutralized') {
+      const likeId = baseline.like ?? current.like;
+      return compareNeutralized(baseline, current, likeId,
+        likeId ? baselineResults[likeId] : undefined, likeId ? currentResults[likeId] : undefined);
+    }
+    return compareSecurity(baseline, current);
+  }
 
-  if (sameStatus && sameType && diffs.length === 0) {
-    // Identical -- but if it was already broken, that is not a success. You neither
-    // fixed it nor broke it, and the report must say exactly that.
-    return isFailure(baseline)
-      ? { state: PRE_EXISTING_FAILURE, details: [`unchanged failure: status ${baseline.status}`] }
-      : { state: PASS, details: [] };
+  if (stateOf(baseline) === ERROR) {
+    return isFailure(current)
+      ? { state: PRE_EXISTING_FAILURE, details: [`failed before and after: transport error -> ${describe(current)}`] }
+      : { state: PASS, details: ['improved from transport error'] };
+  }
+  if (stateOf(current) === ERROR) {
+    return serverError(baseline)
+      ? { state: PRE_EXISTING_FAILURE, details: [`failed before and after: ${baseline.status} -> transport error`] }
+      : { state: REGRESSION, details: ['call failed after refactoring: transport error'] };
   }
 
   const details = [];
-  if (!sameStatus) details.push(`statusChanged ${baseline.status} -> ${current.status}`);
-  if (!sameType) details.push(`contentTypeChanged ${baseline.contentType} -> ${current.contentType}`);
-  for (const diff of diffs) {
-    details.push(diff.kind === 'typeChanged'
-      ? `typeChanged ${diff.path}: ${diff.from} -> ${diff.to}`
-      : `${diff.kind} ${diff.path}`);
+  if (baseline.status !== current.status) {
+    details.push(`statusChanged ${baseline.status} -> ${current.status}`);
+  }
+  if (baseline.contentType !== current.contentType) {
+    details.push(`contentTypeChanged ${baseline.contentType} -> ${current.contentType}`);
+  }
+  details.push(...headersDiff(baseline.headers, current.headers));
+  if (!shapesEqual(baseline.shape, current.shape)) {
+    for (const diff of shapeDiff(baseline.shape, current.shape)) {
+      if (diff.kind === 'typeChanged') {
+        details.push(`typeChanged ${diff.path}: ${diff.from} -> ${diff.to}`);
+      } else if (diff.kind === 'textChanged') {
+        details.push(`textChanged ${diff.path}: -${diff.removed.length} +${diff.added.length} lines`);
+        details.push(...diff.removed.slice(0, 3).map((l) => `  - ${l}`));
+        details.push(...diff.added.slice(0, 3).map((l) => `  + ${l}`));
+      } else {
+        details.push(`${diff.kind} ${diff.path}`);
+      }
+    }
   }
 
+  if (details.length === 0) {
+    // Identical -- but if it was already broken, that is not a success. You neither
+    // fixed it nor broke it, and the report must say exactly that.
+    return serverError(baseline)
+      ? { state: PRE_EXISTING_FAILURE, details: [`unchanged failure: status ${baseline.status}`] }
+      : { state: PASS, details: [] };
+  }
   // Already broken before, still broken in the same way -> neither pass nor regression.
-  if (isFailure(baseline) && baseline.status === current.status) {
+  if (serverError(baseline) && baseline.status === current.status) {
     return { state: PRE_EXISTING_FAILURE, details };
   }
   // Improvement is a behaviour change, so it is named rather than hidden -- but it is
   // not a regression.
-  if (isFailure(baseline) && !isFailure(current)) {
+  if (serverError(baseline) && !isFailure(current)) {
     return { state: PASS, details: [`improved from ${baseline.status}`, ...details] };
   }
   return { state: REGRESSION, details };
@@ -300,9 +589,10 @@ function compareOne(baseline, current) {
 function compare(baselineDoc, currentDoc) {
   const baselineResults = baselineDoc.results ?? {};
   const currentResults = currentDoc.results ?? {};
-  const ids = [...new Set([...Object.keys(baselineResults), ...Object.keys(currentResults)])].sort();
+  const ids = [...new Set([...Object.keys(baselineResults), ...Object.keys(currentResults)])]
+    .sort(byCodePoint);
   return ids.map((id) => ({
-    id, ...compareOne(baselineResults[id], currentResults[id]),
+    id, ...compareOne(baselineResults[id], currentResults[id], baselineResults, currentResults),
   }));
 }
 
@@ -313,7 +603,7 @@ function compare(baselineDoc, currentDoc) {
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
 
 function writeJson(path, document) {
-  writeFileSync(path, `${JSON.stringify(sortKeysDeep(document), null, 2)}\n`, 'utf8');
+  writeFileSync(path, `${serialize(document, 2)}\n`, 'utf8');
 }
 
 /** Minimal --flag value parser: no dependency, no surprises. */
@@ -339,18 +629,33 @@ function printTable(rows) {
 }
 
 function summarize(rows) {
-  const counts = { [PASS]: 0, [REGRESSION]: 0, [PRE_EXISTING_FAILURE]: 0, [UNVERIFIED]: 0 };
-  for (const row of rows) counts[row.state] = (counts[row.state] ?? 0) + 1;
+  const counts = {
+    [PASS]: 0, [REGRESSION]: 0, [PRE_EXISTING_FAILURE]: 0, [UNVERIFIED]: 0, [FIXED]: 0, [NOT_FIXED]: 0,
+  };
+  for (const row of rows) counts[row.state] += 1;
   console.log('');
   console.log(`  ${counts[PASS]} PASS, ${counts[REGRESSION]} REGRESSION, `
     + `${counts[PRE_EXISTING_FAILURE]} PRE-EXISTING FAILURE, ${counts[UNVERIFIED]} UNVERIFIED`);
+  if (counts[FIXED] || counts[NOT_FIXED]) {
+    console.log(`  security: ${counts[FIXED]} FIXED, ${counts[NOT_FIXED]} NOT FIXED`);
+  }
   return counts;
+}
+
+function noteDestructive(surface, only) {
+  if (only) return;
+  const pending = destructiveIds(surface);
+  if (pending.length) {
+    console.error(`note: ${pending.length} destructive entries not exercised: ${pending.join(',')} `
+      + '-- capture each alone, on a fresh boot, with --only <id> --merge (protocol section 2.2)');
+  }
 }
 
 const USAGE = `Baseline-then-replay surface probe (see 06-validation-protocol.md).
 This script never boots the application.
 
-  node probe.mjs capture --surface <path> --base-url <url> --out <path> [--timeout <seconds>]
+  node probe.mjs capture --surface <path> --base-url <url> --out <path>
+                         [--only <id,id,...>] [--merge] [--timeout <seconds>]
   node probe.mjs compare --baseline <path> [--surface <path> --base-url <url>]
                          [--current <path>] [--out <path>] [--timeout <seconds>]`;
 
@@ -370,12 +675,28 @@ async function main() {
         console.error('capture needs --surface, --base-url and --out');
         return 2;
       }
-      const document = await capture(readJson(options.surface), options['base-url'], timeout);
+      const only = typeof options.only === 'string' ? new Set(options.only.split(',')) : null;
+      const surface = readJson(options.surface);
+      let document = await capture(surface, options['base-url'], timeout, only);
+      // Counted before merging: the numbers describe THIS run, not the whole file.
+      const states = Object.values(document.results).map((r) => r.state);
+      const count = (s) => states.filter((x) => x === s).length;
+      if (options.merge) {
+        const previous = readJson(options.out);
+        previous.results = { ...(previous.results ?? {}), ...document.results };
+        previous.version = PROTOCOL_VERSION;
+        document = previous;
+      }
       writeJson(options.out, document);
-      const records = Object.values(document.results);
-      const observed = records.filter((r) => r.state === 'OBSERVED').length;
-      console.log(`captured ${records.length} entries (${observed} observed, `
-        + `${records.length - observed} unverified) -> ${options.out}`);
+      console.log(`captured ${states.length} entries now (${count(OBSERVED)} observed, `
+        + `${count(ERROR)} error, ${count(SKIPPED)} skipped); `
+        + `${Object.keys(document.results).length} in file -> ${options.out}`);
+      if (count(ERROR) > 1) {
+        console.error('warning: several transport errors in this run -- if one entry crashed '
+          + 'the application, the entries after it failed only because it was down '
+          + '(protocol section 3.1)');
+      }
+      noteDestructive(surface, only);
       return 0;
     }
 
@@ -389,8 +710,10 @@ async function main() {
     if (options.current) {
       currentDoc = readJson(options.current);
     } else if (options['base-url'] && options.surface) {
-      currentDoc = await capture(readJson(options.surface), options['base-url'], timeout);
+      const surface = readJson(options.surface);
+      currentDoc = await capture(surface, options['base-url'], timeout, null);
       if (options.out) writeJson(options.out, currentDoc);
+      noteDestructive(surface, null);
     } else {
       console.error('compare needs either --current, or both --base-url and --surface');
       return 2;

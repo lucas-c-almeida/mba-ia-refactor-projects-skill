@@ -1,24 +1,26 @@
 # 05 — Refactoring Playbook
 
-Sixteen transformations, one for each catalog entry. Each states its **contract impact**: `safe`
-(apply automatically) or `contract-changing` (gated per `04-architecture-guidelines.md` §6 — propose,
-do not apply).
+Nineteen transformations, one for each catalog entry (RP-16 covers two). Each states its
+**contract impact**: `safe` (apply automatically) or `contract-changing` (gated per
+`04-architecture-guidelines.md` §6 — propose, do not apply).
 
-Examples span **Python, JavaScript/TypeScript, Go, Ruby and PHP**, deliberately: the patterns are
-not stack-bound, and reading the same idea in five syntaxes is the proof. The domains — warehouse
-inventory, room booking, library loans, sensor telemetry, fleet maintenance — are invented and
-neutral. Translate the shape, not the syntax.
+Examples span **Python, JavaScript/TypeScript, Go, Ruby, PHP and SQL**, deliberately: the patterns
+are not stack-bound, and reading the same idea in several syntaxes is the proof. The domains —
+warehouse inventory, room booking, library loans, sensor telemetry, fleet maintenance, tool
+rental — are invented and neutral. Translate the shape, not the syntax.
 
 **Method for every transformation:** make one behaviour-preserving move at a time; keep the public
-surface fixed unless the gate says otherwise; re-run the validation harness after each meaningful
-step, not only at the end. If a step cannot be made behaviour-preserving, stop and propose it.
+surface fixed unless the gate says otherwise; if a step cannot be made behaviour-preserving, stop
+and propose it. Replaying the harness between steps is a **smoke check** — cheap, optional, and
+worth it after any risky move, because it tells you which step broke something. It never replaces
+the **full replay** of SKILL.md 3c, which is mandatory and is the only replay the report counts.
 
 | Id | Transformation | Fixes | Contract |
 |---|---|---|---|
 | RP-01 | Externalize configuration and secrets | AP-01 | safe |
 | RP-02 | Parameterize queries and commands | AP-02 | safe |
 | RP-03 | Split a God Module by responsibility | AP-03 | safe |
-| RP-04 | Extract authorization into a policy and a guard | AP-04 | safe (see caveat) |
+| RP-04 | Extract authorization into a policy and a guard | AP-04 | legitimate-use test — see entry |
 | RP-05 | Extract a use case from a handler | AP-05 | safe |
 | RP-06 | Introduce dependency injection and a composition root | AP-06 | safe |
 | RP-07 | Replace global mutable state with scoped context | AP-07 | safe |
@@ -31,6 +33,9 @@ step, not only at the end. If a step cannot be made behaviour-preserving, stop a
 | RP-14 | Replace a verified-deprecated API with its successor | AP-14 | safe when behaviour is equivalent |
 | RP-15 | Replace magic values with named constants | AP-15 | safe |
 | RP-16 | Rename for intent and delete dead code | AP-16, AP-17 | safe for internals only |
+| RP-17 | Make runtime configuration safe by default | AP-18 | mixed — see entry |
+| RP-18 | Upgrade a vulnerable dependency to its fixed version | AP-19 | safe within a major — see entry |
+| RP-19 | Declare integrity constraints in the schema | AP-20 | mixed — see entry |
 
 ---
 
@@ -257,15 +262,20 @@ module.exports = (router, controller) => {
 ```
 
 Order of moves: extract persistence first (it has the clearest seam), then the pure rules, then the
-orchestration; the handler is whatever remains. Run the harness after each extraction.
+orchestration; the handler is whatever remains. A smoke replay after each extraction localizes a
+break to the move that caused it.
 
 ---
 
 ## RP-04 — Extract authorization into a policy and a guard
 
-**Fixes AP-04** · **Contract: safe for legitimate clients** — by design it changes what an
-*illegitimate* client observes. If the legitimate policy cannot be determined without guessing, apply
-only what is unambiguous (scoping a lookup to the authenticated principal) and propose the rest.
+**Fixes AP-04** · **Contract: decided by the legitimate-use test**
+(`04-architecture-guidelines.md` §6). When the application **already identifies callers** and the
+fix only stops one principal from acting on another's resource, it is safe — it changes what an
+*illegitimate* caller observes — and it is applied, as below. When the application has **no identity
+model**, adding authentication rejects every current client, legitimate ones included: that is
+contract-changing, and the transformation is proposed — the identity model, the principals and the
+policy — not applied. Never invent a policy to make the fix applicable.
 
 Two moves: put the decision in one policy function, and move the enforcement onto the *operation*
 rather than onto one of its doors.
@@ -1041,12 +1051,13 @@ Procedure:
 
 1. Force detectors on, run, and collect warnings with their stack traces.
 2. For each, confirm the successor from an upstream source and record source + date.
-3. Replace one call site at a time; re-run the harness after each.
+3. Replace one call site at a time; a smoke replay after each localizes any difference.
 4. If the successor is not behaviourally identical, do not apply it — propose it with the difference
    named.
 5. If a package is deprecated with no successor, the finding is the dependency itself; propose a
    maintained replacement or removal, with the migration cost stated.
-6. Record every replacement in the report's Deprecated API Verification table, with its evidence tier.
+6. Record every replacement in the report's Dependency and Deprecated API Verification table, with
+   its evidence tier.
 
 If no live lookup was possible (`--offline`, no network), **this transformation does not run.** Say
 so in the degraded-verification block. A guessed replacement is a fabricated finding with a code
@@ -1160,3 +1171,248 @@ Rules:
   anti-pattern the refactoring just removed;
 - do not reformat files you did not otherwise change: a diff full of whitespace hides the real
   change and defeats review and bisect.
+
+---
+
+## RP-17 — Make runtime configuration safe by default
+
+**Fixes AP-18** · **Contract: mixed.**
+- **Safe:** reading the debug flag, the bind address and the cross-origin policy from configuration
+  **with the same values the application used before** as explicit settings; switching debug off
+  on the production path; replacing a framework's default error output with the centralized
+  handler of RP-09, keeping status codes. The default page answers only when nothing handled the
+  error, so it is not part of the error contract (`04-architecture-guidelines.md` §6): internals
+  in it are not something a legitimate client relies on, and the status code does not change.
+- **Also contract-changing:** switching to a production server the application does not depend on
+  today. It is a new runtime dependency; propose it with the command that would run it.
+- **Contract-changing:** narrowing the cross-origin policy, restricting the bind address, or
+  removing a diagnostic route that clients may call. These change who can reach the application.
+  Propose them, with the exact configuration value that would apply them.
+
+The move is the same in every framework: take each runtime setting out of the code, give it a safe
+default in the configuration module (RP-01), and let the environment opt **in** to the unsafe
+value — never opt out of it.
+
+**Before** (Ruby, a small web service for fleet maintenance)
+
+```ruby
+# app.rb
+require 'sinatra'
+
+set :bind, '0.0.0.0'
+set :show_exceptions, true        # stack traces and an interactive page, on every error
+set :dump_errors, true
+
+before do
+  headers 'Access-Control-Allow-Origin'      => request.env['HTTP_ORIGIN'].to_s,   # reflected
+          'Access-Control-Allow-Credentials' => 'true'
+end
+
+get '/vehicles/:id/work-orders' do
+  WorkOrders.for_vehicle(params[:id]).to_json
+end
+```
+
+**After**
+
+```ruby
+# config/settings.rb — the only place runtime behaviour is decided; unsafe values are opt-in
+module Settings
+  DEBUG           = ENV.fetch('APP_DEBUG', 'false') == 'true'
+  BIND_ADDRESS    = ENV.fetch('APP_BIND', '0.0.0.0')          # same value as before, now visible
+  ALLOWED_ORIGINS = ENV.fetch('APP_ALLOWED_ORIGINS', '').split(',').map(&:strip)
+end
+```
+
+```ruby
+# app.rb — the composition root applies configuration; it does not invent it
+require 'sinatra'
+require_relative 'config/settings'
+require_relative 'middlewares/error_boundary'
+
+set :bind, Settings::BIND_ADDRESS
+set :show_exceptions, Settings::DEBUG
+set :dump_errors, Settings::DEBUG
+use ErrorBoundary                  # RP-09: generic body outside, full detail in the log
+
+before do
+  origin = request.env['HTTP_ORIGIN']
+  if origin && Settings::ALLOWED_ORIGINS.include?(origin)
+    headers 'Access-Control-Allow-Origin'      => origin,
+            'Access-Control-Allow-Credentials' => 'true'
+  end
+end
+```
+
+Here the cross-origin change **is** contract-changing: a browser client on an origin that is not
+listed stops working. In Phase 3 the safe half is applied — debug off by default, error boundary,
+settings externalized — and the origin allow-list is proposed with its default value left to the
+team. Record the proposal with the list of origins the team must supply. Cover the change in the
+surface inventory with an entry carrying an `Origin` header (`06-validation-protocol.md` §5.3), so
+the replay shows exactly which cross-origin headers changed.
+
+---
+
+## RP-18 — Upgrade a vulnerable dependency to its fixed version
+
+**Fixes AP-19** · **Contract: safe within the same major version** when the replay passes.
+Across a major version, or when the changelog between the two versions announces a behaviour
+change, it is safe **only** if the replay exercises the behaviour that changes — contract headers
+included. Otherwise propose it (`04-architecture-guidelines.md` §6, dependency upgrades). This is
+the one rule for upgrades; the procedure below applies it and never replaces it.
+
+**Precondition, without exception:** the advisory is established at evidence tier B or C, with its
+identifier, source and lookup date (`02-antipattern-catalog.md`, AP-19). Like RP-14, the example
+shows the shape of the move with placeholders, because the answer changes over time.
+
+```bash
+# 1. Confirm the advisory and the first fixed version for the RESOLVED version in use
+curl -s -X POST https://api.osv.dev/v1/query \
+  -d '{"package":{"name":"<package>","ecosystem":"Go"},"version":"<resolved-version>"}'
+#    → affected ranges and "fixed" events: pick the lowest fixed version on the same major line
+```
+
+**Before** (Go module manifest)
+
+```go
+// go.mod
+require (
+    example.org/<package> v1.4.2   // <advisory-id>: fixed in v1.4.7 (per <source>, <YYYY-MM-DD>)
+)
+```
+
+**After**
+
+```go
+// go.mod — the smallest move that closes the advisory: same major, lowest fixed version
+require (
+    example.org/<package> v1.4.7
+)
+```
+
+The lockfile moves with the manifest (`go.sum` here; the ecosystem's own lockfile elsewhere),
+regenerated by the ecosystem's tool, never edited by hand.
+
+Procedure:
+
+1. Choose the **lowest** fixed version, on the **same major line** when one exists there. The
+   smallest change that closes the advisory is the one with the least behaviour to verify. When
+   the fix exists only on a later major line, that later version is the candidate — go on to
+   step 3, which decides between applying and proposing it; do not propose it by default.
+2. Update the manifest and regenerate the lockfile with the ecosystem's own tool. If the advisory
+   says the fix needs an option turned on, turn it on in configuration (RP-01): the version alone
+   closes nothing.
+3. Read the changelog between the two versions. A major version, or any announced behaviour change,
+   is applied **only if the replay exercises the behaviour that changes**: check that it does; if
+   not, add a surface entry **captured against the original** first (`06-validation-protocol.md`
+   §4.3). If the changed behaviour cannot be exercised, propose the upgrade.
+4. Replay. A `REGRESSION` means the upgrade is not behaviour-preserving: revert it and propose it,
+   naming what changed.
+5. If the package has no fix at all, propose a replacement (a new dependency — always proposed,
+   `04-architecture-guidelines.md` §6), with the migration cost and the interim mitigation
+   (disable the vulnerable feature, validate the input that reaches it).
+6. Record the advisory, the version change and its evidence in the report's dependency verification
+   table.
+
+If the vulnerable package is transitive, move the **direct** dependency that pulls it in, or use the
+ecosystem's override mechanism, and say which. An override that pins a transitive package outside
+the range its parent declares runs the parent with a version it was never tested against: treat it
+like a major upgrade (step 3).
+
+---
+
+## RP-19 — Declare integrity constraints in the schema
+
+**Fixes AP-20** · **Contract: mixed** — decided per constraint by the legitimate-use test
+(`04-architecture-guidelines.md` §6):
+
+- **Safe:** a uniqueness constraint on a column the application **already treats as an identity**
+  (it looks records up by it and takes one) — a duplicate is a value that breaks an invariant the
+  domain already states; a foreign key that only rejects a reference to a row that does not exist;
+  moving money from binary floating point to an exact type (a fixed-point decimal, or an integer
+  count of minor units) **when the value crosses the boundary in the same type and format as
+  before** — the replay's shape comparison checks exactly that.
+- **Contract-changing:** choosing what happens to children when a parent is deleted (refuse,
+  cascade, detach) — every choice changes what a delete does today; a constraint the **existing
+  data already violates**, which cannot be added without deciding which rows win; a change to how an
+  amount is serialized (number to string, units to minor units). Propose them, with the query that
+  counts the violating rows.
+
+Never apply a schema change by dropping and recreating the datastore. Deliver it the way the
+project already changes its schema — a migration, a versioned DDL script, the ORM's migration
+tool — and if the project has none, as a new idempotent script run at the same point its schema is
+created today. The original's data must survive the change. Some engines cannot add a constraint
+to an existing table; there the migration rebuilds the table by copy — create the constrained
+table, copy the rows, swap the names — inside one transaction, never by dropping data.
+
+**Before** (SQL migration, a tool-rental service; and the Go code that computes a charge)
+
+```sql
+-- 001_init.sql
+CREATE TABLE members (
+  id           INTEGER PRIMARY KEY,
+  member_code  TEXT,            -- members sign in with it; looked up with LIMIT 1
+  full_name    TEXT
+);
+
+CREATE TABLE rentals (
+  id         INTEGER PRIMARY KEY,
+  member_id  INTEGER,           -- joined on members.id; nothing enforces it
+  daily_fee  REAL,              -- binary floating point
+  days       INTEGER
+);
+```
+
+```go
+// charge.go
+func Charge(r Rental) float64 {
+    return r.DailyFee * float64(r.Days) * 1.08   // drifts: 19.99 * 3 * 1.08 is not 64.7676
+}
+```
+
+**After**
+
+```sql
+-- 002_integrity.sql — additive; existing rows are kept
+-- Run first, and stop if either returns rows: the constraint would reject existing data,
+-- and deciding which row wins is a proposal, not a refactoring.
+SELECT member_code, COUNT(*) FROM members GROUP BY member_code HAVING COUNT(*) > 1;
+SELECT r.id FROM rentals r LEFT JOIN members m ON m.id = r.member_id WHERE m.id IS NULL;
+
+CREATE UNIQUE INDEX members_member_code_key ON members (member_code);
+
+ALTER TABLE rentals ADD COLUMN daily_fee_cents INTEGER;
+UPDATE rentals SET daily_fee_cents = CAST(ROUND(daily_fee * 100) AS INTEGER);
+ALTER TABLE rentals
+  ADD CONSTRAINT rentals_member_fk FOREIGN KEY (member_id) REFERENCES members (id);
+  -- no ON DELETE clause here on purpose: what a member delete does to rentals is proposed
+```
+
+```go
+// money.go — exact arithmetic inside; the boundary keeps the type clients already receive
+type Cents int64
+
+const taxBasisPoints = 800 // 8.00 %
+
+func Charge(r Rental) Cents {
+    gross := Cents(r.DailyFeeCents) * Cents(r.Days)
+    return gross + (gross*taxBasisPoints+5000)/10000 // round half up, once, at the end
+}
+
+// Presentation: the response still carries a decimal number, as before.
+func (c Cents) JSONAmount() float64 { return float64(c) / 100 }
+```
+
+Procedure:
+
+1. For each AP-20 finding, write the query that counts the rows the constraint would reject. Run
+   it against a **run copy** of the original's datastore, never against `<target>`.
+2. Zero rows and a safe constraint: add it through the project's own schema-change mechanism.
+   Otherwise, propose it with the count.
+3. For money, convert at the storage and computation layers; keep the boundary type and format
+   unchanged. If the boundary would have to change, propose that part.
+4. Replay. A `REGRESSION` on a write entry means a legitimate request is now rejected — the
+   constraint was not as safe as it looked: revert it and propose it.
+5. Add a security entry for each applied constraint that should now reject something — the
+   duplicate identity, the dangling reference — with `expect: "rejected"`
+   (`06-validation-protocol.md` §2.1).

@@ -102,6 +102,15 @@ medição que o projeto se protege (§5).
 | **D12** | Catálogo cego primeiro, gabarito em sessão separada | Escrever o catálogo sem ter lido nenhum alvo; a análise manual vem depois |
 | **D13** | APIs deprecated: evidência viva, nunca lista estática | *(revertida)* A skill sabe onde perguntar; não pode saber a resposta |
 | **D14** | Re-auditoria obrigatória ao final da Fase 3 | A linha `Zero anti-patterns remaining` só é impressa se uma re-auditoria completa retornar zero |
+| **D15** | Autorização e validação: teste do uso legítimo | Rejeitar o que só clientes ilegítimos mandam é seguro; rejeitar clientes legítimos é proposta *(rodada 2)* |
+| **D16** | O original roda de um snapshot intocado | Toda execução do original acontece numa cópia fora do alvo; a regra de escrita da Fase 2 fica absoluta *(rodada 2)* |
+| **D17** | Entradas de segurança na superfície | Entrada hostil que deve mudar tem estado próprio: `FIXED` / `NOT FIXED`, nunca `REGRESSION` *(rodada 2)* |
+| **D18** | Upgrade de dependência versus contrato | Dentro da major, seguro; fora dela, só se o replay cobrir o que muda *(rodada 2)* |
+| **D19** | Isolamento de execução: container primeiro | Toda execução roda num container nomeado e descartável; sem container, modo host declarado; nunca encerrar por nome *(rodada 3)* |
+| **D20** | Ferramenta de ciclo de vida separada do probe | `proc` sobe o comando que o agente derivou e encerra só a árvore que criou (emenda à D6.1) *(rodada 3)* |
+| **D21** | Entrada de segurança neutralizada | Correção que muda a resposta sem rejeitar é `FIXED` quando o shape bate com o de uma entrada benigna irmã *(rodada 3)* |
+| **D22** | O contrato de erro | São contrato o status e o shape dos erros intencionais; a página padrão do framework não é *(rodada 3)* |
+| **D23** | Laço de correção limitado | Um replay completo; no máximo duas passadas de re-auditoria; `missed-in-phase-2` corrigido é contado à parte *(rodada 3)* |
 
 ---
 
@@ -872,6 +881,343 @@ primeira forma: cobertura reduzida não sustenta afirmação de ausência.
 
 ---
 
+### Nota — decisões da rodada 2 (D15–D18)
+
+As decisões abaixo foram tomadas **depois** da rodada 1, a partir do relatório consolidado
+([`docs/rounds/round1-report.md`](rounds/round1-report.md)), e **antes** do gabarito. A sessão que
+as tomou leu o relatório, mas não o código dos projetos nem o gabarito. Não são mais decisões
+cegas no sentido de D12. A lista de mudanças foi congelada e commitada antes de qualquer edição
+([`docs/rounds/round2-changes.md`](rounds/round2-changes.md)), e cada decisão aponta para o problema da rodada 1
+que a originou. Um revisor pode assim separar o que veio da literatura do que veio da calibração.
+
+---
+
+### D15 — Autorização e validação: o teste do uso legítimo
+
+**Contexto.** Problema #6 da rodada 1. O `SKILL.md` tratava todo `401` novo como mudança de
+contrato (portanto: propor). As guidelines §6 e o playbook RP-04 mandavam aplicar a checagem de
+autorização que faltava. As duas instruções se contradiziam, e o agente escolhia uma delas sem
+regra. Na rodada 1 a escolha foi "propor" nos três projetos. O resultado estava certo lá (nenhum
+dos três tinha modelo de identidade), mas por sorte, não por regra.
+
+**Decisão.** A decisão depende de uma pergunta: **quem recebe a nova rejeição?** Sem modelo de
+identidade, todo cliente atual é anônimo e passaria a receber o `401`, legítimos inclusive: é
+mudança de contrato e vira proposta. Com identidade, mas sem checagem de dono ou papel, só o
+chamador que age sobre o recurso de outro é rejeitado: é seguro e é aplicado. O mesmo teste vale
+para validação: um valor inválido em si mesmo (payload de injeção, identificador malformado,
+período que termina antes de começar) é rejeitado; uma regra que exige decisão de produto é
+proposta. O texto é o mesmo em `SKILL.md`, guidelines §6 e RP-04.
+
+**Justificativa.** Não é uma regra nova. É a regra que a D7 já usava para SQL injection
+("mudam a implementação, não o que o cliente observa **em uso legítimo**"), aplicada por extenso a
+um caso que ela não nomeava. A decisão passa a depender de fatos legíveis no código (existe modelo
+de identidade? um cliente legítimo mandaria esse valor?), e não de adivinhar quem são os
+principais. Passa no Teste do Quarto Projeto: não importa se o alvo é Rails, Go ou Express.
+
+**Alternativas rejeitadas.**
+- *Sempre propor* — previsível, mas a skill nunca fecharia um IDOR, mesmo quando isso não afeta
+  nenhum cliente legítimo. Seria cauteloso demais para uma ferramenta que diz corrigir CRITICAL.
+- *Sempre aplicar* — quebra a promessa da D7 e, na rodada 1, teria trancado todos os clientes dos
+  três projetos.
+
+**Custo aceito / consequências.** A fronteira entre "inválido em si mesmo" e "regra de produto"
+exige julgamento, e haverá casos ambíguos. A regra de desempate é explícita: ambíguo, propõe.
+
+---
+
+### D16 — O original roda de um snapshot intocado, fora do alvo
+
+**Contexto.** Problema #3 da rodada 1. A camada 1 de AP-14 exige executar a aplicação com os
+detectores de deprecation ligados, e isso acontece na Fase 2. Executar a aplicação cria arquivos
+(banco em arquivo, caches, bytecode) fora de `<alvo>/reports/`, a única pasta que a Fase 2 pode
+tocar antes da confirmação. A regra da D5/D10 não previa artefatos de runtime. Relacionados: o
+problema #1 (porta fixa no código, sem instrução para trocá-la sem editar o original) e o #12
+(entradas adicionadas depois do baseline ficavam sem comparação, porque o original já não existia).
+
+**Decisão.** No início da Fase 2, antes de qualquer execução, a skill copia o alvo para um
+**snapshot intocado** num diretório temporário fora dele. Toda execução do **original** (a da
+Fase 2, o baseline, uma captura tardia) roda numa cópia nova desse snapshot. A aplicação
+refatorada roda no alvo. O snapshot é apagado ao final. A escolha de porta segue uma ordem
+declarada: override que o código já lê, porta nativa com execuções em sequência, launcher fora da
+árvore. O original nunca é editado.
+
+**Justificativa.** Mantém a regra de escrita da Fase 2 **absoluta**, sem exceções. Uma regra com
+lista de exceções é a que se erode primeiro. E resolve três problemas com um mecanismo: artefatos
+de runtime (#3), estado inicial igual para todas as execuções do original, e um original disponível
+para capturas tardias (#12).
+
+**Alternativas rejeitadas.**
+- *Executar no lugar e limpar depois* (comparar `git status` antes e depois) — perde arquivos
+  ignorados pelo `.gitignore` e alterações em arquivos de banco versionados, e depende de git.
+- *Ampliar a regra* para aceitar artefatos de runtime — enfraquece justamente o requisito que o
+  enunciado cobra em cinco lugares.
+
+**Custo aceito / consequências.** Copiar o alvo custa tempo e disco. Diretórios de dependência
+podem ser linkados ou reinstalados a partir do lockfile, e o relatório declara qual das duas. Os
+stack traces das execuções apontam para caminhos da cópia e precisam ser traduzidos para caminhos
+relativos ao alvo.
+
+---
+
+### D17 — Entradas de segurança: comportamento que deve mudar
+
+**Contexto.** Problema #9 da rodada 1. Uma entrada maliciosa (injeção, valor fora do domínio) muda
+de status quando o finding é corrigido: era aceita e passa a ser rejeitada. No inventário comum, o
+harness a marcava como `REGRESSION`. O rótulo estava errado, e ensinaria o leitor a ignorar o
+estado de resultado.
+
+**Decisão.** O inventário ganha entradas `kind: "security"`, que obrigatoriamente nomeiam o
+finding que demonstram (`finding: "AP-xx"`), com `expect: "rejected"`. Os resultados são
+`FIXED`, `NOT FIXED`, `REGRESSION` (a correção fez a entrada hostil derrubar a aplicação) ou
+`UNVERIFIED` (o baseline já rejeitava, e a entrada não demonstra nada). Essas entradas rodam
+depois das entradas de contrato, porque podem alterar estado. Um `NOT FIXED` num finding contado
+como resolvido é contradição, e o finding volta para `unresolved`.
+
+**Justificativa.** O baseline deixa de só proteger contra regressão e passa também a provar a
+correção: a rodada 1 mostrou no baseline três findings de segurança sendo explorados, mas nada
+mostrava, depois, que tinham sido fechados. A exigência de `finding` impede que "segurança" vire
+isenção genérica da regra de regressão.
+
+**Alternativas rejeitadas.**
+- *Pular as entradas maliciosas* — perde a única evidência comportamental de que a correção
+  funciona.
+- *Deixar como `REGRESSION` e explicar no relatório* — é o ruído que a D6.5 proíbe.
+
+**Custo aceito / consequências.** O agente precisa escrever essas entradas, e só vale para
+correções visíveis como rejeição. Um hash que deixa de sair na resposta não é "rejeição"; é
+verificado de outra forma, e o relatório diz como.
+
+---
+
+### D18 — Upgrade de dependência versus contrato
+
+**Contexto.** Problema #10 da rodada 1. Não estava definido se um upgrade major, ou com mudança de
+comportamento, é mudança de contrato. Dois subagentes decidiram de formas opostas na mesma rodada.
+Um aplicou um upgrade major; o outro propôs um upgrade porque o harness não capturava os headers
+afetados. O segundo estava mais certo, mas pelo motivo errado: a limitação era do harness, não da
+regra.
+
+**Decisão.** Patch ou minor dentro da mesma major: seguro. Major, ou versão cujo changelog anuncia
+mudança de comportamento: seguro **só** se o replay exercitar o comportamento que muda. Senão,
+proposta. Para tornar isso verificável, o protocolo passa a capturar uma allowlist normativa de
+**headers de contrato** (`Location`, `WWW-Authenticate`, `Access-Control-*` e os nomes dos
+`Set-Cookie`). Advisory de segurança sobe a severidade do finding, mas não dispensa a regra.
+
+**Justificativa.** A regra depende de um fato verificável (o replay cobre o comportamento?), não da
+confiança do agente no changelog. E a allowlist aumenta o que o replay cobre sem trazer de volta o
+ruído que a D6.5 proíbe: são headers que clientes usam, e não detalhes de transporte.
+
+**Alternativas rejeitadas.**
+- *Todo major é contrato* — simples, mas deixaria vulnerabilidades abertas mesmo quando o replay
+  prova que nada mudou.
+- *Todo upgrade com advisory é seguro* — confunde urgência com segurança da mudança.
+
+**Custo aceito / consequências.** O agente precisa ler o changelog entre as versões, e às vezes
+acrescentar uma entrada à superfície **capturada contra o original** (D16).
+
+---
+
+### Mudanças menores da rodada 2 (sem decisão própria)
+
+| # | Mudança | Por quê |
+|---|---|---|
+| 4 | Estados de registro separados: `OBSERVED`, `ERROR` (falha de transporte), `SKIPPED` | A spec v1 dizia em §4 que erro de transporte no baseline é falha, mas mandava gravá-lo em §3 com o mesmo estado de "pulado". **Os dois probes** seguiam o §3. A contradição estava na spec, não em um probe |
+| 4 | Teste de conformidade entre `probe.py` e `probe.mjs` (`tests/probe-conformance/`) | Os probes são traduções da spec, e traduções divergem. O teste já encontrou uma divergência que a rodada 1 não viu: `probe.py` seguia redirects e `probe.mjs` não |
+| 5 | Corpo de texto ≤ 4096 bytes comparado como esqueleto mascarado (linhas distintas, números/UUIDs/timestamps mascarados) | `opaque` escondia mensagens de erro reescritas |
+| 7 | Nova AP-18 *Insecure Runtime Configuration* (OWASP A05) + RP-17 | Lacuna revelada na calibração: os subagentes classificaram debug ligado sob AP-15/AP-06, com escalonamento improvisado |
+| 8 | Nova AP-19 *Known-Vulnerable Dependency* (OWASP A06) + RP-18, separada de AP-14 | Advisory não é deprecation. A regra de evidência de D13 vale integralmente |
+| 11 | Achado resolvido: só três baldes, `resolved`, `proposed`, `unresolved`. **Não existe "parcial"** | Um balde "parcial" deixaria o finding contar como progresso enquanto o resto dele fica fora de todos os totais |
+| 12 | `--only` e `--merge` no harness; entrada tardia é capturada contra o original (D16) | Uma entrada que só rodou contra o código novo não foi comparada com nada |
+| 13 | Varredura **por entrada do catálogo** e tabela `Catalog Coverage` no relatório; AP-01 cobre credenciais em dados que chegam ao datastore de runtime (seeds, migrações) | Os três achados que a Fase 2 perdeu na rodada 1. **Constatação honesta:** AP-11 já listava "invariantes de domínio" na versão cega. A falha foi de **varredura**, não de catálogo, e por isso a correção principal é de processo |
+| 13 | A re-auditoria marca cada `unresolved` com a origem: `failed`, `introduced` ou `missed-in-phase-2` | Mede o recall da Fase 2 separado da qualidade da refatoração (emenda à D14) |
+| 2 | Instalar as dependências **declaradas** pelo alvo em ambiente isolado é permitido e registrado; adicionar dependência continua proibido | "Nunca instale dependência" não distinguia os dois atos |
+| — | A skill nunca altera índice nem histórico do git | Intervenção da rodada 1: um subagente rodou `git rm --cached` |
+
+---
+
+### Nota — decisões da rodada 3 (D19–D23)
+
+Tomadas depois de ler [`docs/rounds/round2-report.md`](rounds/round2-report.md) **e depois do
+gabarito**. Diferente da rodada 2, o autor já não está cego para os alvos. A lista de mudanças foi
+congelada antes de qualquer edição da skill
+([`docs/rounds/round3-changes.md`](rounds/round3-changes.md)), e declara essa contaminação.
+
+---
+
+### D19 — Isolamento de execução: container primeiro, modo host declarado
+
+**Contexto.** Incidente R2-1. Na Fase 2 de um dos projetos, um subagente encerrou a cópia do
+original com `taskkill /F /IM python.exe`, que mira todo processo Python da máquina. A skill manda
+subir e derrubar a aplicação umas seis vezes por execução (Fase 2, baseline, capturas tardias,
+replay, re-auditoria), mas nunca disse **como** derrubar. O log da rodada omitiu o incidente, que
+só apareceu na mensagem final do subagente. Relacionados: R2-2 (a aplicação refatorada rodava no
+alvo e sujava a árvore com banco e bytecode; o snapshot era apagado antes da re-auditoria, que ainda
+precisava dele) e R2-3 (overrides de porta com efeitos colaterais, como desligar o debug).
+
+**Decisão.**
+1. **Modo container**, quando existe um runtime de container. Cada execução (original ou
+   refatorada) roda num container descartável com a cópia de execução montada, nome
+   `refactor-arch-<alvo>-<run>` e label da rodada. O probe roda **dentro** do container (`exec`),
+   contra a porta nativa, e por isso não é preciso publicar porta nem mudar bind. Encerrar é
+   remover o container **por aquele nome exato**.
+2. **Modo host**, quando não há container ou a imagem não pode ser obtida (por exemplo, com
+   `--offline`). Toda execução passa pela ferramenta de ciclo de vida (D20). O relatório declara
+   `Isolation: reduced (host)`.
+3. **Nos dois modos**, é proibido encerrar por nome, imagem ou padrão, encerrar o que a skill não
+   subiu e liberar à força uma porta ocupada por outro processo (escolhe-se outra porta). Todo
+   start e stop entra num `## Execution Log` no relatório, e uma ação sobre processo fora do log é
+   **incidente**, reportado em `## Verification Coverage`.
+4. **Emenda à D16:** a aplicação refatorada também roda de uma cópia (`refactored-<n>/`), nunca no
+   alvo. O snapshot é apagado depois da re-auditoria.
+
+**Justificativa.** A rodada mostrou que uma regra sozinha não basta: o outro projeto Python usou a
+forma segura (`taskkill /PID`) e este não, e a diferença foi acaso. Um container torna o erro
+**inofensivo**, em vez de só proibido: um `kill` errado dentro dele não alcança o host, e o ciclo de
+vida inteiro vira um handle só. É o padrão das outras degradações da skill (D6.4, D13): o melhor
+modo quando possível, e o modo reduzido **declarado**.
+
+**Alternativas rejeitadas.**
+- *Só a regra* — é regra, não barreira. Depende de o agente obedecer sob pressão, que foi
+  exatamente o que falhou.
+- *Só container* — sem Docker, a skill pararia de validar. Isso contraria a D6.2 (dependência
+  adicional zero) e o princípio de degradar declarando, e não parando.
+
+**Custo aceito / consequências.** Dois caminhos de execução para manter e testar. O container
+precisa de uma imagem oficial do runtime na versão da Fase 1, e baixá-la exige rede. Em host POSIX,
+os arquivos criados no volume podem ficar com o dono do container: roda-se com o uid/gid do
+usuário. O container é uma dependência **opcional do host**, não do alvo: a D6.2 continua valendo
+para o que se instala no projeto.
+
+---
+
+### D20 — Ferramenta de ciclo de vida separada do probe (emenda à D6.1)
+
+**Contexto.** No modo host, "encerrar só o que eu subi" exige lembrar o PID de uma invocação para
+outra, conferir que o PID não foi reutilizado e encerrar a árvore inteira (servidores com
+*reloader* criam filhos). Pedir isso a um agente a cada vez, em texto livre, é o que produziu o
+R2-1. A D6.1 dizia que o agente sobe e encerra o processo, e que o harness nunca sobe nada.
+
+**Decisão.** Novos scripts de referência `scripts/proc.py` e `scripts/proc.mjs` (stdlib/built-ins),
+**separados do probe**:
+- `start`: executa o argv que o agente derivou, num grupo de processos novo; grava PID, grupo,
+  argv, cwd, porta e hora de início num arquivo de estado dentro do snapshot; espera a porta
+  aceitar conexões. Recusa uma porta já ocupada.
+- `stop`: confere a identidade do PID (a hora de início bate) e encerra **só a árvore registrada**.
+  Se a identidade não bate, recusa e reporta.
+- `status`: diz se o processo registrado está vivo e se a porta responde.
+
+A D6.1 é emendada: o **agente** continua derivando *o que* rodar; o `proc` é dono só do *tempo de
+vida* do processo; o **probe** continua sem subir nada.
+
+**Justificativa.** Transforma a regra da D19 em código conferível, com teste. O `proc` não sabe nada
+de stack: recebe um argv, como um supervisor de processos qualquer. Por isso não reintroduz o
+acoplamento que a D6.1 evitava, que era o harness saber subir Flask, Express ou Rails.
+
+**Alternativas rejeitadas.**
+- *Pôr o ciclo de vida dentro do probe* — mistura um protocolo puro com gestão de processo e obriga
+  o teste de conformidade do probe a cobrir comportamento de sistema operacional.
+- *Instruções por sistema operacional no SKILL.md* — texto por plataforma, que envelhece, e
+  continua dependendo de o agente acertar o PID.
+
+**Custo aceito / consequências.** Mais duas implementações para manter em conformidade. Conferir a
+hora de início do processo exige um comando do sistema (`ps` em POSIX, PowerShell no Windows),
+porque nem a stdlib do Python nem o Node expõem isso de forma portável.
+
+---
+
+### D21 — Entrada de segurança neutralizada
+
+**Contexto.** R2-5. A D17 só conhece `expect: "rejected"`. Uma correção de injeção que passa a
+tratar a entrada hostil como texto, em vez de rejeitá-la, muda a resposta sem rejeitar. Sem estado
+próprio, a entrada virou `REGRESSION` e a linha do replay saiu com `✗`. A saída foi honesta, mas
+errada, e é o ruído que a D6.5 proíbe.
+
+**Decisão.** `expect: "neutralized"`, obrigatoriamente com `like: <id de entrada benigna>`. O
+resultado é `FIXED` quando o replay responde sem erro e com o mesmo shape da entrada benigna irmã,
+capturada no mesmo baseline; `NOT FIXED` quando repete o comportamento anômalo do baseline. Nunca
+vira `REGRESSION` só por ter mudado.
+
+**Justificativa.** "Neutralizada" sem critério viraria isenção genérica, porque qualquer mudança
+passaria. A entrada benigna irmã é o critério objetivo: a entrada hostil tem que passar a se
+comportar como uma entrada comum do mesmo endpoint.
+
+**Alternativas rejeitadas.**
+- *Marcar a entrada como `skip`* — perde a única prova comportamental de que a injeção foi fechada.
+- *Aceitar qualquer 2xx* — um 2xx com shape diferente pode ser justamente o vazamento.
+
+**Custo aceito / consequências.** Cada entrada neutralizável precisa de uma irmã benigna no
+inventário, com o mesmo método e caminho e parâmetros legítimos.
+
+---
+
+### D22 — O contrato de erro
+
+**Contexto.** R2-7. O §6 das guidelines chamava de mudança de contrato alterar o shape da resposta de
+erro; o RP-17 chamava de seguro trocar a página de erro padrão do framework, que vaza stack trace.
+Um subagente mascarou segredos vazados mantendo o campo, e não havia regra que dissesse se isso é
+seguro. Correções que exigem dependência nova (um servidor de produção) não tinham regra.
+
+**Decisão.**
+- São contrato o **status** e o **shape dos corpos de erro que a aplicação produz de propósito**.
+  A página de erro padrão do framework, emitida quando nada tratou o erro, não é contrato:
+  substituí-la mantendo o status é seguro.
+- Mascarar um segredo ou credencial vazado **mantendo o campo e o tipo** é seguro, pelo teste do
+  uso legítimo da D15: nenhum cliente legítimo depende de ler de volta um hash de senha ou uma
+  chave. Remover o campo continua sendo mudança de contrato.
+- Correção que exige **dependência de runtime nova** é proposta: muda o que quem implanta precisa
+  instalar.
+- Um `missed-in-phase-2` que exige decisão de produto pode ser `proposed`, e não só `unresolved`.
+
+**Justificativa.** O teste é o mesmo em todos os casos: o que um cliente legítimo observa em uso
+legítimo. Ninguém programa contra o HTML de uma página de erro não tratada. Um cliente pode
+programar contra o JSON de erro que a aplicação documenta.
+
+**Alternativas rejeitadas.** *Todo erro é contrato* deixaria vazamentos de stack trace sem correção.
+*Nenhum erro é contrato* quebraria clientes que tratam códigos de erro da aplicação.
+
+**Custo aceito / consequências.** O agente precisa distinguir erro intencional de erro não tratado.
+O critério observável é quem produziu o corpo: um handler da aplicação ou o default do framework.
+
+---
+
+### D23 — Laço de correção limitado
+
+**Contexto.** R2-10. O playbook mandava fazer replay depois de cada transformação e o SKILL.md tinha
+um replay só. Não dizia se o que a re-auditoria encontra pode ser corrigido na mesma rodada. Os três
+subagentes decidiram de três formas.
+
+**Decisão.** Um replay completo é obrigatório; replays por transformação são opcionais (smoke).
+Findings `failed` e `introduced` da re-auditoria podem ser corrigidos na mesma rodada, seguidos de
+replay completo e de **no máximo mais uma** re-auditoria. As duas passadas ficam no relatório.
+`missed-in-phase-2` corrigido na Fase 3 é contado à parte (`fixed-after-re-audit`), e o total de
+findings da Fase 2 não muda.
+
+**Justificativa.** Sem limite, o laço não termina e o relatório final não corresponde a nenhuma
+auditoria completa. Sem permissão para corrigir, a skill entrega defeitos que ela mesma introduziu e
+já viu. Contar `missed-in-phase-2` à parte mantém o recall da Fase 2 mensurável (D8): corrigir não
+apaga o fato de que a auditoria não viu.
+
+**Alternativas rejeitadas.** *Nunca corrigir depois da re-auditoria* é simples, mas entrega
+`introduced` conhecidos. *Corrigir até zerar* pode não terminar.
+
+**Custo aceito / consequências.** Uma rodada pode ter duas re-auditorias, e o relatório fica mais
+longo.
+
+---
+
+### Mudanças menores da rodada 3 (sem decisão própria)
+
+| # | Mudança | Por quê |
+|---|---|---|
+| R2-4 | `Target:` absoluto quando não é relativo ao CWD; campos `Boot:`, `Port:`, `Runtime env:`, `Isolation:`; `surface.json` escrito na 3a; exclusão de diretórios de configuração de agentes na contagem | O bloco da Fase 1 não tinha onde pôr o que o `01` mandava registrar, e a Fase 1 é só leitura |
+| R2-6 | RP-18 alinhado ao §6; correção opt-in; advisory só domina AP-14 no caminho de runtime; pins exatos sem lockfile; degrau para advisory LOW; AP-14 sem sucessor nomeado | Arestas da regra da D18 que os subagentes resolveram cada um de um jeito |
+| R2-9 | `audit-latest.md` é o estado final; sem prompt com `--yes`; uma só `## Proposed, Not Applied`; `File:` do arquivo inteiro para God Module | Contradições do template |
+| R2-11 | Mensagens dos probes, contagem do aviso de transporte, saída de `capture --only --merge`, fixtures de conformidade | Bugs do harness |
+| R2-12 | Precedência única entre AP-03 e AP-05 | As duas escalavam em direções opostas, e o número de findings dependia da escolha |
+| R2-8 | Nova AP-20 *Missing Schema-Level Integrity Constraints* + RP-19 (Karwin, *SQL Antipatterns*); `Catalog Coverage` registra os sinais checados por entrada | Família perdida na Fase 2 nos três projetos. **Constatação honesta:** limite de tamanho de requisição e transição de estado sem guarda **já eram sinais de AP-11**; ali a falha foi de varredura. A entrada nova cobre só o que faltava no catálogo: restrições do esquema |
+
+---
+
 ## 4. O princípio emergente: a skill nunca degrada em silêncio
 
 > **A skill nunca degrada em silêncio.**
@@ -960,7 +1306,7 @@ frequentemente falsa: é o formato exato de uma alucinação bem-sucedida.
 
 ## 6. Estado do registro
 
-D1–D14 estão decididas; `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
+D1–D23 estão decididas (D15–D18 na rodada 2 e D19–D23 na rodada 3, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
 este documento foi escrito. Duas dessas decisões (D6 e D13) já foram revertidas uma vez, e
 o registro das reversões foi mantido deliberadamente: a versão final de cada uma é menos
 instrutiva do que o caminho que levou a ela.
@@ -973,3 +1319,16 @@ depois.
 
 Novas decisões são registradas primeiro em `CLAUDE.md`, que é o documento vivo da
 especificação; este registro é atualizado em seguida, com o histórico e o argumento.
+
+**Revisão da rodada 2 (2026-09-21).** D15–D18 e as mudanças menores foram escritas por uma sessão
+que leu o relatório da rodada 1, e portanto viu achados concretos dos três projetos, mas não leu o
+código deles nem o gabarito. A lista de mudanças foi congelada antes, em
+[`round2-changes.md`](rounds/round2-changes.md). As duas entradas novas do catálogo (AP-18, AP-19) vêm do
+OWASP Top 10 e deveriam ter estado na versão cega. A entrada delas pela calibração é declarada
+aqui, e não escondida.
+
+**Revisão da rodada 3 (2026-09-21).** D19–D23 foram escritas por uma sessão que **leu o gabarito**
+e a comparação dele com a rodada 2. A partir desta revisão o autor não está mais cego para os
+alvos. A única entrada nova do catálogo (AP-20) vem de Karwin, *SQL Antipatterns*. O recall da
+rodada 3 na família que ela cobre é declarado contaminado em
+[`round3-changes.md`](rounds/round3-changes.md), e não conta como evidência de generalização.
