@@ -1,13 +1,13 @@
 # 05 — Refactoring Playbook
 
-Eighteen transformations, one for each catalog entry (RP-16 covers two). Each states its
+Nineteen transformations, one for each catalog entry (RP-16 covers two). Each states its
 **contract impact**: `safe` (apply automatically) or `contract-changing` (gated per
 `04-architecture-guidelines.md` §6 — propose, do not apply).
 
-Examples span **Python, JavaScript/TypeScript, Go, Ruby and PHP**, deliberately: the patterns are
-not stack-bound, and reading the same idea in five syntaxes is the proof. The domains — warehouse
-inventory, room booking, library loans, sensor telemetry, fleet maintenance — are invented and
-neutral. Translate the shape, not the syntax.
+Examples span **Python, JavaScript/TypeScript, Go, Ruby, PHP and SQL**, deliberately: the patterns
+are not stack-bound, and reading the same idea in several syntaxes is the proof. The domains —
+warehouse inventory, room booking, library loans, sensor telemetry, fleet maintenance, tool
+rental — are invented and neutral. Translate the shape, not the syntax.
 
 **Method for every transformation:** make one behaviour-preserving move at a time; keep the public
 surface fixed unless the gate says otherwise; if a step cannot be made behaviour-preserving, stop
@@ -35,6 +35,7 @@ the **full replay** of SKILL.md 3c, which is mandatory and is the only replay th
 | RP-16 | Rename for intent and delete dead code | AP-16, AP-17 | safe for internals only |
 | RP-17 | Make runtime configuration safe by default | AP-18 | mixed — see entry |
 | RP-18 | Upgrade a vulnerable dependency to its fixed version | AP-19 | safe within a major — see entry |
+| RP-19 | Declare integrity constraints in the schema | AP-20 | mixed — see entry |
 
 ---
 
@@ -1317,3 +1318,101 @@ If the vulnerable package is transitive, move the **direct** dependency that pul
 ecosystem's override mechanism, and say which. An override that pins a transitive package outside
 the range its parent declares runs the parent with a version it was never tested against: treat it
 like a major upgrade (step 3).
+
+---
+
+## RP-19 — Declare integrity constraints in the schema
+
+**Fixes AP-20** · **Contract: mixed** — decided per constraint by the legitimate-use test
+(`04-architecture-guidelines.md` §6):
+
+- **Safe:** a uniqueness constraint on a column the application **already treats as an identity**
+  (it looks records up by it and takes one) — a duplicate is a value that breaks an invariant the
+  domain already states; a foreign key that only rejects a reference to a row that does not exist;
+  moving money from binary floating point to an exact type (a fixed-point decimal, or an integer
+  count of minor units) **when the value crosses the boundary in the same type and format as
+  before** — the replay's shape comparison checks exactly that.
+- **Contract-changing:** choosing what happens to children when a parent is deleted (refuse,
+  cascade, detach) — every choice changes what a delete does today; a constraint the **existing
+  data already violates**, which cannot be added without deciding which rows win; a change to how an
+  amount is serialized (number to string, units to minor units). Propose them, with the query that
+  counts the violating rows.
+
+Never apply a schema change by dropping and recreating the datastore. Deliver it the way the
+project already changes its schema — a migration, a versioned DDL script, the ORM's migration
+tool — and if the project has none, as a new idempotent script run at the same point its schema is
+created today. The original's data must survive the change. Some engines cannot add a constraint
+to an existing table; there the migration rebuilds the table by copy — create the constrained
+table, copy the rows, swap the names — inside one transaction, never by dropping data.
+
+**Before** (SQL migration, a tool-rental service; and the Go code that computes a charge)
+
+```sql
+-- 001_init.sql
+CREATE TABLE members (
+  id           INTEGER PRIMARY KEY,
+  member_code  TEXT,            -- members sign in with it; looked up with LIMIT 1
+  full_name    TEXT
+);
+
+CREATE TABLE rentals (
+  id         INTEGER PRIMARY KEY,
+  member_id  INTEGER,           -- joined on members.id; nothing enforces it
+  daily_fee  REAL,              -- binary floating point
+  days       INTEGER
+);
+```
+
+```go
+// charge.go
+func Charge(r Rental) float64 {
+    return r.DailyFee * float64(r.Days) * 1.08   // drifts: 19.99 * 3 * 1.08 is not 64.7676
+}
+```
+
+**After**
+
+```sql
+-- 002_integrity.sql — additive; existing rows are kept
+-- Run first, and stop if either returns rows: the constraint would reject existing data,
+-- and deciding which row wins is a proposal, not a refactoring.
+SELECT member_code, COUNT(*) FROM members GROUP BY member_code HAVING COUNT(*) > 1;
+SELECT r.id FROM rentals r LEFT JOIN members m ON m.id = r.member_id WHERE m.id IS NULL;
+
+CREATE UNIQUE INDEX members_member_code_key ON members (member_code);
+
+ALTER TABLE rentals ADD COLUMN daily_fee_cents INTEGER;
+UPDATE rentals SET daily_fee_cents = CAST(ROUND(daily_fee * 100) AS INTEGER);
+ALTER TABLE rentals
+  ADD CONSTRAINT rentals_member_fk FOREIGN KEY (member_id) REFERENCES members (id);
+  -- no ON DELETE clause here on purpose: what a member delete does to rentals is proposed
+```
+
+```go
+// money.go — exact arithmetic inside; the boundary keeps the type clients already receive
+type Cents int64
+
+const taxBasisPoints = 800 // 8.00 %
+
+func Charge(r Rental) Cents {
+    gross := Cents(r.DailyFeeCents) * Cents(r.Days)
+    return gross + (gross*taxBasisPoints+5000)/10000 // round half up, once, at the end
+}
+
+// Presentation: the response still carries a decimal number, as before.
+func (c Cents) JSONAmount() float64 { return float64(c) / 100 }
+```
+
+Procedure:
+
+1. For each AP-20 finding, write the query that counts the rows the constraint would reject. Run
+   it against a **run copy** of the original's datastore, never against `<target>`.
+2. Zero rows and a safe constraint: add it through the project's own schema-change mechanism.
+   Otherwise, propose it with the count.
+3. For money, convert at the storage and computation layers; keep the boundary type and format
+   unchanged. If the boundary would have to change, propose that part.
+4. Replay. A `REGRESSION` on a write entry means a legitimate request is now rejected — the
+   constraint was not as safe as it looked: revert it and propose it.
+5. Add a security entry for each applied constraint that should now reject something — the
+   duplicate identity, the dangling reference — with `expect: "rejected"`
+   (`06-validation-protocol.md` §2.1).

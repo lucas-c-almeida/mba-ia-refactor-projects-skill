@@ -1,13 +1,14 @@
 # 02 — Anti-Pattern Catalog
 
-Nineteen entries, drawn from Fowler's *Refactoring*, Feathers' *Working Effectively with Legacy
-Code*, the SOLID principles and the OWASP Top 10. Nothing here is specific to a project, a framework
-or an ecosystem.
+Twenty entries, drawn from Fowler's *Refactoring*, Feathers' *Working Effectively with Legacy
+Code*, the SOLID principles, the OWASP Top 10 and Karwin's *SQL Antipatterns*. Nothing here is
+specific to a project, a framework or an ecosystem.
 
-**Sweep by entry.** Phase 2 walks this catalog one entry at a time, looking for that entry's signals
-across the whole target — source, and the data and scripts that reach the runtime — and records
-each entry's outcome in the report's coverage table, hits or none. A file-by-file reading only
-catches what stands out in each file.
+**Sweep by entry, and by signal.** Phase 2 walks this catalog one entry at a time and, within each
+entry, one **detection signal** at a time, across the whole target — source, schema, and the data
+and scripts that reach the runtime — and records each entry's outcome and the signals it checked
+in the report's coverage table, hits or none. A file-by-file reading only catches what stands out
+in each file; an entry-level glance catches the entry's most familiar signal and stops there.
 
 ## How to use this catalog
 
@@ -77,9 +78,11 @@ whichever entry the sweep reaches first.
 | AP-17 | Dead Code and Commented-Out Code | LOW |
 | AP-18 | Insecure Runtime Configuration | HIGH |
 | AP-19 | Known-Vulnerable Dependency | HIGH (impact-driven) |
+| AP-20 | Missing Schema-Level Integrity Constraints | MEDIUM |
 
-AP-18 and AP-19 come last because they were added after the first calibration round, not because
-they matter less. Their ids are stable; the index is not ordered by severity.
+AP-18 and AP-19 come last because they were added after the first calibration round, and AP-20
+after the second — not because they matter less. Their ids are stable; the index is not ordered by
+severity.
 
 ---
 
@@ -870,3 +873,50 @@ memory.
 **Impact.** The vulnerability is public, documented and often already weaponized: attackers read
 the same advisories, and scan for the versions they name. Unlike a flaw in the project's own code,
 this one is found without reading the project at all.
+
+---
+
+## AP-20 — Missing Schema-Level Integrity Constraints
+
+**Default severity:** MEDIUM · **Transformation:** RP-19 · **Source:** Karwin, *SQL Antipatterns*
+("Keyless Entry", "Rounding Errors"); relational schema design
+
+Distinct from AP-11: that one is a value the **boundary** fails to check; this one is a rule the
+**datastore** fails to hold. Application checks can be bypassed by a second entry point, a script,
+a migration or two concurrent requests; a constraint in the schema cannot. When a rule matters
+enough that the application relies on it, the schema is the last place it can be enforced.
+
+**Detection signals**
+
+Read the schema wherever it is declared — DDL, migrations, ORM model definitions, a schema file,
+the statements a bootstrap script runs.
+
+- A column the application **treats as an identity** — it looks records up by it and expects one
+  result (a login name, an email used to sign in, an external reference, a slug) — with no
+  uniqueness constraint or unique index. The observable signal is a lookup by that column that
+  takes the first row, next to a table definition that does not forbid a second.
+- A column that **refers to another table's key** — named after the other entity, or joined on it
+  in queries — with no foreign-key declaration. On engines where foreign keys must be switched on
+  per connection, a declaration that is never enabled counts as absent.
+- A delete of a parent record with no rule for its children: no foreign key with a declared
+  delete behaviour, and no application code that removes, re-parents or refuses. The children stay,
+  pointing at nothing (orphans).
+- A monetary amount, a price, a balance or a quantity of currency stored in a **binary
+  floating-point** type (`float`, `double`, `real`), or computed in one before being stored.
+  Binary floating point cannot represent most decimal fractions; sums drift by fractions of a cent.
+- A column that must always have a value — the application dereferences it unconditionally — left
+  nullable, or a closed set of values stored as free text with no check constraint or reference
+  table.
+
+**Escalate to HIGH** — the missing constraint lets identity or money be corrupted: two accounts
+answering to one sign-in name, a balance that drifts, charges attached to a deleted customer. Say
+which, and how the application would reach that state.
+
+**De-escalate to LOW** — the datastore is an in-process cache or scratch store rebuilt at every
+start, so no corrupt state outlives the process; or the engine cannot express the constraint and the
+application enforces it at a single choke point that every write traverses (name it).
+
+**Impact.** Every rule the application checks in code is a rule some path eventually skips: a new
+endpoint, a batch script, a retried request racing the first. Without the constraint, the data
+records the violation silently and permanently; it surfaces later as a login that picks the wrong
+account, a report that does not add up, or a join that returns rows for nobody.
