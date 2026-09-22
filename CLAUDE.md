@@ -684,7 +684,7 @@ só se o replay cobrir o que muda. Senão, proposta. O protocolo passa a compara
 ## 9. Perguntas em aberto
 
 Nenhuma. D1–D18 decididas. Rodada 2: mudanças da skill aplicadas em `feat/round2`, aguardando
-o gabarito (sessão cega, `docs/gabarito-prompt.md`) e a execução da rodada.
+a execução da rodada. Gabarito pronto em `docs/gabarito.md` (seção A do README).
 
 ---
 
