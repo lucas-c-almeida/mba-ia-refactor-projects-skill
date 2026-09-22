@@ -186,22 +186,24 @@ Mais o código refatorado dos três projetos, commitado.
 ### 7.1 Artefatos de processo (nossos, fora da estrutura exigida)
 
 A árvore acima é a exigida pelo enunciado. Nossas decisões produzem artefatos adicionais, que
-**não** substituem nada dela e ficam **ancorados na raiz do repositório**:
+**não** substituem nada dela. `CLAUDE.md` e `instructions.md` ficam na raiz; todo o resto fica
+agrupado sob `docs/`:
 
 ```
-instructions.md          # enunciado original, preservado intacto (era README.md)
-CLAUDE.md                # esta especificação viva
-docs/decisions.md        # registro ADR das decisões, com alternativas e custos
-runs/p<N>-iter<K>.md     # transcript de cada rodada                      (D3)
-evals/rubric.md          # rubrica de avaliação                           (D8)
-evals/run-p<N>-iter<K>.md# scorecard preenchido por rodada                (D8)
+instructions.md                # enunciado original, preservado intacto (era README.md)
+CLAUDE.md                      # esta especificação viva
+docs/decisions.md              # registro ADR das decisões, com alternativas e custos
+docs/rounds/round<K>-report.md # relatório consolidado de cada rodada
+docs/runs/p<N>-iter<K>.md      # transcript de cada rodada                 (D3)
+docs/evals/rubric.md           # rubrica de avaliação                      (D8)
+docs/evals/run-p<N>-iter<K>.md # scorecard preenchido por rodada           (D8)
 ```
 
 Dentro de cada projeto-alvo, a skill gera `<alvo>/reports/audit-*.md` (D5); a entrega copia o
 `audit-latest.md` de cada um para `reports/audit-project-N.md` na raiz.
 
-**Nota:** `runs/` e `evals/` existem para a nossa metodologia de medição, não para a nota. Se
-poluírem a entrega, vão para `.gitignore` — mas a decisão padrão é commitá-los, porque são a
+**Nota:** `docs/runs/` e `docs/evals/` existem para a nossa metodologia de medição, não para a
+nota. Se poluírem a entrega, vão para `.gitignore` — mas a decisão padrão é commitá-los, porque são a
 evidência de que a seção C do README de entrega não foi inventada.
 
 ---
@@ -255,7 +257,7 @@ Cada execução da skill num projeto é uma **rodada**, e toda rodada é isolada
 |---|---|---|
 | Contexto | Sessão nova do Claude por projeto (nunca os 3 na mesma) | Contaminação: o agente chegar no projeto 2 já "sabendo" o que achar |
 | Código | `git tag run/p<N>/iter<K>` antes de cada rodada | Rodada não repetível; impossibilidade de re-testar após ajustar a skill |
-| Evidência | Transcript salvo em `runs/p<N>-iter<K>.md` | Perder o *porquê* de uma regressão quando a sessão fecha |
+| Evidência | Transcript salvo em `docs/runs/p<N>-iter<K>.md` | Perder o *porquê* de uma regressão quando a sessão fecha |
 
 ```bash
 git tag run/p2/iter1
@@ -391,7 +393,7 @@ com argumento. Decidir *por* o time o que quebrar não é papel de uma ferrament
 
 ### D8 — Medição: **scorecard formal com métricas de generalização** ✅ decidido
 
-`evals/rubric.md` define a rubrica; cada rodada produz `evals/run-p<N>-iter<K>.md`.
+`docs/evals/rubric.md` define a rubrica; cada rodada produz `docs/evals/run-p<N>-iter<K>.md`.
 
 Métricas, e o que cada uma responde:
 

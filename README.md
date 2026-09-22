@@ -59,7 +59,11 @@ mba-ia-refactor-projects-skill/
 │       ├── probe.py                       #   harness de referência — Python stdlib
 │       └── probe.mjs                      #   harness de referência — Node, zero deps
 │
-├── docs/decisions.md                      # registro ADR das decisões D1–D14
+├── docs/                                  # artefatos de processo (nossos, fora do exigido)
+│   ├── decisions.md                       #   registro ADR das decisões D1–D14
+│   ├── rounds/                            #   relatório consolidado de cada rodada
+│   ├── runs/                              #   PENDENTE — transcript de cada rodada (D3)
+│   └── evals/                             #   PENDENTE — rubrica e scorecards (D8)
 │
 ├── code-smells-project/                   # Projeto 1 — campo de prova
 ├── ecommerce-api-legacy/                  # Projeto 2 — campo de prova
@@ -69,14 +73,11 @@ mba-ia-refactor-projects-skill/
 │   ├── audit-project-1.md
 │   ├── audit-project-2.md
 │   └── audit-project-3.md
-│
-├── runs/                                  # PENDENTE — transcript de cada rodada (D3)
-└── evals/                                 # PENDENTE — rubrica e scorecards (D8)
 ```
 
 **O que o enunciado exige** é o bloco de cima somado a `reports/` e à cópia da skill dentro dos três
-projetos. **O que é artefato de processo nosso** são `instructions.md`, `CLAUDE.md`, `docs/`,
-`runs/` e `evals/` — descritos em `CLAUDE.md` §7.1. Eles não substituem nada da estrutura exigida;
+projetos. **O que é artefato de processo nosso** são `instructions.md`, `CLAUDE.md` e tudo sob
+`docs/` — descritos em `CLAUDE.md` §7.1. Eles não substituem nada da estrutura exigida;
 existem para que a seção C deste documento seja verificável em vez de afirmada.
 
 Sobre a cópia da skill: a versão canônica vive **uma única vez**, na raiz. A exigência do enunciado
@@ -731,7 +732,7 @@ completa):
 
 ### C.6 — Métricas de generalização (D8)
 
-Preenchidas a partir de `evals/run-p<N>-iter<K>.md`, só depois de a seção A existir.
+Preenchidas a partir de `docs/evals/run-p<N>-iter<K>.md`, só depois de a seção A existir.
 
 | Métrica | O que responde | P1 | P2 | P3 |
 |---|---|---|---|---|
