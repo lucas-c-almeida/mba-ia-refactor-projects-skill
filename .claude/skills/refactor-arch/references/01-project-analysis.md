@@ -27,8 +27,11 @@ Do not rely on a single signal. Rank by weight:
 
 **Exclude from the census** anything not authored here: dependency directories
 (`node_modules`, `vendor`, `.venv`, `venv`, `site-packages`, `target`, `Pods`), build output
-(`dist`, `build`, `out`, `.next`, `__pycache__`, `*.min.*`), and anything matched by `.gitignore`.
-State the exclusion rule you used in the report — a file count is meaningless without it.
+(`dist`, `build`, `out`, `.next`, `__pycache__`, `*.min.*`), tool and agent configuration
+directories (`.claude/`, `.github/`, `.vscode/`, `.idea/` — including this skill's own files when it
+is installed inside the target), audit output (`reports/` written by this skill), and anything
+matched by `.gitignore`. State the exclusion rule you used in the report — a file count is
+meaningless without it.
 
 A repository may be **polyglot**. Report the dominant language by authored bytes and name the others.
 If a second language carries real logic (not just tooling), analyze it too.
@@ -116,18 +119,24 @@ Rules for enumerating:
   a helper — follow the registration, not just the literal decorators.
 - Record, per entry, everything needed to exercise it: method, path template, a sample value for each
   path/query parameter, a minimal valid body, and whether authentication is required.
-- Mark entries you cannot exercise safely or deterministically (destructive operations, calls to a
-  third-party service, endpoints needing credentials you do not have). They become `UNVERIFIED`, not
-  silent omissions.
+- Mark destructive operations (delete, purge, reset) as destructive: they are exercised alone,
+  not skipped (`06-validation-protocol.md` §2.2). Mark entries you cannot exercise at all (calls to
+  a third-party service, endpoints needing credentials you do not have) as skipped. They become
+  `UNVERIFIED`, not silent omissions.
 - A project may be **hybrid** — a service with a CLI for migrations, a library with a demo server.
   Enumerate every surface it has and say so.
 
-Write the inventory to `<target>/reports/` in the format specified by `06-validation-protocol.md` §2.
+Phase 1 is read-only: hold the enumeration, and write it in Phase 3a as
+`<target>/reports/surface.json`, in the format specified by `06-validation-protocol.md` §2.
 
 ## 6. Deriving the boot command
 
-The agent boots; the harness never does. Derive the command from the target's own declarations —
-never from assumption.
+The agent decides what to boot; the harness never does, and the process itself is owned by a
+container or by `proc` (`06-validation-protocol.md` §1.3). Derive the command from the target's own
+declarations — never from assumption. Write it as an **argv** (program and arguments), not a shell
+line: that is what the container runtime and `proc` take. When the declared command is a
+package-manager script, prefer the runtime invocation it stands for (the script's own body), so the
+process tree is one level shorter; record both.
 
 Look, in order:
 
@@ -146,14 +155,17 @@ Then handle what boot needs:
   capture run and record that you did. Never invent a credential for a real external service.
 - **Port.** Record how the port is set: an override the code already reads (flag, environment
   variable, settings key), or a value fixed in source. A fixed port is not a reason to edit the
-  original — `06-validation-protocol.md` §1.2 gives the order to follow. Prefer a free, non-default
-  port where an override exists, so a developer's already-running instance is not mistaken for
-  yours.
+  original — `06-validation-protocol.md` §1.2 gives the order to follow. In host mode, prefer a
+  free, non-default port where an override exists, so a developer's already-running instance is not
+  mistaken for yours. Check what else the override changes (debug, reloader, bind address): a
+  framework's run command and the entry point's own defaults often differ, and the audit must
+  observe the latter (§1.2).
 - **Runtime environment.** If the target's runtime is present but the dependencies the target
   **declares** are not installed, install exactly those — from the lockfile when there is one, at
-  the resolved versions — into an isolated location that is not part of the target: a virtual
-  environment or dependency directory inside the snapshot's run copy, or one that `.gitignore`
-  already excludes. Record in the report what was installed, where and from which file. This is not
+  the resolved versions — into an isolated location that is not part of the target: inside the
+  container, or a virtual environment or dependency directory inside the run copy. The refactored
+  application gets its own environment, installed in its own copy from the **refactored**
+  manifest, since it may pin different versions. Record in the report what was installed, where and from which file. This is not
   "adding a dependency": the dependency set is the one the project already declares. **Adding** a
   package the project does not declare — for the harness, for convenience, to make boot work —
   stays forbidden. If the declared dependencies cannot be installed (no network, a resolution
@@ -168,8 +180,10 @@ Then handle what boot needs:
   baseline is `UNVERIFIED`. Record the error verbatim. Do not repair the original in order to
   capture a baseline — that is already a modification, and it destroys the comparison.
 
-Record the exact boot command, its working directory, environment and port in the Phase 1 output —
-Phase 3 replays it twice. Also record whether the working tree has uncommitted changes: the
+Record the exact boot command, its working directory, environment and port in the Phase 1 output
+(`Boot:`, `Port:`, `Runtime env:`) — Phase 3 replays it twice. Detect the isolation mode too
+(`Isolation:`, `06-validation-protocol.md` §1.3): whether a container runtime answers, and whether
+the runtime's official image at the detected version can be obtained. Also record whether the working tree has uncommitted changes: the
 snapshot copies the tree as found, and the report should say what the audit read.
 
 ## 7. Database and schema detection
