@@ -1,0 +1,88 @@
+{
+  "version": 3,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:3000",
+  "entries": [
+    {
+      "id": "checkout-new-user-paid",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Guilherme", "eml": "gui@fullcycle.com.br", "pwd": "senhaforte", "c_id": 2, "card": "4111222233334444" },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "checkout-new-user-no-password",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "NoPwd", "eml": "nopwd@example.com", "c_id": 2, "card": "4111222233334444" },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "checkout-existing-user-paid",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Leonan", "eml": "leonan@fullcycle.com.br", "pwd": "123", "c_id": 2, "card": "4111222233334444" },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "checkout-denied",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Joao", "eml": "joao@teste.com", "pwd": "123", "c_id": 1, "card": "5111222233334444" },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "checkout-missing-fields",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "X" },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "checkout-invalid-course",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Y", "eml": "y@example.com", "pwd": "123", "c_id": 999, "card": "4111222233334444" },
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "checkout-malformed-json",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "rawBody": "{bad json",
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "financial-report",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "headers": { "Accept": "application/json" },
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    },
+    {
+      "id": "delete-seed-user",
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "destructive": true,
+      "body": null,
+      "skip": false,
+      "skipReason": null
+    }
+  ]
+}
