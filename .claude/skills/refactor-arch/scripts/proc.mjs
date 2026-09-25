@@ -19,6 +19,8 @@
  *   stop    stop the recorded tree -- after checking that the PID still belongs to the
  *           process that was started (PIDs are reused)
  *   status  is the recorded process alive, and does the port answer?
+ *   copy    copy a directory tree to a new directory, leaving out VCS directories -- the
+ *           snapshot and every run copy of protocol section 1.1, in one literal command
  *
  * What it deliberately does NOT do
  * --------------------------------
@@ -35,6 +37,7 @@
  *                        [--env KEY=VALUE ...] [--timeout 60] -- <argv...>
  *   node proc.mjs stop   --state <file> [--timeout 10]
  *   node proc.mjs status --state <file>
+ *   node proc.mjs copy   --from <dir> --to <new dir> [--exclude <name> ...]
  *
  * Every command prints one JSON line (keys sorted) and exits with:
  *   0 ok (status: running)       1 status: not running         2 usage or I/O error
@@ -45,7 +48,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import {
-  closeSync, existsSync, openSync, readFileSync, statSync, writeFileSync,
+  closeSync, cpSync, existsSync, lstatSync, openSync, readFileSync, statSync, writeFileSync,
 } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
@@ -424,6 +427,54 @@ async function cmdStatus(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// copy
+//
+// Copying a tree without its VCS directory is where an agent improvises shell: a loop, a
+// variable holding the destination, a second command to delete .git afterwards. Commands like
+// that cannot be analysed by a permission layer, so each one asks the person. One literal
+// invocation per copy is analysable, and it behaves the same on every OS.
+// ---------------------------------------------------------------------------
+
+const ALWAYS_EXCLUDED = ['.git', '.hg', '.svn'];
+
+function lexists(file) {
+  try { lstatSync(file); return true; } catch { return false; }
+}
+
+function cmdCopy(opts) {
+  const source = path.resolve(opts.from);
+  const target = path.resolve(opts.to);
+  const excluded = [...new Set([...ALWAYS_EXCLUDED, ...opts.exclude])].sort(byCodePoint);
+  const norm = (p) => (IS_WINDOWS ? p.toLowerCase() : p);
+  if (!existsSync(source) || !statSync(source).isDirectory()) {
+    return emit({ error: `source is not a directory: ${source}` }, EXIT.USAGE);
+  }
+  if (lexists(target)) {
+    return emit({
+      error: `destination already exists: ${target}. A copy is always fresh: pick a new `
+        + 'directory, never overwrite one.',
+    }, EXIT.USAGE);
+  }
+  if (norm(target).startsWith(norm(source) + path.sep)) {
+    return emit({ error: `destination is inside the source: ${target}` }, EXIT.USAGE);
+  }
+  let copied = 0;
+  cpSync(source, target, {
+    recursive: true,
+    verbatimSymlinks: true,
+    preserveTimestamps: true,
+    filter: (src) => {
+      if (src !== source && excluded.includes(path.basename(src))) return false;
+      if (lstatSync(src).isFile()) copied += 1;
+      return true;
+    },
+  });
+  return emit({
+    copied, excluded, from: source, to: target,
+  }, EXIT.OK);
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
@@ -433,17 +484,18 @@ const USAGE = `Start and stop exactly the process tree this tool started
   node proc.mjs start  --state <file> --port <n> [--cwd <dir>] [--log <file>]
                        [--env KEY=VALUE ...] [--timeout <s>] -- <argv...>
   node proc.mjs stop   --state <file> [--timeout <s>]
-  node proc.mjs status --state <file>`;
+  node proc.mjs status --state <file>
+  node proc.mjs copy   --from <dir> --to <new dir> [--exclude <name> ...]`;
 
 function parseArgs(tokens) {
-  const opts = { env: [] };
+  const opts = { env: [], exclude: [] };
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
     if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const value = tokens[i + 1];
     if (value === undefined || value.startsWith('--')) { opts[key] = true; continue; }
-    if (key === 'env') opts.env.push(value);
+    if (key === 'env' || key === 'exclude') opts[key].push(value);
     else opts[key] = value;
     i += 1;
   }
@@ -458,14 +510,18 @@ async function main() {
   const [mode, ...rest] = head;
   const opts = parseArgs(rest);
 
-  if (!['start', 'stop', 'status'].includes(mode) || typeof opts.state !== 'string'
-      || (mode === 'start' && !/^\d+$/.test(String(opts.port)))) {
+  const usable = mode === 'copy'
+    ? typeof opts.from === 'string' && typeof opts.to === 'string'
+    : ['start', 'stop', 'status'].includes(mode) && typeof opts.state === 'string'
+      && (mode !== 'start' || /^\d+$/.test(String(opts.port)));
+  if (!usable) {
     console.error(USAGE);
     return EXIT.USAGE;
   }
   try {
     if (mode === 'start') return await cmdStart(opts, command);
     if (mode === 'stop') return await cmdStop(opts);
+    if (mode === 'copy') return cmdCopy(opts);
     return await cmdStatus(opts);
   } catch (err) {
     return emit({ error: `${err.name}: ${err.message}` }, EXIT.USAGE);

@@ -1218,6 +1218,56 @@ longo.
 
 ---
 
+### D24 — Comandos analisáveis e scratch dentro do perímetro (emenda à D16 e à D19)
+
+**Contexto.** Depois da rodada 3, toda execução da skill passou a interromper o usuário dezenas de
+vezes com *"Contains simple_expansion; under the read block
+(permissions.blockReadsOutsideWorkingDirectories) a command the shell parser cannot analyse asks
+the person"*. Com essa configuração ligada, o Claude Code só roda um comando shell sem perguntar se
+provar, **lendo o texto do comando**, que todo path acessado fica dentro dos diretórios permitidos.
+A D16 pôs o snapshot no temp do sistema (fora do perímetro), e o placeholder `<tmp>` só podia ser
+preenchido com `$TMPDIR`, `$env:TEMP` ou uma variável `SNAP=...` reaproveitada. Cada comando falhava
+duas vezes: path fora do perímetro **e** path que só existe em tempo de execução. A D19/D20
+multiplicou o número desses comandos (cópia por execução, `proc` start/status/stop, `docker exec`).
+
+**O erro registrado.** A D16 e a D19 decidiram *onde* executar sem perguntar *como o harness
+autoriza* o que é executado. O raciocínio de cada uma estava certo no eixo em que foi feito
+(isolamento, posse de processo) e ignorou um terceiro eixo: um comando que ninguém consegue ler
+antes de rodar. É o mesmo tipo de erro da primeira versão da D6: uma escolha local correta com um
+custo que só aparece no uso.
+
+**Decisão.**
+1. **Scratch root em ordem de preferência** (protocolo §1.1): o diretório de scratch que o ambiente
+   do agente designa; senão, `.refactor-arch-work/` ao lado do alvo, dentro do perímetro; senão, o
+   temp do sistema, **declarado** no relatório (campo `Scratch:`). Fora do alvo e fora de `reports/`
+   continua valendo; a D16 muda só de endereço.
+2. **Comandos literais** (protocolo §1.4): cada path é resolvido uma vez e colado como absoluto; sem
+   `$VAR`, `$env:`, `%VAR%`, `$(...)`, `cd ... &&`, laços; ambiente por `--env`/`-e`; argv em vez de
+   `sh -c` no container; leitura de arquivos pelas ferramentas do agente. O que não puder ser escrito
+   assim é declarado (`NON-LITERAL` em `## Verification Coverage`).
+3. **`proc copy`**: um subcomando novo do `proc` (não um script novo) para toda cópia (snapshot,
+   `run-<n>`, `refactored-<n>`). Deixa de fora os diretórios de VCS, recusa destino existente ou
+   dentro da origem, e é coberto pelo teste de conformidade nas duas implementações.
+
+**Justificativa.** As duas metades são necessárias: path dentro do perímetro escrito como `$SNAP`
+ainda pergunta, e path literal no temp do sistema também. A regra é agnóstica: vale para qualquer
+camada de permissão que avalia comandos antes de rodar, e para o humano que os lê. Uma pessoa que
+aprova doze comandos opacos seguidos parou de lê-los, e aí a pergunta já não protege nada.
+
+**Alternativas rejeitadas.** *Desligar `blockReadsOutsideWorkingDirectories`* resolve a máquina do
+autor e esconde o defeito, que volta na máquina de quem roda a skill com a proteção ligada.
+*Adicionar o temp do sistema a `additionalDirectories`* não resolve a expansão de variável e
+depende de configuração do usuário. *Um `snapshot.py` separado* duplicaria o par py/mjs e a
+conformidade; o `proc` já é a ferramenta de "coisas que a skill faz no host".
+
+**Custo aceito / consequências.** Comandos mais longos e repetitivos (paths absolutos por extenso).
+Diretórios de dependência dentro da árvore **nunca são copiados**: a Fase 1 os identifica, cada
+`proc copy` os recebe em `--exclude`, e as dependências declaradas são instaladas na cópia que roda.
+A lista não fica no `proc` (seria acoplada a ecossistemas); fica no raciocínio do agente, que já
+detectou a stack. Custo: toda execução paga uma instalação.
+
+---
+
 ## 4. O princípio emergente: a skill nunca degrada em silêncio
 
 > **A skill nunca degrada em silêncio.**
@@ -1306,7 +1356,7 @@ frequentemente falsa: é o formato exato de uma alucinação bem-sucedida.
 
 ## 6. Estado do registro
 
-D1–D23 estão decididas (D15–D18 na rodada 2 e D19–D23 na rodada 3, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
+D1–D24 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3 e D24 depois dela, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
 este documento foi escrito. Duas dessas decisões (D6 e D13) já foram revertidas uma vez, e
 o registro das reversões foi mantido deliberadamente: a versão final de cada uma é menos
 instrutiva do que o caminho que levou a ela.

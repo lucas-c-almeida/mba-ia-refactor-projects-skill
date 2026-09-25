@@ -718,11 +718,21 @@ nova é proposta. Resolve R2-7.
 Um replay completo obrigatório; no máximo duas passadas de re-auditoria, ambas no relatório;
 `missed-in-phase-2` corrigido na Fase 3 é contado à parte. Resolve R2-10.
 
+### D24 — **Comandos analisáveis**, scratch dentro do perímetro ✅ decidido
+
+Com `blockReadsOutsideWorkingDirectories`, o Claude Code só roda sem perguntar um comando cujos
+paths ele consegue ler no texto. D16/D19 puseram o snapshot no temp do sistema, e o agente o
+referenciava por `$VAR`: cada comando virava um prompt. Emenda à D16: scratch root em ordem de
+preferência (scratch do ambiente → `.refactor-arch-work/` ao lado do alvo → temp do sistema,
+declarado). Regra nova (protocolo §1.4): paths absolutos literais, sem `$VAR`/`$env:`/`$(...)`/
+`cd &&`, ambiente por `--env`. Toda cópia por `proc copy`. O que não couber é declarado
+(`NON-LITERAL`).
+
 ---
 
 ## 9. Perguntas em aberto
 
-Nenhuma. D1–D23 decididas. Rodada 3: lista de mudanças congelada em
+Nenhuma. D1–D24 decididas. Rodada 3: lista de mudanças congelada em
 `docs/rounds/round3-changes.md`; implementação em `feat/round3`.
 
 ---

@@ -19,6 +19,8 @@ What it does
   stop    stop the recorded tree -- after checking that the PID still belongs to the
           process that was started (PIDs are reused)
   status  is the recorded process alive, and does the port answer?
+  copy    copy a directory tree to a new directory, leaving out VCS directories -- the
+          snapshot and every run copy of protocol section 1.1, in one literal command
 
 What it deliberately does NOT do
 --------------------------------
@@ -33,6 +35,7 @@ Usage
                         [--env KEY=VALUE ...] [--timeout 60] -- <argv...>
   python proc.py stop   --state <file> [--timeout 10]
   python proc.py status --state <file>
+  python proc.py copy   --from <dir> --to <new dir> [--exclude <name> ...]
 
 Every command prints one JSON line (keys sorted) and exits with:
   0 ok (status: running)       1 status: not running         2 usage or I/O error
@@ -363,6 +366,42 @@ def cmd_status(args):
     return emit(document, EXIT_OK if alive else EXIT_NOT_RUNNING)
 
 
+# ---------------------------------------------------------------------------
+# copy
+#
+# Copying a tree without its VCS directory is where an agent improvises shell: a loop, a
+# variable holding the destination, a second command to delete .git afterwards. Commands
+# like that cannot be analysed by a permission layer, so each one asks the person. One
+# literal invocation per copy is analysable, and it behaves the same on every OS.
+# ---------------------------------------------------------------------------
+
+ALWAYS_EXCLUDED = (".git", ".hg", ".svn")
+
+
+def cmd_copy(args):
+    source = os.path.abspath(args.source)
+    target = os.path.abspath(args.dest)
+    excluded = sorted(set(ALWAYS_EXCLUDED) | set(args.exclude or []))
+    if not os.path.isdir(source):
+        return emit({"error": "source is not a directory: " + source}, EXIT_USAGE)
+    if os.path.lexists(target):
+        return emit({"error": "destination already exists: " + target + ". A copy is always "
+                              "fresh: pick a new directory, never overwrite one."}, EXIT_USAGE)
+    if os.path.normcase(target).startswith(os.path.normcase(source) + os.sep):
+        return emit({"error": "destination is inside the source: " + target}, EXIT_USAGE)
+
+    copied = []
+
+    def count(src, dst):
+        copied.append(src)
+        return shutil.copy2(src, dst)
+
+    shutil.copytree(source, target, symlinks=True, copy_function=count,
+                    ignore=lambda _dir, names: [n for n in names if n in excluded])
+    return emit({"copied": len(copied), "excluded": excluded, "from": source, "to": target},
+                EXIT_OK)
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     command = []
@@ -372,7 +411,8 @@ def main(argv=None):
 
     parser = argparse.ArgumentParser(
         description="Start and stop exactly the process tree this tool started "
-                    "(06-validation-protocol.md section 1.3). Never stops anything else.")
+                    "(06-validation-protocol.md section 1.3). Never stops anything else. "
+                    "Also makes the fresh copies of section 1.1.")
     sub = parser.add_subparsers(dest="mode")
     start_parser = sub.add_parser("start", help="run the argv given after --")
     start_parser.add_argument("--state", required=True)
@@ -386,6 +426,10 @@ def main(argv=None):
     stop_parser.add_argument("--timeout", type=float, default=10.0)
     status_parser = sub.add_parser("status", help="report on the recorded process")
     status_parser.add_argument("--state", required=True)
+    copy_parser = sub.add_parser("copy", help="copy a tree, leaving out VCS directories")
+    copy_parser.add_argument("--from", dest="source", required=True)
+    copy_parser.add_argument("--to", dest="dest", required=True)
+    copy_parser.add_argument("--exclude", action="append")
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -399,8 +443,10 @@ def main(argv=None):
             return cmd_start(args)
         if args.mode == "stop":
             return cmd_stop(args)
+        if args.mode == "copy":
+            return cmd_copy(args)
         return cmd_status(args)
-    except (OSError, ValueError, KeyError) as err:
+    except (OSError, ValueError, KeyError, shutil.Error) as err:
         return emit({"error": "{0}: {1}".format(type(err).__name__, err)}, EXIT_USAGE)
 
 

@@ -60,10 +60,25 @@ file database, caches, logs, compiled bytecode — and before the Phase 2 gate n
 refactored.
 
 At the start of Phase 2, before anything executes, copy the target to a **pristine snapshot**
-outside it (a system temporary directory, never inside `<target>` and never inside `reports/`):
+outside it — never inside `<target>` and never inside `reports/` — in a **scratch root** chosen in
+this order:
+
+1. **The scratch directory the agent's environment designates**, if it designates one (a
+   session scratch or work directory the agent may read and write without asking). It is outside
+   every project by construction, and commands that touch it need no approval.
+2. Otherwise, a directory **inside the working directories the agent is allowed to use, but
+   outside `<target>`** — `<parent of target>/.refactor-arch-work/` when the target is a
+   subdirectory of an allowed directory. Say in the report that it must be deleted (it is, at the
+   end of the run) and never committed.
+3. Otherwise, the system temporary directory — **declared** in the report: in an environment that
+   restricts reads outside the working directories, every command that touches it will ask the
+   user for approval.
+
+Resolve the scratch root **once**, print its absolute path, and from then on write it literally
+in every command (§1.4). Record which of the three it was under `## Verification Coverage`.
 
 ```
-<tmp>/refactor-arch-<target-name>-<YYYYMMDD-HHMM>/
+<scratch root>/refactor-arch-<target-name>-<YYYYMMDD-HHMM>/
 ├── pristine/         exact copy of <target> as found — never executed, never modified
 ├── run-<n>/          a fresh copy of pristine/, made for each execution of the original
 ├── refactored-<n>/   a fresh copy of <target> after refactoring, for each execution of it
@@ -71,9 +86,16 @@ outside it (a system temporary directory, never inside `<target>` and never insi
 ```
 
 - Copy the working tree as it is, uncommitted changes included: the snapshot is what the audit read.
-  Leave out the VCS directory.
-- Dependency directories may be linked instead of copied, or installed inside the run copy from the
-  lockfile (§1 above). State which in the report.
+  Leave out the VCS directory. Make **every** copy — `pristine/`, each `run-<n>/`, each
+  `refactored-<n>/` — with `proc copy` (§1.4), one literal command each:
+  `<runtime> proc copy --from <dir> --to <new dir>`. It leaves VCS directories out, refuses an
+  existing destination, and behaves the same on every OS.
+- **Dependency directories are never copied.** Phase 1 identifies the directories where the
+  ecosystem installs dependencies inside the tree (a virtual environment, a vendored package
+  directory, build output); pass each one to every `proc copy` as `--exclude <name>`, and install
+  the declared dependencies inside the copy that runs (below, and §1 above). A copied dependency
+  directory carries whatever happened to be installed on this machine, not what the manifest
+  declares, and it can be thousands of files. Name the excluded directories in the report.
 - Every execution of the **original** — the Phase 2 deprecation run, the Phase 3a baseline, a late
   capture (§4.3) — happens in a new `run-<n>/` copy. Each starts from the same state, which makes
   the runs comparable with each other.
@@ -140,8 +162,11 @@ report.
   copy), means host mode.
 - Mount the run copy (or `refactored-<n>/`) read-write as the working directory, the skill's
   `scripts/` read-only, and `<target>/reports/` read-write as the probe's input and output
-  directory (the inventory and the captures live there; §2, §3). On a POSIX host, run as the invoking user's uid and gid, so the files the
-  application creates can be deleted with the snapshot.
+  directory (the inventory and the captures live there; §2, §3). Every mount is written with
+  literal absolute host paths (§1.4) — never `$(pwd)` or `${PWD}`. On a POSIX host, run as the
+  invoking user's uid and gid, so the files the application creates can be deleted with the
+  snapshot: read them once (`id -u`, `id -g`) and pass the numbers literally (`--user 1000:1000`),
+  never `$(id -u)`.
 - Name every container `refactor-arch-<target-name>-<run-id>-<n>` and label it
   `refactor-arch.run=<run-id>`. Start it detached; install the declared dependencies and boot
   the derived command inside it.
@@ -160,7 +185,10 @@ start and stop goes through `proc` (`scripts/proc.py`, `scripts/proc.mjs`, or on
                       [--env KEY=VALUE ...] [--timeout <s>] -- <boot argv>
 <runtime> proc stop   --state <snapshot>/proc/<name>.json
 <runtime> proc status --state <snapshot>/proc/<name>.json
+<runtime> proc copy   --from <dir> --to <new dir> [--exclude <name> ...]
 ```
+
+Every `<...>` above is written as a literal absolute path in the actual command (§1.4).
 
 `proc` starts the argv in a new process group, records the PID and the OS start time, waits for
 the port, and stops **only the recorded tree** — after checking that the PID still belongs to the
@@ -184,6 +212,36 @@ nuisance the user can resolve; a stranger's process killed is damage nobody can 
 and state file), command and result — is a row of the report's `## Execution Log`
 (`03-report-template.md`). A process action that is not in the log is an incident and goes into
 `## Verification Coverage`, stated plainly.
+
+### 1.4 Commands a reviewer can read — literal, one at a time
+
+Every command this skill runs is shown to a person, or to a permission layer acting for them,
+before it runs. That check reads the command **as text**: it can tell which paths a literal
+command touches, but not what `$SNAP/run-2`, `$env:TEMP`, `%TEMP%` or `$(mktemp -d)` will become
+at run time. A command it cannot read is a command it has to ask about. A run that starts and
+stops the application a dozen times, each through a variable, turns into a dozen interruptions —
+and a person who approves a dozen opaque commands in a row has stopped reading them.
+
+So, in every command — copies, `proc`, the container runtime, the probe, deletions:
+
+- **Resolve each path once, then write it literally.** Find the scratch root (§1.1), print its
+  absolute path, and paste that path into every later command. Never write `$VAR`, `${VAR}`,
+  `$env:VAR`, `%VAR%`, `$(...)`, backticks, or `~`; never assign a shell variable to reuse later.
+  Shell state does not survive between commands anyway.
+- **Pass the application's environment as arguments**, never through the shell:
+  `proc start --env KEY=VALUE`, or `-e KEY=VALUE` on the container runtime. No `export`, no
+  `$env:KEY = ...`, no `KEY=VALUE cmd` prefix.
+- **One command per invocation.** No `cd <dir> && ...` chains, no loops, no pipelines that build
+  paths. Give the working directory as an argument instead: `proc start --cwd`, the container
+  runtime's `-w`, an absolute path to the script.
+- **Copy with `proc copy`**, never with a hand-written copy-then-delete sequence.
+- **Read and search files with the agent's own file tools**, not with shell commands. They
+  need no shell, so there is nothing to analyse.
+- **Inside a container, pass an argv**, not a shell string: `exec <name> python /skill/probe.py
+  capture --surface ... --out ...`, never `exec <name> sh -c "... $X ..."`.
+
+When a step truly cannot be written this way, run it anyway, say in the report which command
+needed approval and why, and write it as simply as the step allows.
 
 ## 2. Surface inventory
 
@@ -667,25 +725,24 @@ ownership ran on a generated tool.
 - A full `capture` or live `compare` leaves destructive entries out and notes them on stderr
   (§2.2).
 
-`proc` (host mode, §1.3) has its own CLI, shared by `proc.py` and `proc.mjs`; it is documented in
-§1.3 and at the top of each script.
+`proc` (host mode, §1.3, and the copies of §1.1 in both modes) has its own CLI, shared by
+`proc.py` and `proc.mjs`; it is documented in §1.3 and at the top of each script.
 
 ## 9. Floor mode — declared, never silent
 
 If no runtime capable of parsing JSON is available, the protocol degrades to **status-code parity
 only**:
 
-```bash
-# Capture, before refactoring
-while IFS=' ' read -r id method path; do
-  code=$(curl -s -o /dev/null -w '%{http_code}' -X "$method" "$BASE_URL$path" --max-time 10)
-  printf '%s %s\n' "$id" "$code"
-done < surface.txt > reports/baseline-floor.txt
+One literal command per surface entry (§1.4), recording each status code in
+`reports/baseline-floor.txt` as `<id> <code>`, one line per entry:
 
-# Replay, after refactoring
-... > reports/replay-floor.txt
-diff reports/baseline-floor.txt reports/replay-floor.txt
 ```
+curl -s -o /dev/null -w "%{http_code}" -X GET http://127.0.0.1:8081/widgets --max-time 10
+curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8081/widgets --max-time 10
+```
+
+After refactoring, repeat the same commands into `reports/replay-floor.txt` and compare the two
+files line by line.
 
 Floor mode verifies that each entry still answers with the same status. It verifies **nothing** about
 the response body: a handler that returns `200` with an empty object where it previously returned a
@@ -722,6 +779,9 @@ because in the output it is indistinguishable from the real thing.
 - **Freeing a busy port.** The process holding it is not yours. Choose another port.
 - **Running the refactored application inside the target.** Its runtime artifacts land in the
   delivered tree. Run it from `refactored-<n>/` (§1.1).
+- **Paths carried in shell variables.** `SNAP=...` once and `$SNAP/run-2` afterwards reads
+  naturally, but no reviewer or permission layer can check what it expands to, so every such
+  command interrupts the user. Write the literal path (§1.4).
 - **Deleting the snapshot before the re-audit.** The re-audit still needs to run the application.
 - **Relying on a port override that also turns debug off.** The audit then never observes the
   debug surface it is supposed to judge (§1.2).
