@@ -1,88 +1,85 @@
-from flask import Flask, jsonify, request
+"""
+Composition root and entry point (fixes AP-06: this is now the one place that names
+concrete implementations and assembles the object graph — configuration, the
+database connection, repositories, controllers, routes and the error boundary).
+
+Run exactly as before: `python app.py`. See README.md for configuration.
+"""
+import logging
+
+from flask import Flask
 from flask_cors import CORS
-import controllers
-from database import get_db
 
-app = Flask(__name__)
-app.config["SECRET_KEY"] = "minha-chave-super-secreta-123"
-app.config["DEBUG"] = True
-CORS(app)
+from src.config.settings import load_settings
+from src.controllers.admin_controller import AdminController
+from src.controllers.order_controller import OrderController
+from src.controllers.product_controller import ProductController
+from src.controllers.report_controller import ReportController
+from src.controllers.system_controller import SystemController
+from src.controllers.user_controller import UserController
+from src.middlewares.errors import register_error_handlers
+from src.models.db import create_connection
+from src.models.order_repository import OrderRepository
+from src.models.product_repository import ProductRepository
+from src.models.schema import ensure_schema_and_seed
+from src.models.user_repository import UserRepository
+from src.views import (
+    admin_routes,
+    order_routes,
+    product_routes,
+    report_routes,
+    system_routes,
+    user_routes,
+)
 
-app.add_url_rule("/produtos", "listar_produtos", controllers.listar_produtos, methods=["GET"])
-app.add_url_rule("/produtos/busca", "buscar_produtos", controllers.buscar_produtos, methods=["GET"])
-app.add_url_rule("/produtos/<int:id>", "buscar_produto", controllers.buscar_produto, methods=["GET"])
-app.add_url_rule("/produtos", "criar_produto", controllers.criar_produto, methods=["POST"])
-app.add_url_rule("/produtos/<int:id>", "atualizar_produto", controllers.atualizar_produto, methods=["PUT"])
-app.add_url_rule("/produtos/<int:id>", "deletar_produto", controllers.deletar_produto, methods=["DELETE"])
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("code-smells-project")
 
-app.add_url_rule("/usuarios", "listar_usuarios", controllers.listar_usuarios, methods=["GET"])
-app.add_url_rule("/usuarios/<int:id>", "buscar_usuario", controllers.buscar_usuario, methods=["GET"])
-app.add_url_rule("/usuarios", "criar_usuario", controllers.criar_usuario, methods=["POST"])
-app.add_url_rule("/login", "login", controllers.login, methods=["POST"])
 
-app.add_url_rule("/pedidos", "criar_pedido", controllers.criar_pedido, methods=["POST"])
-app.add_url_rule("/pedidos", "listar_todos_pedidos", controllers.listar_todos_pedidos, methods=["GET"])
-app.add_url_rule("/pedidos/usuario/<int:usuario_id>", "listar_pedidos_usuario", controllers.listar_pedidos_usuario, methods=["GET"])
-app.add_url_rule("/pedidos/<int:pedido_id>/status", "atualizar_status_pedido", controllers.atualizar_status_pedido, methods=["PUT"])
+def create_app() -> Flask:
+    settings = load_settings()
+    if settings.secret_key_is_ephemeral:
+        logger.warning(
+            "SECRET_KEY not set in the environment; using a per-process generated "
+            "key. Set SECRET_KEY explicitly outside local development."
+        )
 
-app.add_url_rule("/relatorios/vendas", "relatorio_vendas", controllers.relatorio_vendas, methods=["GET"])
+    connection = create_connection(settings.db_path)
+    ensure_schema_and_seed(connection)
 
-app.add_url_rule("/health", "health_check", controllers.health_check, methods=["GET"])
+    produtos = ProductRepository(connection)
+    usuarios = UserRepository(connection)
+    pedidos = OrderRepository(connection)
 
-@app.route("/")
-def index():
-    return jsonify({
-        "mensagem": "Bem-vindo à API da Loja",
-        "versao": "1.0.0",
-        "endpoints": {
-            "produtos": "/produtos",
-            "usuarios": "/usuarios",
-            "pedidos": "/pedidos",
-            "login": "/login",
-            "relatorios": "/relatorios/vendas",
-            "health": "/health"
-        }
-    })
+    product_controller = ProductController(produtos)
+    user_controller = UserController(usuarios)
+    order_controller = OrderController(pedidos, usuarios)
+    report_controller = ReportController(pedidos)
+    admin_controller = AdminController(connection)
+    system_controller = SystemController(produtos, usuarios, pedidos, settings)
 
-@app.route("/admin/reset-db", methods=["POST"])
-def reset_database():
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("DELETE FROM itens_pedido")
-    cursor.execute("DELETE FROM pedidos")
-    cursor.execute("DELETE FROM produtos")
-    cursor.execute("DELETE FROM usuarios")
-    db.commit()
-    print("!!! BANCO DE DADOS RESETADO !!!")
-    return jsonify({"mensagem": "Banco de dados resetado", "sucesso": True}), 200
+    app = Flask(__name__)
+    app.config["SECRET_KEY"] = settings.secret_key
+    app.config["DEBUG"] = settings.debug
+    if settings.cors_allow_all:
+        CORS(app)
 
-@app.route("/admin/query", methods=["POST"])
-def executar_query():
-    dados = request.get_json()
-    query = dados.get("sql", "")
-    if not query:
-        return jsonify({"erro": "Query não informada"}), 400
+    product_routes.register(app, product_controller)
+    user_routes.register(app, user_controller)
+    order_routes.register(app, order_controller)
+    report_routes.register(app, report_controller)
+    admin_routes.register(app, admin_controller)
+    system_routes.register(app, system_controller)
 
-    db = get_db()
-    cursor = db.cursor()
-    try:
-        cursor.execute(query)
-        if query.strip().upper().startswith("SELECT"):
-            rows = cursor.fetchall()
-            result = [dict(row) for row in rows]
-            return jsonify({"dados": result, "sucesso": True}), 200
-        else:
-            db.commit()
-            return jsonify({"mensagem": "Query executada", "sucesso": True}), 200
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 500
+    register_error_handlers(app, logger)
+
+    return app, settings
+
 
 if __name__ == "__main__":
-
-    get_db()
+    app, settings = create_app()
     print("=" * 50)
     print("SERVIDOR INICIADO")
-    print("Rodando em http://localhost:5000")
+    print("Rodando em http://localhost:{0}".format(settings.port))
     print("=" * 50)
-
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host=settings.host, port=settings.port, debug=settings.debug)
