@@ -728,6 +728,11 @@ declarado). Regra nova (protocolo §1.4): paths absolutos literais, sem `$VAR`/`
 `cd &&`, ambiente por `--env`. Toda cópia por `proc copy`. O que não couber é declarado
 (`NON-LITERAL`).
 
+**D24.1** (após `run/task-manager-api/iter4`): arquivos só pelas ferramentas do agente (nunca
+`sed -i`/redirecionamento); corpo de requisição por `@<arquivo>`; argumentos com `,` `@` `{` entre
+aspas (no PowerShell, `a,b` é array); caminhos de container fora de shell que os reescreve. O
+agente não vê aprovações e nunca reporta a contagem delas: quem conta é o observador da sessão.
+
 ---
 
 ## 9. Perguntas em aberto

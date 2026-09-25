@@ -239,9 +239,30 @@ So, in every command — copies, `proc`, the container runtime, the probe, delet
   need no shell, so there is nothing to analyse.
 - **Inside a container, pass an argv**, not a shell string: `exec <name> python /skill/probe.py
   capture --surface ... --out ...`, never `exec <name> sh -c "... $X ..."`.
+- **Write and edit files with the agent's own file tools**, never through the shell: no
+  `sed -i`, `awk`, `perl -pi`, `tee`, `>` or `>>`. An in-place editor can write any file, so a
+  permission layer cannot bound it by reading the command. This includes the report itself.
+- **Request bodies go in a file, not on the command line.** Write the JSON body with the file
+  tools into the scratch root, then pass it by literal path: `curl -s -X POST <url> -H
+  "Content-Type: application/json" --data-binary "@<scratch root>/osv-query.json"`. The command
+  stays short, and nothing in it has to be interpreted as structure.
+- **Quote every argument that carries shell syntax** — `,` `;` `@` `{` `}` `(` `)` `[` `]` `&`
+  `|`. What is plain text in one shell is an expression in another: unquoted, `--only a,b` is a
+  run-time array in PowerShell, and the permission layer cannot tell what it evaluates to. Write
+  `--only "a,b"`.
+- **Keep container paths out of a shell that rewrites them.** Some POSIX-emulation shells on
+  Windows turn any argument that looks like a POSIX path (`-w /app`, `/skill/probe.py`) into a
+  host path before the container runtime sees it. Run container commands through the host's
+  native shell instead; do not disable the rewriting with an environment prefix, which breaks the
+  rule on environment above.
 
-When a step truly cannot be written this way, run it anyway, say in the report which command
-needed approval and why, and write it as simply as the step allows.
+When a step truly cannot be written this way, run it anyway, and say in the report which command
+could not be written literally and why (`NON-LITERAL`).
+
+**You cannot see approvals.** When a person approves a command, the agent only sees that the
+command ran. Never report how many commands needed approval, or that none did: that number
+belongs to whoever watched the session. Report what you control — which commands were not
+literal, and why.
 
 ## 2. Surface inventory
 
@@ -733,7 +754,7 @@ ownership ran on a generated tool.
 If no runtime capable of parsing JSON is available, the protocol degrades to **status-code parity
 only**:
 
-One literal command per surface entry (§1.4), recording each status code in
+One literal command per surface entry (§1.4). Record each status code, with the file tools, in
 `reports/baseline-floor.txt` as `<id> <code>`, one line per entry:
 
 ```

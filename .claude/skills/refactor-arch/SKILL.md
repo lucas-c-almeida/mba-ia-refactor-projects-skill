@@ -81,8 +81,11 @@ owns **exactly the processes it starts, and nothing else** (`references/06-valid
 
 **Write every command literally** (`references/06-validation-protocol.md` §1.4): resolve each
 path once and paste it as an absolute path — no `$VAR`, `$env:`, `%VAR%` or `$(...)`, no
-`cd ... &&` chains, environment passed as `--env KEY=VALUE`. A command whose paths only exist at
-run time cannot be checked before it runs, so the user gets asked about every one of them.
+`cd ... &&` chains, environment passed as `--env KEY=VALUE`, arguments with `,` `@` `{` quoted,
+request bodies passed as `@<file>`. Write and edit files only with your file tools, never with
+`sed -i` or redirection. A command whose effect is only known at run time cannot be checked
+before it runs, so the user gets asked about every one of them. You cannot see those approvals:
+never report a count of them.
 
 ---
 

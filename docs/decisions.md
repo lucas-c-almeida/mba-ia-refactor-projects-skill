@@ -1266,6 +1266,26 @@ Diretórios de dependência dentro da árvore **nunca são copiados**: a Fase 1 
 A lista não fica no `proc` (seria acoplada a ecossistemas); fica no raciocínio do agente, que já
 detectou a stack. Custo: toda execução paga uma instalação.
 
+**D24.1 — Emenda depois da primeira rodada real (`run/task-manager-api/iter4`).** A rodada
+eliminou os prompts por `$VAR`, mas ainda gerou 4, de outras causas:
+
+| Prompt | Causa | Como se verificou |
+|---|---|---|
+| 2× `curl -X POST ... -d '<json>'` | não reproduzida: o mesmo curl com 1 e com 2 consultas inline passou limpo | testes A/A2 limpos; o gatilho exato ficou em aberto |
+| `docker exec ... --only a,b` (PowerShell) | `a,b` sem aspas é array calculado em tempo de execução no PowerShell | teste C pediu aprovação; D (`"a,b"`) passou limpo |
+| `sed -i ...` no relatório | editor in-place pode gravar qualquer arquivo | mensagem do próprio prompt |
+
+Regras acrescentadas ao §1.4: arquivos se escrevem e editam só com as ferramentas do agente; corpo
+de requisição vai num arquivo e entra por `--data-binary "@<caminho literal>"` (testes B/E limpos
+em Bash e PowerShell), o que torna irrelevante o gatilho não reproduzido; argumentos com sintaxe de
+shell vão entre aspas; comandos com caminho de container não passam por shell que reescreve
+caminhos.
+
+**Falha de método registrada.** O subagente relatou "0 prompts" e estava errado: quando o usuário
+aprova, o agente só vê que o comando rodou. A contagem de aprovações é dado de quem observa a
+sessão, nunca do agente. A skill agora proíbe o agente de reportar essa contagem, e a verificação
+de uma rodada inclui a contagem feita pelo observador.
+
 ---
 
 ## 4. O princípio emergente: a skill nunca degrada em silêncio
