@@ -79,6 +79,14 @@ owns **exactly the processes it starts, and nothing else** (`references/06-valid
 - Every start and stop is a row of the report's `## Execution Log`. A process action outside the
   log is an incident, and the report says so.
 
+**Write every command literally** (`references/06-validation-protocol.md` §1.4): resolve each
+path once and paste it as an absolute path — no `$VAR`, `$env:`, `%VAR%` or `$(...)`, no
+`cd ... &&` chains, environment passed as `--env KEY=VALUE`, arguments with `,` `@` `{` quoted,
+request bodies passed as `@<file>`. Write and edit files only with your file tools, never with
+`sed -i` or redirection. A command whose effect is only known at run time cannot be checked
+before it runs, so the user gets asked about every one of them. You cannot see those approvals:
+never report a count of them.
+
 ---
 
 ## PHASE 1 — Analysis
@@ -134,8 +142,9 @@ If a field cannot be determined, print `undetermined — <reason>`. Never guess 
 
 **Read `references/02-antipattern-catalog.md` and `references/03-report-template.md` before starting.**
 
-0. **Snapshot the target** before anything executes: copy it to a pristine snapshot outside the
-   target (`references/06-validation-protocol.md` §1.1). Every execution of the original — here and
+0. **Snapshot the target** before anything executes: copy it with `proc copy` to a pristine
+   snapshot outside the target, under the scratch root chosen per
+   `references/06-validation-protocol.md` §1.1 (the environment's own scratch directory first). Every execution of the original — here and
    in Phase 3 — happens in a fresh copy of that snapshot, never in `<target>`, in the isolation
    mode Phase 1 detected (§1.3), and is logged.
 1. **Sweep by catalog entry, and by signal within the entry.** For each entry of the catalog in
@@ -389,4 +398,4 @@ otherwise use `○` (or `✗` for regressions). `<r> + <p> + <u>` always equals 
 | `references/05-refactoring-playbook.md` | Executing each Phase 3 transformation |
 | `references/06-validation-protocol.md` | Phase 1 step 10 (isolation), Phase 2 step 0 (snapshot), Phase 3a, and whenever validation degrades |
 | `scripts/probe.py`, `scripts/probe.mjs` | Reference harness implementations; read to adapt |
-| `scripts/proc.py`, `scripts/proc.mjs` | Host-mode process ownership (protocol §1.3); run them, do not hand-type kills |
+| `scripts/proc.py`, `scripts/proc.mjs` | Host-mode process ownership (protocol §1.3) and every snapshot or run copy (§1.1); run them, do not hand-type kills or copies |

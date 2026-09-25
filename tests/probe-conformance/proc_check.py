@@ -8,6 +8,9 @@ host. proc is the fix, and a fix that is not tested is a claim. The central chec
 decoy: a process this test starts on its own, which proc must never touch -- not when it
 stops its own tree, and not when a state file points at the decoy's PID.
 
+It also holds `proc copy` (the fresh copies of protocol section 1.1) to one behaviour in
+both implementations: VCS directories left out, the destination never overwritten.
+
 Run through tests/probe-conformance/run.py.
 """
 
@@ -114,6 +117,43 @@ def check_one(impl, work, decoy, failures):
                      "--", sys.executable, "-c", "import sys; sys.exit(3)")
     expect("process that exits before ready", code, 5)
     shapes.append(("exits", sorted(doc)))
+
+    shapes.extend(check_copy(impl, work, expect, failures))
+    return shapes
+
+
+def make_tree(root):
+    for rel, text in (("app.txt", "a"), ("pkg/mod.txt", "b"), (".git/HEAD", "ref"),
+                      ("pkg/.git", "gitdir: elsewhere"), ("cache/tmp.txt", "c")):
+        full = os.path.join(root, *rel.split("/"))
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w", encoding="utf-8") as handle:
+            handle.write(text)
+
+
+def check_copy(impl, work, expect, failures):
+    shapes = []
+    source = os.path.join(work, "{0}-tree".format(impl))
+    make_tree(source)
+    dest = os.path.join(work, "{0}-copies".format(impl), "run-1")
+    code, doc = call(impl, "copy", "--from", source, "--to", dest, "--exclude", "cache")
+    expect("copy", code, 0)
+    shapes.append(("copy", sorted(doc), doc.get("copied"), doc.get("excluded")))
+    found = sorted(os.path.relpath(os.path.join(d, f), dest).replace(os.sep, "/")
+                   for d, _, files in os.walk(dest) for f in files)
+    if found != ["app.txt", "pkg/mod.txt"]:
+        failures.append("proc {0}: copy produced {1}, expected app.txt and pkg/mod.txt only"
+                        .format(impl, found))
+
+    code, doc = call(impl, "copy", "--from", source, "--to", dest)
+    expect("copy onto an existing destination", code, 2)
+    shapes.append(("copy exists", sorted(doc)))
+
+    code, doc = call(impl, "copy", "--from", source, "--to", os.path.join(source, "inner"))
+    expect("copy into the source", code, 2)
+    shapes.append(("copy inside", sorted(doc)))
+    if os.path.exists(os.path.join(source, "inner")):
+        failures.append("proc {0}: copy into the source wrote something".format(impl))
     return shapes
 
 

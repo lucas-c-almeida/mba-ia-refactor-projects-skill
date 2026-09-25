@@ -1019,13 +1019,15 @@ below shows the *shape* of the move, not a claim about any particular API.
 
 ```bash
 # 1. Force the detector on and capture the warning with its stack trace (tier A)
-node --pending-deprecation --trace-deprecation ./entry.js 2>&1 | tee reports/deprecations.log
+node --pending-deprecation --trace-deprecation ./entry.js
 #    → gives "DeprecationWarning: ... at <file>:<line>" — the report's File: field, for free
 
-# 2. Confirm the successor from the upstream source, and record the date (tier B/C)
+# 2. Confirm the successor from the upstream source, and record the date (tier B/C).
+#    The query body is written with the file tools first (06-validation-protocol.md §1.4):
+#    {"package":{"name":"<package>","ecosystem":"npm"},"version":"<resolved-version>"}
 npm view <package>@<resolved-version> deprecated
-curl -s -X POST https://api.osv.dev/v1/query \
-  -d '{"package":{"name":"<package>","ecosystem":"npm"},"version":"<resolved-version>"}'
+curl -s -X POST https://api.osv.dev/v1/query -H "Content-Type: application/json" \
+  --data-binary "@<scratch root>/osv-query.json"
 ```
 
 **Before** — the call site the warning pointed at:
@@ -1266,9 +1268,11 @@ identifier, source and lookup date (`02-antipattern-catalog.md`, AP-19). Like RP
 shows the shape of the move with placeholders, because the answer changes over time.
 
 ```bash
-# 1. Confirm the advisory and the first fixed version for the RESOLVED version in use
-curl -s -X POST https://api.osv.dev/v1/query \
-  -d '{"package":{"name":"<package>","ecosystem":"Go"},"version":"<resolved-version>"}'
+# 1. Confirm the advisory and the first fixed version for the RESOLVED version in use.
+#    Body, written with the file tools (06-validation-protocol.md §1.4):
+#    {"package":{"name":"<package>","ecosystem":"Go"},"version":"<resolved-version>"}
+curl -s -X POST https://api.osv.dev/v1/query -H "Content-Type: application/json" \
+  --data-binary "@<scratch root>/osv-query.json"
 #    → affected ranges and "fixed" events: pick the lowest fixed version on the same major line
 ```
 

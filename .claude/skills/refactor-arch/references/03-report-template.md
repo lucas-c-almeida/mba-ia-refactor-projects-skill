@@ -40,6 +40,7 @@ Confirmation: <pending human review | human-confirmed: y | human-confirmed: CRIT
 Tree:    <clean at <commit> | uncommitted changes present — the audit read the working tree as found>
 Runtime: <as found | installed the declared dependencies from <file> into <location outside the target>>
 Isolation: <container (<runtime> <version>, image <name:tag>) | reduced (host) — <reason>>
+Scratch: <environment scratch directory | .refactor-arch-work/ beside the target | system temporary directory — commands touching it needed approval>  (protocol §1.1)
 
 ## Summary
 CRITICAL: <n> | HIGH: <n> | MEDIUM: <n> | LOW: <n>
@@ -107,6 +108,9 @@ DEGRADED — the following checks did not run, and the findings above do not cov
   - <check name>: <why it did not run> → <what is therefore unverified>
 <And, whenever there was one:>
 INCIDENT — <a process action outside the Execution Log, or one that reached something this run did not start: what, when, and what it may have affected>
+<And, whenever a command could not be written literally (protocol §1.4):>
+NON-LITERAL — <the command, and why the step could not be written with literal paths>
+<If the scratch root was the system temporary directory, say so here too.>
 
 ================================
 Total: <N> findings
