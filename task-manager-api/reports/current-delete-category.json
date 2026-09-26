@@ -1,0 +1,30 @@
+{
+  "baseUrl": "http://127.0.0.1:5000",
+  "capturedAt": "2026-09-26T21:24:24Z",
+  "results": {
+    "delete-category-with-tasks": {
+      "contentType": "application/json",
+      "destructive": true,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-20",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "delete-category-with-tasks",
+      "kind": "security",
+      "like": null,
+      "method": "DELETE",
+      "path": "/categories/4",
+      "shape": {
+        "properties": {
+          "message": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    }
+  },
+  "version": 3
+}
