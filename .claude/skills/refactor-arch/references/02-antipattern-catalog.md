@@ -581,9 +581,10 @@ Runtimes **hide** deprecation warnings by default. Python suppresses `Deprecatio
 `__main__`; Node keeps pending deprecations off. A clean run with the detectors off is not
 information. Turn them on before concluding anything:
 
-```bash
-# Python target
-PYTHONWARNINGS=always::DeprecationWarning python -X dev <boot command>
+```
+# Python target: environment PYTHONWARNINGS=always::DeprecationWarning (passed with -e/--env,
+# never as a shell prefix), interpreter flag -X dev
+python -X dev <boot command>
 
 # Node target
 node --pending-deprecation --trace-deprecation <boot entry>
@@ -592,6 +593,20 @@ node --pending-deprecation --trace-deprecation <boot entry>
 For other ecosystems, use the equivalent: the compiler's deprecation diagnostics raised to warnings
 or errors, the build tool's deprecation report, the linter rule set that flags deprecated members.
 Name the mechanism you used in the finding.
+
+**Exercise what the application actually runs.** Most deprecated calls sit in code that runs only
+when it is reached: a handler, a scheduled job, a setup script. Importing or loading the entry
+point exercises only what runs at load time, and a clean result from it says nothing about the
+rest. With the detectors on, exercise, each as its own command:
+
+- the boot, with the derived boot command, until the application is ready;
+- every bootstrap, seed or migration script the project itself documents or runs at start;
+- every public surface entry, or at least one per module that registers entries — the same
+  requests the baseline will send;
+- for a CLI or a library, each command or exported entry point with a representative argument.
+
+List what was exercised in the AP-14 row of `## Catalog Coverage`. What was not exercised is not
+covered, and a gap there goes into `## Verification Coverage`.
 
 Side benefit that matters for the deliverable: a forced warning arrives with a **stack trace naming
 file and line** — exactly the `File: <path>:<line>` the report requires. The evidence arrives

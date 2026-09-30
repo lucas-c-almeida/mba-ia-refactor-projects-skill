@@ -769,12 +769,24 @@ chamadas separadas (`run ... sleep infinity`, `exec` para instalar, `exec -d` pa
 agente consegue contar os próprios comandos, ao contrário das aprovações (D24.1). Vale também para
 as sessões de autoria. Resolve R4-1 e R4-4.
 
+### D26 — Correções operacionais da rodada 4 ✅ decidido
+
+Lista congelada em `docs/rounds/round5-changes.md`. (a) **`proc wait --port`**: a espera de
+prontidão vira ferramenta, nas duas implementações e no teste de conformidade; no container, uma
+chamada `exec ... proc wait`. Nunca laço de polling no shell (R4-2). (b) O shell que carrega
+caminho de container é escolhido na Fase 1, pelo sinal de emulação POSIX no Windows (R4-3). (c) O
+bloco da Fase 1 é impresso antes da Fase 2 e copiado literalmente no topo do relatório (R4-5).
+(d) A camada 1 do AP-14 exercita o que a aplicação roda (boot, seed/migração documentados,
+superfície), não só o import (R4-6). (e) A ordenação é conferida antes de gravar, e o intervalo
+de arquivo inteiro termina na última linha real (checklist da seção C). **Não** mexe no catálogo:
+os ✗ dos scorecards ficam adiados pela contaminação declarada.
+
 ---
 
 ## 9. Perguntas em aberto
 
-Nenhuma. D1–D25 decididas. Rodada 3: lista de mudanças congelada em
-`docs/rounds/round3-changes.md`; implementação em `feat/round3`.
+Nenhuma. D1–D26 decididas. Rodada 5: lista de mudanças congelada em
+`docs/rounds/round5-changes.md`; implementação em `feat/round5`.
 
 ---
 

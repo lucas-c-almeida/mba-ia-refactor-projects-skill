@@ -174,7 +174,10 @@ report.
      (a container that only stays alive);
   2. `<runtime> exec <name> <install argv>` — the ecosystem's install command, as an argv;
   3. `<runtime> exec -d <name> <boot argv>` — the derived boot command, detached;
-  4. one call per readiness check, then the probe with `exec`.
+  4. `<runtime> exec <name> <target runtime> /skill/proc.<py|mjs> wait --port <n> --timeout <s>`
+     — one call that returns when the port answers (exit `0`) or when the time runs out (exit
+     `4`: read `<runtime> logs <name>` for the reason). The wait loop lives in the tool, never in
+     a shell: no `while`/`until`/`for` with a sleep. Then the probe, with `exec`.
 
   Starting, stopping and removing a container are separate calls too: never `run ... && rm ...`,
   never `stop ...; rm ...`.
@@ -193,6 +196,7 @@ start and stop goes through `proc` (`scripts/proc.py`, `scripts/proc.mjs`, or on
                       [--env KEY=VALUE ...] [--timeout <s>] -- <boot argv>
 <runtime> proc stop   --state <snapshot>/proc/<name>.json
 <runtime> proc status --state <snapshot>/proc/<name>.json
+<runtime> proc wait   --port <n> [--timeout <s>]      (readiness only; starts and stops nothing)
 <runtime> proc copy   --from <dir> --to <new dir> [--exclude <name> ...]
 ```
 
@@ -263,9 +267,12 @@ So, in every command — copies, `proc`, the container runtime, the probe, delet
   `--only "a,b"`.
 - **Keep container paths out of a shell that rewrites them.** Some POSIX-emulation shells on
   Windows turn any argument that looks like a POSIX path (`-w /app`, `/skill/probe.py`) into a
-  host path before the container runtime sees it. Run container commands through the host's
-  native shell instead; do not disable the rewriting with an environment prefix, which breaks the
-  rule on environment above.
+  host path before the container runtime sees it — the command is literal, and still reaches the
+  runtime changed. Recognize such a shell by its signals: the host is Windows and the shell reports
+  a POSIX-emulation layer (`uname` naming `MINGW`, `MSYS` or `CYGWIN`), or shows host drives as
+  `/c/...`. Decide once, in Phase 1 with the isolation mode, which shell carries container
+  commands: the host's native shell. Do not disable the rewriting with an environment prefix,
+  which breaks the rule on environment above.
 
 When a step truly cannot be written this way, run it anyway, and say in the report which command
 could not be written literally and why (`NON-LITERAL`).
@@ -736,6 +743,12 @@ start time recorded before readiness; identity checked before every stop; only t
 stopped; a busy port refused, never freed; the same exit codes. Say in the report that process
 ownership ran on a generated tool.
 
+**Container mode on an unshipped runtime** may leave `proc wait` without an interpreter: the
+target's image need not carry Python or Node. Then check readiness with **one single-attempt
+command per call** — the container's log (`<runtime> logs <name>`) showing the listening line, or
+one request sent from inside the container — and repeat the call, never a shell loop. Or generate
+`wait` alongside the harness: it is a port check with a deadline, and it owns nothing.
+
 ## 8. Harness CLI (shared by every implementation)
 
 ```
@@ -757,8 +770,8 @@ ownership ran on a generated tool.
 - A full `capture` or live `compare` leaves destructive entries out and notes them on stderr
   (§2.2).
 
-`proc` (host mode, §1.3, and the copies of §1.1 in both modes) has its own CLI, shared by
-`proc.py` and `proc.mjs`; it is documented in §1.3 and at the top of each script.
+`proc` (host mode, §1.3; the copies of §1.1 and the readiness `wait` in both modes) has its own
+CLI, shared by `proc.py` and `proc.mjs`; it is documented in §1.3 and at the top of each script.
 
 ## 9. Floor mode — declared, never silent
 

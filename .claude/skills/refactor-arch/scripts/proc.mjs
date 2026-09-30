@@ -19,6 +19,9 @@
  *   stop    stop the recorded tree -- after checking that the PID still belongs to the
  *           process that was started (PIDs are reused)
  *   status  is the recorded process alive, and does the port answer?
+ *   wait    wait until a port answers, without starting or stopping anything -- the readiness
+ *           check of a process started some other way (inside a container, protocol section
+ *           1.3), so the waiting loop lives here and never in a shell
  *   copy    copy a directory tree to a new directory, leaving out VCS directories -- the
  *           snapshot and every run copy of protocol section 1.1, in one literal command
  *
@@ -37,11 +40,14 @@
  *                        [--env KEY=VALUE ...] [--timeout 60] -- <argv...>
  *   node proc.mjs stop   --state <file> [--timeout 10]
  *   node proc.mjs status --state <file>
+ *   node proc.mjs wait   --port 8081 [--timeout 60]
  *   node proc.mjs copy   --from <dir> --to <new dir> [--exclude <name> ...]
  *
  * Every command prints one JSON line (keys sorted) and exits with:
- *   0 ok (status: running)       1 status: not running         2 usage or I/O error
- *   3 port already in use        4 not ready in time (stopped) 5 exited before ready
+ *   0 ok (status: running; wait: ready)                        2 usage or I/O error
+ *   1 status: not running
+ *   3 port already in use        4 not ready in time (start: stopped; wait: nothing touched)
+ *   5 exited before ready
  *   6 PID identity mismatch: refused to stop a process it did not start
  *   7 port still answering after stop: something else holds it
  */
@@ -427,6 +433,37 @@ async function cmdStatus(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// wait
+//
+// Waiting for readiness is where an agent writes a shell loop: `until curl ...; do sleep 1;
+// done`. A permission layer cannot bound a loop by reading it, and some refuse it outright.
+// The loop belongs in a tool. This one only watches a port: it owns no process, so it has
+// nothing to stop when the time runs out.
+// ---------------------------------------------------------------------------
+
+async function cmdWait(opts) {
+  const port = Number(opts.port);
+  const timeout = opts.timeout !== undefined ? Number(opts.timeout) : 60;
+  const started = Date.now();
+  const deadline = started + timeout * 1000;
+  for (;;) {
+    if (await portAnswers(port)) {
+      return emit({
+        state: 'ready', port, waited: Math.round((Date.now() - started) / 100) / 10,
+      }, EXIT.OK);
+    }
+    if (Date.now() >= deadline) {
+      return emit({
+        error: `port ${port} did not answer within ${timeout}s. Nothing was started or stopped: `
+          + "read the application's log for the reason",
+        port,
+      }, EXIT.NOT_READY);
+    }
+    await sleep(250);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // copy
 //
 // Copying a tree without its VCS directory is where an agent improvises shell: a loop, a
@@ -485,6 +522,7 @@ const USAGE = `Start and stop exactly the process tree this tool started
                        [--env KEY=VALUE ...] [--timeout <s>] -- <argv...>
   node proc.mjs stop   --state <file> [--timeout <s>]
   node proc.mjs status --state <file>
+  node proc.mjs wait   --port <n> [--timeout <s>]
   node proc.mjs copy   --from <dir> --to <new dir> [--exclude <name> ...]`;
 
 function parseArgs(tokens) {
@@ -510,10 +548,15 @@ async function main() {
   const [mode, ...rest] = head;
   const opts = parseArgs(rest);
 
-  const usable = mode === 'copy'
-    ? typeof opts.from === 'string' && typeof opts.to === 'string'
-    : ['start', 'stop', 'status'].includes(mode) && typeof opts.state === 'string'
+  let usable;
+  if (mode === 'copy') usable = typeof opts.from === 'string' && typeof opts.to === 'string';
+  else if (mode === 'wait') {
+    usable = /^\d+$/.test(String(opts.port))
+      && (opts.timeout === undefined || !Number.isNaN(Number(opts.timeout)));
+  } else {
+    usable = ['start', 'stop', 'status'].includes(mode) && typeof opts.state === 'string'
       && (mode !== 'start' || /^\d+$/.test(String(opts.port)));
+  }
   if (!usable) {
     console.error(USAGE);
     return EXIT.USAGE;
@@ -522,6 +565,7 @@ async function main() {
     if (mode === 'start') return await cmdStart(opts, command);
     if (mode === 'stop') return await cmdStop(opts);
     if (mode === 'copy') return cmdCopy(opts);
+    if (mode === 'wait') return await cmdWait(opts);
     return await cmdStatus(opts);
   } catch (err) {
     return emit({ error: `${err.name}: ${err.message}` }, EXIT.USAGE);

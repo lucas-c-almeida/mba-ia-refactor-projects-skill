@@ -27,7 +27,16 @@ a modification of the project, and does not require the confirmation. No file ou
 
 ## Template
 
+The report opens with the Phase 1 block **exactly as it was printed** (`SKILL.md`, Phase 1). Phase 1
+writes nothing; Phase 2 carries the block into the file, so what Phase 1 concluded — domain,
+architecture, file count — can be checked after the session is gone.
+
 ````markdown
+## Phase 1 — Project Analysis
+```
+<the PHASE 1: PROJECT ANALYSIS block, verbatim>
+```
+
 ================================
 ARCHITECTURE AUDIT REPORT
 ================================
@@ -133,7 +142,9 @@ Confirmation: --yes (auto-approved, not human-reviewed)
 ## Field rules
 
 **Ordering.** CRITICAL → HIGH → MEDIUM → LOW, always, with no exception. Within a severity, order by
-file path then by starting line, so two runs over the same code produce comparable reports.
+file path then by starting line, so two runs over the same code produce comparable reports. Check
+the order before writing the file, reading each heading's severity top to bottom. A finding added
+after the gate (to `audit-latest.md` only) is inserted at its severity's position, never appended.
 
 **`File:`** — a path relative to `<target>`, never absolute and never relative to the CWD. Always a
 line range, even for a single line (`config.ext:12-12`). The range must bound the evidence: the
@@ -144,7 +155,8 @@ finding per line for the same defect.
 The one exception is a finding **about the file as a whole** — a God Module (AP-03), whose evidence
 is the file's size and its mix of responsibilities. Its range is `1-<last line>`, and
 `Description:` names the line ranges of each responsibility it mixes, so the reader can still check
-it.
+it. `<last line>` is the number of the file's last line as your file-reading tool shows it — a
+trailing line break does not add a line. A range that ends past the file is not exact.
 
 **`Description:`** — what you actually read. Name the construct. "A route handler builds the query
 by concatenating the request's filter parameter" is a description; "unsafe database usage" is not.

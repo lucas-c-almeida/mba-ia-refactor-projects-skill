@@ -95,6 +95,10 @@ owns **exactly the processes it starts, and nothing else** (`references/06-valid
   second declared as `Isolation: reduced (host)`. Never start the application any other way.
 - Stop an execution only through its handle: remove the container by its exact name, or
   `proc stop` its state file.
+- **Wait for readiness with a tool, never with a shell loop.** In host mode `proc start` already
+  waits. In container mode, one call: `<container runtime> exec <name> <target runtime>
+  /skill/proc.<py|mjs> wait --port <n> --timeout <s>`. Never `while`/`until`/`for` with a sleep,
+  in any shell (the HARD RULE).
 - **Never stop anything by name, image or pattern** — `pkill`, `killall`, `taskkill /IM`,
   `Stop-Process -Name`, bulk container removal. Never stop a process or container this run did not
   start, and never free a busy port: choose another one.
@@ -132,9 +136,12 @@ Read-only. Do not write anything in this phase.
 9. Derive the boot command, its native port, and the runtime environment it needs
    (`01-project-analysis.md` §6). Record them — Phase 3 needs them.
 10. Detect the isolation mode (`06-validation-protocol.md` §1.3): does a container runtime answer,
-    and can the runtime's official image be obtained? This is a read-only question.
+    and can the runtime's official image be obtained? This is a read-only question. In container
+    mode, also decide which of your shells may carry a container-internal path (§1.4: a shell
+    that rewrites POSIX-looking paths may not), and use that shell for every container command.
 
-Print exactly:
+**Print this block now, before any step of Phase 2** — not as a summary at the end of the run.
+Phase 2 copies it, verbatim, to the top of the report. Print exactly:
 
 ```
 ================================
@@ -186,14 +193,20 @@ If a field cannot be determined, print `undetermined — <reason>`. Never guess 
    say in the finding when you did.
 4. For AP-14 (deprecated APIs) and AP-19 (known-vulnerable dependencies), follow the evidence
    protocol strictly. Tier D — your own prior knowledge — is never reportable. Layer 1 runs the
-   original **from a run copy of the snapshot**. Skip the live lookups if `--offline`, and declare it.
-5. Sort findings CRITICAL → HIGH → MEDIUM → LOW.
+   original **from a run copy of the snapshot**, and exercises what the application actually runs
+   — boot, the project's own bootstrap/seed/migration scripts, the surface entries — not just the
+   entry point's import (catalog AP-14, Layer 1). Skip the live lookups if `--offline`, and declare it.
+5. Sort findings CRITICAL → HIGH → MEDIUM → LOW, and **check the order before writing the
+   file**: read the severity of each heading top to bottom; one out of place is a defect of the
+   report. A finding added after the gate goes into `audit-latest.md` at its severity's position,
+   never at the end.
 6. Mark each finding `contract-safe` or `contract-changing` per the gate in
    `references/04-architecture-guidelines.md` §6 — including its **legitimate-use test** for
    authorization and validation, and its rule for dependency upgrades. Phase 3 needs this
    classification.
 7. Write the report to `<target>/reports/audit-<YYYYMMDD-HHMM>.md` and copy it to
-   `<target>/reports/audit-latest.md`. Print it to the terminal as well. The timestamped file is
+   `<target>/reports/audit-latest.md`, opening with the Phase 1 block exactly as printed
+   (`03-report-template.md`). Print it to the terminal as well. The timestamped file is
    the Phase 2 audit **as it stood at the gate** and is never edited again; `audit-latest.md` is
    the **final state** of the run and also receives the Phase 3 sections.
 
@@ -429,4 +442,4 @@ otherwise use `○` (or `✗` for regressions). `<r> + <p> + <u>` always equals 
 | `references/05-refactoring-playbook.md` | Executing each Phase 3 transformation |
 | `references/06-validation-protocol.md` | Phase 1 step 10 (isolation), Phase 2 step 0 (snapshot), Phase 3a, and whenever validation degrades |
 | `scripts/probe.py`, `scripts/probe.mjs` | Reference harness implementations; read to adapt |
-| `scripts/proc.py`, `scripts/proc.mjs` | Host-mode process ownership (protocol §1.3) and every snapshot or run copy (§1.1); run them, do not hand-type kills or copies |
+| `scripts/proc.py`, `scripts/proc.mjs` | Host-mode process ownership (protocol §1.3), every snapshot or run copy (§1.1), and readiness waits in both modes (`wait`); run them, do not hand-type kills, copies or wait loops |

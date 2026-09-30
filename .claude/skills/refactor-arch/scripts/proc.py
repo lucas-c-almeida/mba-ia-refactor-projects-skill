@@ -19,6 +19,9 @@ What it does
   stop    stop the recorded tree -- after checking that the PID still belongs to the
           process that was started (PIDs are reused)
   status  is the recorded process alive, and does the port answer?
+  wait    wait until a port answers, without starting or stopping anything -- the readiness
+          check of a process started some other way (inside a container, protocol section
+          1.3), so the waiting loop lives here and never in a shell
   copy    copy a directory tree to a new directory, leaving out VCS directories -- the
           snapshot and every run copy of protocol section 1.1, in one literal command
 
@@ -35,11 +38,14 @@ Usage
                         [--env KEY=VALUE ...] [--timeout 60] -- <argv...>
   python proc.py stop   --state <file> [--timeout 10]
   python proc.py status --state <file>
+  python proc.py wait   --port 8081 [--timeout 60]
   python proc.py copy   --from <dir> --to <new dir> [--exclude <name> ...]
 
 Every command prints one JSON line (keys sorted) and exits with:
-  0 ok (status: running)       1 status: not running         2 usage or I/O error
-  3 port already in use        4 not ready in time (stopped) 5 exited before ready
+  0 ok (status: running; wait: ready)                        2 usage or I/O error
+  1 status: not running
+  3 port already in use        4 not ready in time (start: stopped; wait: nothing touched)
+  5 exited before ready
   6 PID identity mismatch: refused to stop a process it did not start
   7 port still answering after stop: something else holds it
 """
@@ -367,6 +373,30 @@ def cmd_status(args):
 
 
 # ---------------------------------------------------------------------------
+# wait
+#
+# Waiting for readiness is where an agent writes a shell loop: `until curl ...; do sleep 1;
+# done`. A permission layer cannot bound a loop by reading it, and some refuse it outright.
+# The loop belongs in a tool. This one only watches a port: it owns no process, so it has
+# nothing to stop when the time runs out.
+# ---------------------------------------------------------------------------
+
+def cmd_wait(args):
+    started = time.monotonic()
+    deadline = started + args.timeout
+    while True:
+        if port_answers(args.port):
+            return emit({"state": "ready", "port": args.port,
+                         "waited": round(time.monotonic() - started, 1)}, EXIT_OK)
+        if time.monotonic() >= deadline:
+            return emit({"error": "port {0} did not answer within {1}s. Nothing was started "
+                                  "or stopped: read the application's log for the reason"
+                                  .format(args.port, args.timeout), "port": args.port},
+                        EXIT_NOT_READY)
+        time.sleep(0.25)
+
+
+# ---------------------------------------------------------------------------
 # copy
 #
 # Copying a tree without its VCS directory is where an agent improvises shell: a loop, a
@@ -426,6 +456,9 @@ def main(argv=None):
     stop_parser.add_argument("--timeout", type=float, default=10.0)
     status_parser = sub.add_parser("status", help="report on the recorded process")
     status_parser.add_argument("--state", required=True)
+    wait_parser = sub.add_parser("wait", help="wait until a port answers; start or stop nothing")
+    wait_parser.add_argument("--port", required=True, type=int)
+    wait_parser.add_argument("--timeout", type=float, default=60.0)
     copy_parser = sub.add_parser("copy", help="copy a tree, leaving out VCS directories")
     copy_parser.add_argument("--from", dest="source", required=True)
     copy_parser.add_argument("--to", dest="dest", required=True)
@@ -445,6 +478,8 @@ def main(argv=None):
             return cmd_stop(args)
         if args.mode == "copy":
             return cmd_copy(args)
+        if args.mode == "wait":
+            return cmd_wait(args)
         return cmd_status(args)
     except (OSError, ValueError, KeyError, shutil.Error) as err:
         return emit({"error": "{0}: {1}".format(type(err).__name__, err)}, EXIT_USAGE)

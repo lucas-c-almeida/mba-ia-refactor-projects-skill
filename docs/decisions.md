@@ -113,6 +113,7 @@ medição que o projeto se protege (§5).
 | **D23** | Laço de correção limitado | Um replay completo; no máximo duas passadas de re-auditoria; `missed-in-phase-2` corrigido é contado à parte *(rodada 3)* |
 | **D24** | Comandos analisáveis, scratch dentro do perímetro | Paths literais, sem `$VAR`; scratch do ambiente primeiro; toda cópia por `proc copy` *(depois da rodada 3)* |
 | **D25** | Nunca `cd`, nunca encadear | Regra inviolável no topo da skill e do `CLAUDE.md`, com checagem antes de cada comando e linha `Commands:` no relatório *(depois da rodada 4)* |
+| **D26** | Correções operacionais da rodada 4 | `proc wait` no lugar de laço de polling; shell de container escolhido na Fase 1; bloco da Fase 1 guardado no relatório; camada 1 exercita o que roda; ordenação conferida *(rodada 5)* |
 
 ---
 
@@ -1337,6 +1338,43 @@ duas). Uma linha a mais no bloco de validação.
 `✓ Processes: ... 0 incidents`. A regra do template não distinguia incidente de processo de
 incidente de comando. Agora cada linha responde pelo próprio tipo.
 
+### D26 — Correções operacionais da rodada 4 (rodada 5)
+
+**Contexto.** O relatório da rodada 4 registrou R4-2 (laço de polling recusado), R4-3 (caminho de
+container reescrito pelo Git Bash), R4-5 (bloco da Fase 1 não impresso) e R4-6 (camada 1 do AP-14
+só importou o entry point). Ao escrever a seção C do README, surgiram mais duas falhas do
+checklist avaliado: um MEDIUM depois dos LOW no relatório congelado do P3, e os três intervalos de
+"arquivo inteiro" passando uma linha do fim. Lista congelada em
+[`round5-changes.md`](rounds/round5-changes.md) antes da implementação.
+
+**Decisão.**
+1. **`proc wait --port <n> [--timeout <s>]`**, subcomando novo das duas implementações do `proc`,
+   coberto pelo teste de conformidade. Só observa uma porta: não inicia nem encerra nada. No modo
+   container, a prontidão é uma chamada `exec <name> <runtime do alvo> /skill/proc.<ext> wait`. O
+   `scripts/` já está montado, e o runtime do alvo já está na imagem (D6.2).
+2. **Shell de container escolhido na Fase 1** pelo sinal de emulação POSIX num host Windows, e
+   usado em todo comando com caminho interno de container.
+3. **Bloco da Fase 1** impresso antes da Fase 2 e copiado literalmente no topo do relatório.
+4. **Camada 1 do AP-14 exercita o que a aplicação roda**: boot, scripts de bootstrap/seed/migração
+   documentados pelo projeto e a superfície. O exemplo com `PYTHONWARNINGS=...` como prefixo de
+   shell, que contradizia a D24, virou ambiente passado por argumento.
+5. **Ordenação conferida antes de gravar**; finding acrescentado depois do gate entra na posição da
+   sua severidade. **Último número do intervalo de arquivo inteiro** = última linha real.
+
+**Justificativa.** O item 1 segue o raciocínio da D20 e da D24: o laço é necessário, mas não pode
+estar num texto que alguém precisa ler e aprovar. Dentro de uma ferramenta testada ele é inofensivo.
+O `proc` era o lugar natural, porque já esperava a porta no `start`. O item 3 torna verificável
+depois da sessão um item do checklist ("domínio descrito") que, na rodada 4, só existia no terminal.
+
+**Alternativas rejeitadas.** *`wait` no `probe`*: o probe exercita a superfície e compara, e o
+ciclo de vida é do `proc` (D20). *Publicar a porta do container no host e esperar de fora*:
+mudaria o desenho da D19, que mantém tudo dentro do container. *Corrigir também os ✗ de catálogo
+dos scorecards*: inflaria o recall da rodada 5 por construção (contaminação, ver `round5-changes.md`).
+
+**Custo aceito.** Mais um subcomando para manter em paridade nas duas implementações. Num alvo de
+stack sem harness embarcado, a imagem pode não ter Python nem Node. Nesse caso, a prontidão volta a
+ser uma checagem por chamada, repetida (protocolo §7).
+
 ---
 
 ## 4. O princípio emergente: a skill nunca degrada em silêncio
@@ -1427,7 +1465,7 @@ frequentemente falsa: é o formato exato de uma alucinação bem-sucedida.
 
 ## 6. Estado do registro
 
-D1–D25 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3, D24 depois dela e D25 depois da rodada 4, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
+D1–D26 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3, D24 depois dela, D25 e D26 depois da rodada 4, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
 este documento foi escrito. Duas dessas decisões (D6 e D13) já foram revertidas uma vez, e
 o registro das reversões foi mantido deliberadamente: a versão final de cada uma é menos
 instrutiva do que o caminho que levou a ela.
