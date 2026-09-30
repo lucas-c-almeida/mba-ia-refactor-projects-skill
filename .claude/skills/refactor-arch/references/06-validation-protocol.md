@@ -169,7 +169,15 @@ report.
   never `$(id -u)`.
 - Name every container `refactor-arch-<target-name>-<run-id>-<n>` and label it
   `refactor-arch.run=<run-id>`. Start it detached; install the declared dependencies and boot
-  the derived command inside it.
+  the derived command inside it — **as separate calls, never one chained shell string**:
+  1. `<runtime> run -d --name <name> --label ... -v ... -w <workdir> <image> sleep infinity`
+     (a container that only stays alive);
+  2. `<runtime> exec <name> <install argv>` — the ecosystem's install command, as an argv;
+  3. `<runtime> exec -d <name> <boot argv>` — the derived boot command, detached;
+  4. one call per readiness check, then the probe with `exec`.
+
+  Starting, stopping and removing a container are separate calls too: never `run ... && rm ...`,
+  never `stop ...; rm ...`.
 - **Run the probe inside the same container** (`exec`), against the native port on the loopback
   address. Nothing is published to the host, and the bind address never has to change.
 - Stop it by removing **that exact name**. Never remove containers by filter, label or pattern,
@@ -231,9 +239,12 @@ So, in every command — copies, `proc`, the container runtime, the probe, delet
 - **Pass the application's environment as arguments**, never through the shell:
   `proc start --env KEY=VALUE`, or `-e KEY=VALUE` on the container runtime. No `export`, no
   `$env:KEY = ...`, no `KEY=VALUE cmd` prefix.
-- **One command per invocation.** No `cd <dir> && ...` chains, no loops, no pipelines that build
-  paths. Give the working directory as an argument instead: `proc start --cwd`, the container
-  runtime's `-w`, an absolute path to the script.
+- **One command per invocation — the HARD RULE of `SKILL.md`, with no exception.** Never change
+  directory (`cd`, `Set-Location`, `pushd`, …) and never chain (`&&`, `||`, `;`, a loop, or any of
+  these inside a string handed to another shell). No pipelines that build paths either. Give the
+  working directory as an argument instead: `proc start --cwd`, the container runtime's `-w`,
+  `git -C`, an absolute path to the script. Unlike the literal-path rule, this one has no
+  `NON-LITERAL` escape: every violation is an `INCIDENT` and counts on the `Commands:` line.
 - **Copy with `proc copy`**, never with a hand-written copy-then-delete sequence.
 - **Read and search files with the agent's own file tools**, not with shell commands. They
   need no shell, so there is nothing to analyse.

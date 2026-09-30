@@ -111,6 +111,8 @@ medição que o projeto se protege (§5).
 | **D21** | Entrada de segurança neutralizada | Correção que muda a resposta sem rejeitar é `FIXED` quando o shape bate com o de uma entrada benigna irmã *(rodada 3)* |
 | **D22** | O contrato de erro | São contrato o status e o shape dos erros intencionais; a página padrão do framework não é *(rodada 3)* |
 | **D23** | Laço de correção limitado | Um replay completo; no máximo duas passadas de re-auditoria; `missed-in-phase-2` corrigido é contado à parte *(rodada 3)* |
+| **D24** | Comandos analisáveis, scratch dentro do perímetro | Paths literais, sem `$VAR`; scratch do ambiente primeiro; toda cópia por `proc copy` *(depois da rodada 3)* |
+| **D25** | Nunca `cd`, nunca encadear | Regra inviolável no topo da skill e do `CLAUDE.md`, com checagem antes de cada comando e linha `Commands:` no relatório *(depois da rodada 4)* |
 
 ---
 
@@ -1286,6 +1288,55 @@ aprova, o agente só vê que o comando rodou. A contagem de aprovações é dado
 sessão, nunca do agente. A skill agora proíbe o agente de reportar essa contagem, e a verificação
 de uma rodada inclui a contagem feita pelo observador.
 
+### D25 — Nunca `cd`, nunca encadear: regra inviolável (emenda à D24)
+
+**Contexto.** A D24 já proibia `cd ... &&`. Mesmo assim, a rodada 4
+([`round4-report.md`](rounds/round4-report.md)) registrou dois casos de encadeamento: um `docker run`
+com um `docker rm` na mesma chamada, bloqueado pela camada de permissão como *"Remove-Item on system
+path '/app'"* (R4-1), e três `Remove-Item` ligados por `;` (R4-4). A sessão que leu esse relatório
+abriu com um `cd "<repo>" && ls ...`, com o `CLAUDE.md` e a memória do projeto carregados. O autor
+pediu que a regra deixasse de poder ser ignorada.
+
+**O erro registrado.** A D24 tratou `cd &&` como um caso de "comando não literal", ao lado de `$VAR`
+e aspas. Esse não é um erro de conhecimento, e sim de reflexo: o agente sabe a regra e digita
+`cd X && cmd` por hábito, no meio do trabalho. Um item de lista, lido uma vez no início, não compete
+com um hábito que se manifesta a cada chamada. O R4-4 mostra isso: a regra existia, o subagente a
+conhecia, tinha recebido a proibição por escrito, e mesmo assim a quebrou.
+
+**Decisão.**
+1. **Regra própria, no topo:** uma seção `HARD RULE` logo abaixo do quadro das fases no `SKILL.md`,
+   e §0 do `CLAUDE.md`, antes de qualquer outra coisa. Vale também para as sessões de autoria.
+2. **Sem exceção.** O escape `NON-LITERAL` da D24 continua valendo para paths, mas não para `cd`
+   ou encadeamento. Não existe comando que precise dos dois: o diretório vira argumento (`-C`,
+   `--cwd`, `-w`) e dois comandos viram duas chamadas.
+3. **Cobertura do envelope:** o encadeamento dentro de uma string passada a outro shell
+   (`sh -c "a && b"`) conta. No modo container, instalação e boot deixam de ir juntos num `sh -c`
+   (a forma que o próprio protocolo sugeria) e viram `run ... sleep infinity`, `exec <install>`,
+   `exec -d <boot>`.
+4. **Checagem antes de cada comando:** reler o texto procurando `cd`, `&&`, `||`, `;` e laço.
+5. **Consequência visível:** linha `Commands: <c> directory changes, <k> chained commands` no
+   bloco `## Validation`, `✗` a cada violação, e um `INCIDENT — command rule` por caso.
+
+**Justificativa.** Os itens 1 e 4 atacam o reflexo: a regra fica onde o olho passa e é revisitada
+no momento em que o erro acontece. O item 5 dá à regra o mesmo peso das outras verificações, e ele
+é possível por uma assimetria: o agente **não** vê as aprovações (D24.1), mas vê todo comando que
+enviou. Contar violações é, então, um fato que ele pode reportar. O item 2 fecha a porta que o R4-4
+usou: "foi inofensivo" não serve de justificativa, porque a regra não existe para evitar dano ao
+arquivo, e sim para que quem aprova consiga ler o comando.
+
+**Alternativas rejeitadas.** *Um hook `PreToolUse` que bloqueie `cd`/`&&`* seria mais forte, mas é
+configuração do ambiente do usuário, não conteúdo da skill: não viaja com ela para outro projeto.
+Pode existir, **além** da regra, como proteção local do autor. *Manter a regra na lista da D24 e só
+reforçar o texto* repete o que a rodada 4 já mostrou que não funciona.
+
+**Custo aceito.** Mais chamadas de ferramenta por rodada (instalar e bootar um container viram
+duas). Uma linha a mais no bloco de validação.
+
+**Inconsistência encontrada ao escrever esta decisão.** Na rodada 4, o relatório do
+`task-manager-api` declarou o `;` como `INCIDENT` e mesmo assim imprimiu
+`✓ Processes: ... 0 incidents`. A regra do template não distinguia incidente de processo de
+incidente de comando. Agora cada linha responde pelo próprio tipo.
+
 ---
 
 ## 4. O princípio emergente: a skill nunca degrada em silêncio
@@ -1376,7 +1427,7 @@ frequentemente falsa: é o formato exato de uma alucinação bem-sucedida.
 
 ## 6. Estado do registro
 
-D1–D24 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3 e D24 depois dela, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
+D1–D25 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3, D24 depois dela e D25 depois da rodada 4, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
 este documento foi escrito. Duas dessas decisões (D6 e D13) já foram revertidas uma vez, e
 o registro das reversões foi mantido deliberadamente: a versão final de cada uma é menos
 instrutiva do que o caminho que levou a ela.

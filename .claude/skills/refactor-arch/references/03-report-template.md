@@ -108,6 +108,8 @@ DEGRADED — the following checks did not run, and the findings above do not cov
   - <check name>: <why it did not run> → <what is therefore unverified>
 <And, whenever there was one:>
 INCIDENT — <a process action outside the Execution Log, or one that reached something this run did not start: what, when, and what it may have affected>
+<And, for every command that changed directory or chained commands (SKILL.md HARD RULE):>
+INCIDENT — command rule: <the command as sent, which rule it broke (directory change / chain), and what it did>
 <And, whenever a command could not be written literally (protocol §1.4):>
 NON-LITERAL — <the command, and why the step could not be written with literal paths>
 <If the scratch root was the system temporary directory, say so here too.>
@@ -250,6 +252,7 @@ PHASE 3: REFACTORING COMPLETE
     Re-audit passes: <1|2>; fixed after re-audit: <f> (<m> of them missed-in-phase-2)
   ✓ Processes: <s> started, <s> stopped through their handles, 0 left running, 0 incidents
     Isolation: <container | reduced (host)>
+  ✓ Commands: 0 directory changes, 0 chained commands
 
 ## Proposed, Not Applied
 ### [<SEVERITY>] <Anti-Pattern Name>   (AP-xx)
@@ -287,9 +290,18 @@ The `Security entries` line appears only when the surface inventory has security
 `unresolved`.
 
 **The processes line** is `✓` only when every start in `## Execution Log` has a matching stop
-through the same handle, nothing of this run is left running, and there is no `INCIDENT` line.
-Otherwise it is `✗`, with the count of what is left running or of incidents — never `○`: an
+through the same handle, nothing of this run is left running, and there is no process `INCIDENT`
+line. Otherwise it is `✗`, with the count of what is left running or of incidents — never `○`: an
 out-of-scope process action is a failure of the run, not a neutral fact.
+
+**The commands line** counts the run's own commands, across all three phases, against the HARD
+RULE of `SKILL.md`: a directory change (`cd`, `Set-Location`, `pushd`, …) or a chain (`&&`, `||`,
+`;`, a loop, or any of these inside a string handed to another shell). It is `✓` only when both
+counts are 0. Otherwise it is `✗ Commands: <c> directory changes, <k> chained commands`, with one
+`INCIDENT — command rule` line per violation — never `○`, and never omitted because the command was
+harmless. A harmless violation still broke a rule the user relies on to read commands before they
+run. The agent sees every command it sends, so this count is always available; it is not the count
+of approvals, which the agent cannot see (protocol §1.4).
 
 ---
 

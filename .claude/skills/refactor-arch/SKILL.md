@@ -14,6 +14,30 @@ PHASE 2  Audit         →  findings report. Writes only to <target>/reports/. E
 PHASE 3  Refactoring   →  restructure + validate. Runs only after the gate is passed.
 ```
 
+## HARD RULE — never `cd`, never chain. One command per tool call.
+
+This rule has **no exception** and is checked **before every command you send**, not once at the
+start of the run.
+
+- **Never change directory**, in any form: `cd`, `Set-Location`, `sl`, `pushd`, `Push-Location`,
+  `chdir`. Pass the directory as an argument instead — `git -C <dir>`, `proc start --cwd`, the
+  container runtime's `-w`, a tool's own `--prefix`/`--cwd` flag — or use an absolute path.
+- **Never chain commands**, in any form: `&&`, `||`, `;`, a trailing `&`, two commands on separate
+  lines of one call, or a loop (`for`, `foreach`, `while`, `until`). This includes chains **inside a
+  string handed to another shell**: `sh -c "a && b"`, `bash -c`, `cmd /c`, `powershell -Command`.
+  Two commands are two tool calls.
+- **Before sending any command, reread its text** for `cd`, `&&`, `||`, `;` and loop keywords. If
+  one is there, rewrite the command before sending it.
+
+Why: every command is read **as text** by a person or a permission layer before it runs. A chain
+or a directory change makes the command impossible to bound by reading it, so each one interrupts
+the user — and a chain that mixes a container path with a removal can be refused outright as a
+deletion on the host. The rest of the literal-command discipline is in
+`references/06-validation-protocol.md` §1.4.
+
+A violation is reported, never hidden: it is an `INCIDENT` line under `## Verification Coverage`,
+and it turns the `Commands:` line of the final `## Validation` block into `✗`.
+
 ## Invocation contract
 
 ```
@@ -80,8 +104,8 @@ owns **exactly the processes it starts, and nothing else** (`references/06-valid
   log is an incident, and the report says so.
 
 **Write every command literally** (`references/06-validation-protocol.md` §1.4): resolve each
-path once and paste it as an absolute path — no `$VAR`, `$env:`, `%VAR%` or `$(...)`, no
-`cd ... &&` chains, environment passed as `--env KEY=VALUE`, arguments with `,` `@` `{` quoted,
+path once and paste it as an absolute path — no `$VAR`, `$env:`, `%VAR%` or `$(...)`, and never
+`cd` or a chain (the HARD RULE above), environment passed as `--env KEY=VALUE`, arguments with `,` `@` `{` quoted,
 request bodies passed as `@<file>`. Write and edit files only with your file tools, never with
 `sed -i` or redirection. A command whose effect is only known at run time cannot be checked
 before it runs, so the user gets asked about every one of them. You cannot see those approvals:
@@ -354,6 +378,7 @@ PHASE 3: REFACTORING COMPLETE
     Re-audit passes: <1|2>; fixed after re-audit: <f> (<m> of them missed-in-phase-2)
   ✓ Processes: <s> started, <s> stopped through their handles, 0 left running, 0 incidents
     Isolation: <container | reduced (host)>
+  ✓ Commands: 0 directory changes, 0 chained commands
 
 ## Proposed, Not Applied
 <contract-changing items, or "none">
@@ -364,8 +389,14 @@ PHASE 3: REFACTORING COMPLETE
 ```
 
 The processes line is `✓` only when every start has a matching stop through its handle, nothing
-is left running, and the execution log records no incident. Otherwise it is `✗`, and the
-incident is described under `## Verification Coverage`.
+is left running, and there is no process `INCIDENT` (a process action outside the log, or one that
+reached something this run did not start). Otherwise it is `✗`, and the incident is described
+under `## Verification Coverage`.
+
+The commands line counts **your own** commands against the HARD RULE, across all three phases.
+You can see every command you sent, so this count is yours to report (unlike approvals, which you
+cannot see). It is `✓` only when both numbers are 0; otherwise it is
+`✗ Commands: <c> directory changes, <k> chained commands`, and each one is an `INCIDENT` line.
 
 The re-audit line always appears, in one of exactly three forms, chosen by what 3d actually
 returned:

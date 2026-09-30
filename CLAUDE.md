@@ -13,6 +13,31 @@
 
 ---
 
+## 0. Regra inviolável de comandos (D25) — vale para TODA sessão neste repositório
+
+> **Nunca `cd`. Nunca encadear comandos.** Um comando por chamada de ferramenta, sempre.
+
+Vale para a skill **e** para qualquer agente trabalhando neste repositório (sessões de autoria,
+orquestração, subagentes, esta inclusive). Não há exceção declarável.
+
+- **Proibido mudar de diretório**, em qualquer forma: `cd`, `Set-Location`, `sl`, `pushd`,
+  `Push-Location`, `chdir`. O diretório vai como argumento: `git -C <dir>`, `--cwd`, `-w`,
+  `--prefix`, ou um path absoluto.
+- **Proibido encadear**, em qualquer forma: `&&`, `||`, `;`, `&` de fundo, quebra de linha com
+  dois comandos, laço (`for`/`foreach`/`while`/`until`), inclusive **dentro de uma string** passada a
+  outro shell (`sh -c "a && b"`, `bash -c`, `cmd /c`, `powershell -Command`). Dois comandos são duas
+  chamadas.
+- **Antes de enviar cada comando, reler o texto** procurando `cd`, `&&`, `||`, `;` e laço. Se
+  aparecer, reescrever antes de enviar.
+
+**Por quê:** a camada de permissão lê o comando como texto. Encadeamento e mudança de diretório
+tornam o comando inanalisável e fazem cada um deles pedir aprovação ao usuário. Na rodada 4, um
+encadeamento de `docker` foi bloqueado como exclusão de arquivo do sistema (R4-1). A regra já estava
+na D24, mas como um item de lista, e foi quebrada por reflexo (R4-4, e na abertura da sessão que
+escreveu esta seção). Uma regra que precisa ser lembrada a cada chamada tem que estar no topo.
+
+---
+
 ## 1. O que é este repositório
 
 Repositório de um desafio do MBA FullCycle. O **entregável não é código refatorado** — é uma
@@ -733,11 +758,22 @@ declarado). Regra nova (protocolo §1.4): paths absolutos literais, sem `$VAR`/`
 aspas (no PowerShell, `a,b` é array); caminhos de container fora de shell que os reescreve. O
 agente não vê aprovações e nunca reporta a contagem delas: quem conta é o observador da sessão.
 
+### D25 — **Nunca `cd`, nunca encadear**: regra inviolável ✅ decidido
+
+Depois da rodada 4. Promove a meia frase da D24 a regra própria, no topo do `SKILL.md` e deste
+documento (§0). O texto completo está em §0. Três mudanças em relação à D24: (a) **sem exceção**:
+`NON-LITERAL` continua valendo para paths, mas não para `cd` ou encadeamento; (b) cobre o
+encadeamento **dentro de string** (`sh -c "a && b"`): no container, a instalação e o boot viram
+chamadas separadas (`run ... sleep infinity`, `exec` para instalar, `exec -d` para bootar); (c)
+**consequência visível**: uma linha `Commands:` no bloco `## Validation`, `✗` a cada violação. O
+agente consegue contar os próprios comandos, ao contrário das aprovações (D24.1). Vale também para
+as sessões de autoria. Resolve R4-1 e R4-4.
+
 ---
 
 ## 9. Perguntas em aberto
 
-Nenhuma. D1–D24 decididas. Rodada 3: lista de mudanças congelada em
+Nenhuma. D1–D25 decididas. Rodada 3: lista de mudanças congelada em
 `docs/rounds/round3-changes.md`; implementação em `feat/round3`.
 
 ---
@@ -748,3 +784,4 @@ Nenhuma. D1–D24 decididas. Rodada 3: lista de mudanças congelada em
   trade-offs explícitos, não só o resultado.
 - Nenhuma análise dos 3 projetos entra na skill como caso concreto (§2).
 - Este `CLAUDE.md` é o documento vivo do projeto: novas decisões são registradas aqui.
+- **§0 vale para esta sessão também:** nenhum `cd`, nenhum encadeamento, um comando por chamada.
