@@ -1,0 +1,97 @@
+{
+  "version": 3,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:3000",
+  "entries": [
+    {
+      "id": "post-checkout-new-user-paid",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Guilherme", "eml": "gui@fullcycle.com.br", "pwd": "senhaforte", "c_id": 2, "card": "4111222233334444" }
+    },
+    {
+      "id": "post-checkout-existing-user-paid",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Leonan", "eml": "leonan@fullcycle.com.br", "pwd": "123", "c_id": 2, "card": "4999000011112222" }
+    },
+    {
+      "id": "post-checkout-new-user-no-password",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Maria", "eml": "maria@teste.com", "c_id": 1, "card": "4000111122223333" }
+    },
+    {
+      "id": "post-checkout-payment-denied",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Joao", "eml": "joao@teste.com", "pwd": "123", "c_id": 1, "card": "5111222233334444" }
+    },
+    {
+      "id": "post-checkout-missing-fields",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Ana" }
+    },
+    {
+      "id": "post-checkout-course-not-found",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Ana", "eml": "ana@teste.com", "pwd": "x", "c_id": 999, "card": "4111222233334444" }
+    },
+    {
+      "id": "post-checkout-malformed-json",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "rawBody": "{\"usr\": ",
+      "skip": true,
+      "skipReason": "the body is the framework's default error page with a stack trace, which the AP-18 fix replaces on purpose (guidelines §6, error contract); a text-skeleton comparison would report the intended fix as a regression. Status verified out of band before and after."
+    },
+    {
+      "id": "get-admin-financial-report",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "headers": { "Accept": "application/json" },
+      "body": null
+    },
+    {
+      "id": "get-unknown-route",
+      "method": "GET",
+      "path": "/api/does-not-exist",
+      "body": null
+    },
+    {
+      "id": "delete-user-1",
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "body": null,
+      "destructive": true
+    },
+    {
+      "id": "post-checkout-card-not-string",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Eve", "eml": "eve@teste.com", "pwd": "x", "c_id": 1, "card": 4111222233334444 },
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    },
+    {
+      "id": "delete-user-non-numeric-id",
+      "method": "DELETE",
+      "path": "/api/users/abc",
+      "body": null,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    }
+  ]
+}
