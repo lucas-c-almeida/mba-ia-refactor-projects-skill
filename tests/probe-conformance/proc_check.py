@@ -9,7 +9,9 @@ decoy: a process this test starts on its own, which proc must never touch -- not
 stops its own tree, and not when a state file points at the decoy's PID.
 
 It also holds `proc copy` (the fresh copies of protocol section 1.1) to one behaviour in
-both implementations: VCS directories left out, the destination never overwritten.
+both implementations: VCS directories left out, the destination never overwritten. And
+`proc wait` (the readiness check that replaces a shell polling loop): ready on a live port,
+exit 4 on a closed one, nothing started or stopped either way.
 
 Run through tests/probe-conformance/run.py.
 """
@@ -85,6 +87,17 @@ def check_one(impl, work, decoy, failures):
     code, doc = call(impl, "status", "--state", state)
     expect("status while running", code, 0)
     shapes.append(("status", sorted(doc)))
+
+    # wait watches a port and owns nothing: ready on a live port, exit 4 on a closed one --
+    # and in neither case may it touch the server or the decoy.
+    code, doc = call(impl, "wait", "--port", str(port), "--timeout", "10")
+    expect("wait on a port that answers", code, 0)
+    shapes.append(("wait ready", sorted(doc)))
+    code, doc = call(impl, "wait", "--port", str(free_port()), "--timeout", "1")
+    expect("wait on a closed port", code, 4)
+    shapes.append(("wait timeout", sorted(doc)))
+    if not answers(port):
+        failures.append("proc {0}: the server stopped answering after wait".format(impl))
 
     code, doc = call(impl, "stop", "--state", state)
     expect("stop", code, 0)

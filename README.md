@@ -44,32 +44,37 @@ mba-ia-refactor-projects-skill/
 │
 ├── README.md                              # esta documentação de entrega (A · B · C · D)
 ├── instructions.md                        # enunciado original, preservado intacto
-├── CLAUDE.md                              # especificação viva do projeto (D1–D14)
+├── CLAUDE.md                              # especificação viva do projeto (D1–D26)
 │
 ├── .claude/skills/refactor-arch/          # ← A SKILL (fonte única da verdade, D2)
 │   ├── SKILL.md                           #   orquestração das 3 fases
 │   ├── references/
 │   │   ├── 01-project-analysis.md         #   heurísticas de detecção (Fase 1)
-│   │   ├── 02-antipattern-catalog.md      #   catálogo de 19 anti-patterns (Fase 2)
+│   │   ├── 02-antipattern-catalog.md      #   catálogo de 20 anti-patterns (Fase 2)
 │   │   ├── 03-report-template.md          #   formato normativo do relatório (Fase 2)
 │   │   ├── 04-architecture-guidelines.md  #   arquitetura alvo e gate de contrato (Fase 3)
-│   │   ├── 05-refactoring-playbook.md     #   18 transformações antes/depois (Fase 3)
+│   │   ├── 05-refactoring-playbook.md     #   19 transformações antes/depois (Fase 3)
 │   │   └── 06-validation-protocol.md      #   protocolo normativo de validação (Fase 3)
 │   └── scripts/
 │       ├── probe.py                       #   harness de referência — Python stdlib
-│       └── probe.mjs                      #   harness de referência — Node, zero deps
+│       ├── probe.mjs                      #   harness de referência — Node, zero deps
+│       ├── proc.py                        #   ciclo de vida de processos (D20) — Python stdlib
+│       └── proc.mjs                       #   ciclo de vida de processos (D20) — Node, zero deps
 │
 ├── docs/                                  # artefatos de processo (nossos, fora do exigido)
-│   ├── decisions.md                       #   registro ADR das decisões D1–D14
+│   ├── decisions.md                       #   registro ADR das decisões D1–D26
+│   ├── gabarito.md                        #   análise manual (cópia na seção A)
 │   ├── rounds/                            #   relatório consolidado de cada rodada
-│   ├── runs/                              #   PENDENTE — transcript de cada rodada (D3)
-│   └── evals/                             #   PENDENTE — rubrica e scorecards (D8)
+│   ├── runs/                              #   transcript de cada rodada (D3)
+│   └── evals/                             #   rubrica e scorecards por rodada (D8)
+│
+├── tests/probe-conformance/               # teste de conformidade entre os probes (D6.3)
 │
 ├── code-smells-project/                   # Projeto 1 — campo de prova
 ├── ecommerce-api-legacy/                  # Projeto 2 — campo de prova
 ├── task-manager-api/                      # Projeto 3 — campo de prova
 │
-├── reports/                               # PENDENTE — saída da Fase 2 de cada projeto
+├── reports/                               # saída da Fase 2 de cada projeto
 │   ├── audit-project-1.md
 │   ├── audit-project-2.md
 │   └── audit-project-3.md
@@ -237,23 +242,24 @@ repositório; nenhum arquivo versionado foi alterado.
 
 ### B.1 — Estrutura dos arquivos e *progressive disclosure*
 
-A skill tem nove arquivos, com uma divisão de papéis deliberada:
+A skill tem onze arquivos, com uma divisão de papéis deliberada:
 
 | Arquivo | Papel | Quando é lido |
 |---|---|---|
 | `SKILL.md` | **Orquestra.** Contrato de invocação, sequência das fases, formato exato dos blocos impressos, o gate, as regras invioláveis. | Sempre, inteiro |
 | `references/01-project-analysis.md` | Heurísticas de detecção: linguagem, framework, dependências, banco, tipo de aplicação, superfície pública, comando de boot | Início da Fase 1 |
-| `references/02-antipattern-catalog.md` | Catálogo de 19 anti-patterns, com sinais observáveis e regras de severidade | Início da Fase 2 |
+| `references/02-antipattern-catalog.md` | Catálogo de 20 anti-patterns, com sinais observáveis e regras de severidade | Início da Fase 2 |
 | `references/03-report-template.md` | Formato normativo do relatório e regras de cada campo | Ao escrever o relatório |
 | `references/04-architecture-guidelines.md` | Arquitetura alvo, direção de dependências, teste "camada real ou nominal", gate de contrato público | Ao planejar a Fase 3 |
-| `references/05-refactoring-playbook.md` | 18 transformações concretas com código antes/depois | A cada transformação |
+| `references/05-refactoring-playbook.md` | 19 transformações concretas com código antes/depois | A cada transformação |
 | `references/06-validation-protocol.md` | Spec normativa da validação baseline-then-replay | Fase 3a e sempre que a validação degradar |
 | `scripts/probe.py`, `scripts/probe.mjs` | Implementações de referência do protocolo | Fase 3a, ou como base para gerar outra |
+| `scripts/proc.py`, `scripts/proc.mjs` | Ciclo de vida dos processos: sobe o argv derivado pelo agente, espera a porta, encerra só a árvore registrada (D20) | Sempre que a aplicação original ou refatorada precisa rodar |
 
 **O SKILL.md é um prompt; os arquivos de referência são conhecimento de domínio.** Essa separação
 não é estética: o SKILL.md entra inteiro no contexto toda vez que a skill é invocada, enquanto os
 arquivos de referência são carregados sob demanda, na fase que precisa deles. Por isso o SKILL.md
-tem ~230 linhas e o playbook tem ~1.160: o custo de contexto de cada um é pago em momentos
+tem ~450 linhas e o playbook tem ~1.420: o custo de contexto de cada um é pago em momentos
 diferentes. O SKILL.md termina com um mapa explícito de *"leia este arquivo quando…"*, para que o
 carregamento seja uma decisão instruída e não um acaso.
 
@@ -272,7 +278,7 @@ divergência deliberada de idioma entre o artefato e o texto que o descreve.
 
 ### B.2 — O catálogo: o que entrou e por quê
 
-**19 anti-patterns** (o enunciado exige ≥8), extraídos de literatura — Fowler (*Refactoring*),
+**20 anti-patterns** (o enunciado exige ≥8), extraídos de literatura — Fowler (*Refactoring*),
 Feathers (*Working Effectively with Legacy Code*), os princípios SOLID e o OWASP Top 10 — e não dos
 projetos-alvo.
 
@@ -282,6 +288,7 @@ projetos-alvo.
 | **HIGH** (5) | AP-05 … AP-09 | Business Logic in the Delivery Layer · Hard-Wired Dependencies / No Composition Root · Mutable Global State · Unsafe Handling of Credentials · Swallowed or Uncentralized Error Handling |
 | **HIGH** (2, rodada 2) | AP-18, AP-19 | Insecure Runtime Configuration · Known-Vulnerable Dependency |
 | **MEDIUM** (5) | AP-10 … AP-14 | N+1 / Query-Inside-Loop · Missing Boundary Validation · Duplicated Logic · Unbounded Resources and Leaked Handles · Deprecated or End-of-Life API Usage |
+| **MEDIUM** (1, rodada 3) | AP-20 | Missing Schema-Level Integrity Constraints |
 | **LOW** (3) | AP-15 … AP-17 | Magic Values · Misleading Names and Inconsistent Structure · Dead Code and Commented-Out Code |
 
 **AP-18 e AP-19 entraram depois da rodada 1**, e isso é declarado em vez de escondido: as duas
@@ -290,6 +297,11 @@ classificados de forma improvisada sob outras entradas). Ambas vêm do OWASP Top
 *Security Misconfiguration* e *Vulnerable and Outdated Components* — e deveriam ter estado no
 catálogo cego desde o início. A lista de mudanças da rodada 2 foi congelada e commitada antes de
 existir o gabarito ([`docs/rounds/round2-changes.md`](docs/rounds/round2-changes.md)).
+
+**AP-20 entrou na rodada 3, já com o autor contaminado pelo gabarito**, e a contaminação está
+declarada em [`docs/rounds/round3-changes.md`](docs/rounds/round3-changes.md). A fonte é Karwin
+(*SQL Antipatterns*, "Keyless Entry" e "Rounding Errors"): regra que a aplicação confere mas o
+banco não garante. A transformação correspondente é RP-19.
 
 A lógica organizadora é a própria escala de severidade do enunciado, lida como uma escala de
 **natureza do dano**: segurança e destruição total de separação de responsabilidades no topo;
@@ -321,7 +333,7 @@ Três regras transversais do catálogo merecem destaque, porque são o que o man
   findings. O número é o que o código produzir; poucos findings num projeto limpo é um resultado
   correto, não uma falha da auditoria.
 
-O **playbook** espelha o catálogo com **18 transformações** (o enunciado exige ≥8), com exemplos de
+O **playbook** espelha o catálogo com **19 transformações** (o enunciado exige ≥8), com exemplos de
 código antes/depois em **Python, JavaScript/TypeScript, Go, Ruby e PHP** — deliberadamente, porque
 ler a mesma ideia em cinco sintaxes é a prova de que o padrão não é preso a uma stack. Os domínios
 dos exemplos (estoque de armazém, reserva de salas, empréstimo de livros, telemetria de sensores,
@@ -608,68 +620,166 @@ reportar finding que não foi observado; nunca afirmar que um check passou sem t
 
 ## C) Resultados
 
-> ## ⚠️ PENDENTE — nenhuma execução ocorreu
+> **Fonte desta seção: a rodada 5** (2026-09-30 a 2026-10-01), com a skill **na versão entregue**
+> (D1–D26, `feat/round5@7ef5932`, a mesma copiada para os três projetos). Relatório da rodada:
+> [`docs/rounds/round5-report.md`](docs/rounds/round5-report.md). Transcripts:
+> [`docs/runs/`](docs/runs/). A rodada 4 aparece só como comparação.
 >
-> **O que esta seção vai conter:** o resumo dos relatórios de auditoria dos três projetos (findings
-> por severidade), a comparação antes/depois da estrutura de cada um, o checklist de validação
-> preenchido por projeto, os logs das aplicações rodando após a refatoração e as observações sobre o
-> comportamento da skill em stacks diferentes.
+> **O gate foi respondido por uma pessoa nos três projetos.** Cada execução parou no prompt
+> `[y/n]`; o autor leu o resumo e respondeu `y`. Os três relatórios registram
+> `Confirmation: human-confirmed: y`.
 >
-> **De que ela depende:** de **executar a skill nos três projetos** — o que ainda não aconteceu.
-> **Zero rodadas foram realizadas.** Depende também da seção A, porque as métricas de recall e de
-> *achados além do gabarito* (D8) só existem contra um gabarito.
+> **Como cada número foi obtido.** Nada aqui foi copiado sem conferência:
 >
-> **Por que está vazia e não apenas inacabada:** qualquer número aqui que não venha de uma execução
-> real é invenção — e este projeto inteiro existe para medir quanto uma skill generaliza. Estimar
-> contagens de findings, desenhar uma árvore de diretórios "provável" ou marcar um checkbox de
-> validação sem ter observado o check passar destruiria a metodologia de medição (D8) na origem, e
-> seria precisamente a degradação silenciosa que o princípio de B.5 proíbe — aplicada à própria
-> documentação do projeto.
->
-> **Nenhuma caixa abaixo está marcada, e nenhuma célula abaixo contém resultado.**
+> | Dado | Fonte | Conferência |
+> |---|---|---|
+> | Findings, severidades, estados da Fase 3 | `reports/audit-project-{1,2,3}.md` (= `<projeto>/reports/audit-latest.md`) | Contagens do `## Summary` batem com os findings listados |
+> | Referências `arquivo:linhas` | Relatórios congelados no gate | **74/74** conferidas contra o código original em `main`: o arquivo existe e o intervalo cabe nele |
+> | Replay | `baseline.json` e o replay final de cada projeto | **Reclassificado fora da sessão do subagente** com `probe.py compare --current`: idêntico aos três relatórios. É a saída mostrada nos blocos "Replay" |
+> | Containers | `docker ps -a` filtrado pelo nome/label de cada execução | Vazio nos três, inclusive depois da interrupção do projeto 3 |
+> | Recall, falsos positivos, achados além do gabarito | Scorecards em [`docs/evals/`](docs/evals/) | Cada item da seção A casado pela [rubrica](docs/evals/rubric.md), com a justificativa de cada ◐ e ✗ |
 
 ### C.1 — Resumo dos relatórios de auditoria
 
-| Projeto | Stack | Arquivos | CRITICAL | HIGH | MEDIUM | LOW | Total | Relatório |
+| Projeto | Stack detectada | Arquivos | CRITICAL | HIGH | MEDIUM | LOW | Total | Relatório |
 |---|---|---|---|---|---|---|---|---|
-| 1 — `code-smells-project` | Python / Flask | — | — | — | — | — | — | `reports/audit-project-1.md` |
-| 2 — `ecommerce-api-legacy` | Node.js / Express | — | — | — | — | — | — | `reports/audit-project-2.md` |
-| 3 — `task-manager-api` | Python / Flask | — | — | — | — | — | — | `reports/audit-project-3.md` |
+| 1 — `code-smells-project` | Python 3.13 · Flask 3.1.1 · SQLite | 4 | 12 | 7 | 6 | 4 | **29** | [`reports/audit-project-1.md`](reports/audit-project-1.md) |
+| 2 — `ecommerce-api-legacy` | Node.js 24 · Express 4.22.1 · sqlite3 (memória) | 3 | 6 | 5 | 3 | 3 | **17** | [`reports/audit-project-2.md`](reports/audit-project-2.md) |
+| 3 — `task-manager-api` | Python 3.13 · Flask 3.0.0 · Flask-SQLAlchemy 3.1.1 · SQLite | 15 | 8 | 7 | 9 | 4 | **28** | [`reports/audit-project-3.md`](reports/audit-project-3.md) |
 
-Modo de cada rodada (D10 / D10.1 — obrigatório para que uma rodada parcial não seja lida como
-completa):
+Modo de cada execução (D10 / D10.1):
 
-| Projeto | `Mode` (full / `--offline`) | `Confirmation` | Escopo aplicado | `Verification Coverage` |
-|---|---|---|---|---|
-| 1 | — | — | — | — |
-| 2 | — | — | — | — |
-| 3 | — | — | — | — |
+| Projeto | `Mode` | `Confirmation` | Escopo aplicado | `Isolation` | `Verification Coverage` |
+|---|---|---|---|---|---|
+| 1 | full (OSV.dev + PyPI) | `human-confirmed: y` | todas as severidades | container (`python:3.13-slim`) | Full |
+| 2 | full (npm audit + OSV.dev) | `human-confirmed: y` | todas as severidades | container (`node:24`) | DEGRADED — 1 entrada `UNVERIFIED` de propósito (verificada fora do harness); saída de deprecation do DELETE não observada no original |
+| 3 | full (OSV.dev + PyPI) | `human-confirmed: y` | todas as severidades | container (`python:3.13-slim`) | DEGRADED — execução interrompida por limite de API no replay final e refeita do zero; itens propostos não exercitados |
 
 ### C.2 — Projeto 1 — `code-smells-project` (Python / Flask)
 
 **Estrutura antes → depois**
 
 ```
-(antes — a preencher a partir da Fase 1 da rodada)
+code-smells-project/                 (antes)
+├── app.py              config + registro de rotas + SQL administrativo inline
+├── controllers.py      handlers de todas as rotas, 4 domínios
+├── models.py           acesso a dados + regras de negócio de 4 domínios
+├── database.py         conexão global + schema + seed
+├── requirements.txt
+└── README.md
 ```
 
 ```
-(depois — a preencher a partir do bloco "New Project Structure" da Fase 3)
+code-smells-project/                 (depois)
+├── app.py                composition root (create_app) + entry point
+├── requirements.txt      flask 3.1.3, flask-cors 6.0.0
+├── .env.example · .gitignore · README.md
+├── config/settings.py    único leitor do ambiente
+├── models/               errors, database, seed, senhas (PBKDF2), produto, usuario, pedido, relatorio, sistema
+├── controllers/          produto, usuario, pedido, relatorio, sistema
+├── views/                registrar_rotas, requisicao, *_routes (parse → call → render)
+├── middlewares/          error_handler, db_session
+└── adapters/notificador.py
 ```
+
+`controllers.py`, `models.py` e `database.py` foram removidos (reescrita in-place, D9).
 
 **Validação comportamental (D4 — baseline-then-replay)**
 
-| PASS | REGRESSION | PRE-EXISTING FAILURE | UNVERIFIED |
-|---|---|---|---|
-| — | — | — | — |
-
-**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** —
-
-**Logs da aplicação após a refatoração**
+| PASS | REGRESSION | PRE-EXISTING FAILURE | UNVERIFIED | Segurança |
+|---|---|---|---|---|
+| 45 | 0 | 0 | 0 | 9 FIXED · 0 NOT FIXED |
 
 ```
-(a preencher com a saída real do boot e do replay)
+  ✓ Application boots without errors
+  ✓ Public surface replayed: 45 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+    Security entries: 9 FIXED, 0 NOT FIXED
+  ○ Findings resolved: 20/29  (9 proposed, 0 unresolved)
+  ○ Anti-patterns remaining: 9 proposed-not-applied, 2 unresolved  (re-audit: 11 findings)
+    Re-audit passes: 2; fixed after re-audit: 3 (1 of them missed-in-phase-2)
+  ✓ Processes: 14 started, 14 stopped through their handles, 0 left running, 0 incidents
+    Isolation: container
+  ✓ Commands: 0 directory changes, 0 chained commands
 ```
+
+Os 2 `unresolved` são achados que a Fase 2 não viu (`missed-in-phase-2`): o status de pedido
+inexistente e as regras de e-mail no cadastro. A correção dos dois muda contrato, então ficaram em
+`PROPOSED, NOT APPLIED` com a etiqueta. O terceiro achado tardio, a venda acima do estoque com itens
+repetidos, foi corrigido.
+
+**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** 11.
+- AP-04 ×2: rotas sem autorização e `/admin/reset-db`. Não existe modelo de identidade (D15).
+- AP-02: `/admin/query`. O crash com corpo não-objeto e o vazamento do erro do driver foram corrigidos.
+- AP-18 ×2: servidor de produção (exige dependência nova) e campos de configuração no `/health`. O segredo foi mascarado.
+- AP-01: contas do seed documentadas no README. As senhas agora são guardadas com hash.
+- AP-20: FKs, regra de exclusão e dinheiro em centavos. O `UNIQUE` de e-mail foi aplicado.
+- AP-10: limite de linhas por pedido. As idas e voltas ao banco foram corrigidas.
+- AP-13: paginação.
+- AP-11 ×2 (`missed-in-phase-2`): 404 para pedido inexistente e regras de e-mail.
+
+<details>
+<summary><b>Replay — reclassificação offline</b> (<code>probe.py compare --baseline baseline.json --current replay-2.json</code>)</summary>
+
+```
+  admin-query-array-body                  PASS   - improved from 500 (500 -> 400)
+  admin-query-empty                       PASS
+  admin-query-select                      PASS
+  admin-reset-db                          PASS
+  create-pedido                           PASS
+  create-pedido-negative-qty              FIXED  - rejected with 400 (baseline: 201)
+  create-pedido-no-items                  PASS
+  create-pedido-no-stock                  PASS
+  create-pedido-no-user                   PASS
+  create-pedido-oversell-duplicate-lines  FIXED  - rejected with 400 (baseline: 201)
+  create-pedido-unknown-product           PASS
+  create-pedido-unknown-user              FIXED  - rejected with 400 (baseline: 201)
+  create-produto                          PASS
+  create-produto-apostrophe               PASS   - improved from 500 (500 -> 201)
+  create-produto-bad-category             PASS
+  create-produto-missing-name             PASS
+  create-produto-negative-price           PASS
+  create-produto-string-price             FIXED  - rejected with 400 (baseline: 500)
+  create-usuario                          PASS
+  create-usuario-duplicate-email          FIXED  - rejected with 400 (baseline: 201)
+  create-usuario-empty                    PASS
+  create-usuario-missing-fields           PASS
+  delete-produto                          PASS
+  delete-produto-missing                  PASS
+  get-health                              PASS
+  get-produto                             PASS
+  get-produto-missing                     PASS
+  get-root                                PASS
+  get-usuario                             PASS
+  get-usuario-missing                     PASS
+  list-pedidos                            PASS
+  list-pedidos-usuario                    PASS
+  list-pedidos-usuario-none               PASS
+  list-produtos                           PASS
+  list-produtos-cors                      PASS
+  list-usuarios                           PASS
+  login-missing                           PASS
+  login-new-user                          PASS
+  login-null-body                         FIXED  - rejected with 400 (baseline: 500)
+  login-ok                                PASS
+  login-sql-injection                     FIXED  - rejected with 401 (baseline: 200)
+  login-wrong                             PASS
+  not-found-route                         PASS
+  preflight-produtos                      PASS
+  relatorio-vendas                        PASS
+  search-produtos                         PASS
+  search-produtos-empty-query             PASS
+  search-produtos-quote                   FIXED  - now behaves like 'search-produtos' (baseline: 500)
+  update-produto                          PASS
+  update-produto-bad-category             FIXED  - rejected with 400 (baseline: 200)
+  update-produto-missing                  PASS
+  update-produto-no-price                 PASS
+  update-status-pedido                    PASS
+  update-status-pedido-invalid            PASS
+
+  45 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+  security: 9 FIXED, 0 NOT FIXED
+```
+</details>
 
 **Checklist de Validação**
 
@@ -677,29 +787,29 @@ completa):
 ## Checklist de Validação
 
 ### Fase 1 — Análise
-- [ ] Linguagem detectada corretamente
-- [ ] Framework detectado corretamente
-- [ ] Domínio da aplicação descrito corretamente
-- [ ] Número de arquivos analisados condiz com a realidade
+- [x] Linguagem detectada corretamente          (Python 3.13)
+- [x] Framework detectado corretamente          (Flask 3.1.1, do pin exato)
+- [x] Domínio da aplicação descrito corretamente (E-commerce: produtos, usuarios, pedidos/itens_pedido, relatório de vendas)
+- [x] Número de arquivos analisados condiz com a realidade   (4 arquivos .py)
 
 ### Fase 2 — Auditoria
-- [ ] Relatório segue o template definido nos arquivos de referência
-- [ ] Cada finding tem arquivo e linhas exatos
-- [ ] Findings ordenados por severidade (CRITICAL → LOW)
-- [ ] Mínimo de 5 findings identificados
-- [ ] Detecção de APIs deprecated incluída (se aplicável)
-- [ ] Skill pausa e pede confirmação antes da Fase 3
+- [x] Relatório segue o template definido nos arquivos de referência (abre com o bloco da Fase 1)
+- [x] Cada finding tem arquivo e linhas exatos  (29/29 conferidos contra o original)
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados        (29)
+- [x] Detecção de APIs deprecated incluída      (warnings forçados no boot e na superfície: nenhuma; OSV.dev/PyPI: 4 advisories)
+- [x] Skill pausa e pede confirmação antes da Fase 3 (parou no [y/n]; respondido pelo autor: y)
 
 ### Fase 3 — Refatoração
-- [ ] Estrutura de diretórios segue padrão MVC
-- [ ] Configuração extraída para módulo de config (sem hardcoded)
-- [ ] Models criados para abstrair dados
-- [ ] Views/Routes separadas para visualização ou roteamento
-- [ ] Controllers concentram o fluxo da aplicação
-- [ ] Error handling centralizado
-- [ ] Entry point claro
-- [ ] Aplicação inicia sem erros
-- [ ] Endpoints originais respondem corretamente
+- [x] Estrutura de diretórios segue padrão MVC  (models/, controllers/, views/)
+- [x] Configuração extraída para módulo de config (config/settings.py + .env.example)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado               (middlewares/error_handler.py)
+- [x] Entry point claro                         (app.py, create_app)
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente (45 PASS, 0 REGRESSION)
 ```
 
 ### C.3 — Projeto 2 — `ecommerce-api-legacy` (Node.js / Express)
@@ -707,26 +817,91 @@ completa):
 **Estrutura antes → depois**
 
 ```
-(antes — a preencher a partir da Fase 1 da rodada)
+ecommerce-api-legacy/                (antes)
+├── src/
+│   ├── app.js            entry point
+│   ├── AppManager.js     conexão, schema, seed, rotas, regra de checkout e pagamento
+│   └── utils.js          config com segredos, cache global, "hash" de senha
+├── api.http
+├── package.json / package-lock.json
+└── README.md
 ```
 
 ```
-(depois — a preencher a partir do bloco "New Project Structure" da Fase 3)
+ecommerce-api-legacy/                (depois)
+├── .env.example · README.md · api.http
+├── package.json / package-lock.json  express 4.22.3 (dentro da major); sqlite3 mantido
+└── src/
+    ├── app.js                     composition root e entry point
+    ├── errors.js                  taxonomia de erros
+    ├── config/index.js            único leitor do ambiente
+    ├── models/                    database, schema (UNIQUE, centavos, CHECK), repositories, payment, password (scrypt), money
+    ├── controllers/               checkout (uma transação), report, user
+    ├── routes/                    a camada View: parse → call → render
+    └── middlewares/errorHandler.js
 ```
+
+`src/AppManager.js` e `src/utils.js` foram removidos.
 
 **Validação comportamental (D4 — baseline-then-replay)**
 
-| PASS | REGRESSION | PRE-EXISTING FAILURE | UNVERIFIED |
-|---|---|---|---|
-| — | — | — | — |
+| PASS | REGRESSION | PRE-EXISTING FAILURE | UNVERIFIED | Segurança |
+|---|---|---|---|---|
+| 9 | 0 | 0 | 1 | 2 FIXED · 0 NOT FIXED |
 
-**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** —
-
-**Logs da aplicação após a refatoração**
+O `UNVERIFIED` é `post-checkout-malformed-json`. O corpo do original é a página de erro padrão do
+Express, com stack trace, que a correção do AP-18 substitui de propósito (D22). A entrada foi
+excluída do diff no inventário e verificada fora do harness: 400 com stack trace antes, 400 com
+`Bad Request` depois.
 
 ```
-(a preencher com a saída real do boot e do replay)
+  ✓ Application boots without errors
+  ✓ Public surface replayed: 9 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 1 UNVERIFIED
+    Security entries: 2 FIXED, 0 NOT FIXED
+  ○ Findings resolved: 12/17  (3 proposed, 2 unresolved)
+  ○ Anti-patterns remaining: 3 proposed-not-applied, 3 unresolved  (re-audit: 6 findings)
+    Re-audit passes: 2; fixed after re-audit: 1 (0 of them missed-in-phase-2)
+  ✓ Processes: 10 started, 10 stopped through their handles, 0 left running, 0 incidents
+    Isolation: container
+  ✓ Commands: 0 directory changes, 0 chained commands
 ```
+
+Os 2 `unresolved (failed)` deveriam ser `proposed`. O que resta deles é exatamente o que o gate de
+contrato segurou: o formato de e-mail e a paginação do relatório. Pela D14.1, a contagem certa é
+12 / 5 / 0 (R5-3 em [`round5-report.md`](docs/rounds/round5-report.md)).
+
+**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** 6.
+- AP-04: autorização no DELETE e no relatório. Não existe modelo de identidade.
+- AP-19: o sqlite3 6.0.1 foi aplicado e replayed, mas a aplicação **não subiu**: o binário exige glibc 2.38, ausente na imagem. O upgrade foi revertido, e o upstream marca o pacote como sem manutenção.
+- AP-20: FKs com regra de exclusão. O `UNIQUE` e os centavos foram aplicados.
+- AP-11: formato de e-mail.
+- AP-13: paginação do relatório. O N+1 foi corrigido.
+- AP-09 (`missed-in-phase-2`): falha de banco na busca do curso responde 404.
+
+<details>
+<summary><b>Replay — reclassificação offline</b> (<code>probe.py compare --baseline baseline.json --current replay-2.json</code>)</summary>
+
+```
+  delete-user-1                       PASS
+  delete-user-non-numeric-id          FIXED       - rejected with 400 (baseline: 200)
+  get-admin-financial-report          PASS
+  get-unknown-route                   PASS
+  post-checkout-card-not-string       FIXED       - rejected with 400 (baseline: transport error)
+  post-checkout-course-not-found      PASS
+  post-checkout-existing-user-paid    PASS
+  post-checkout-malformed-json        UNVERIFIED  - skipped in baseline: framework default error page (error contract)
+  post-checkout-missing-fields        PASS
+  post-checkout-new-user-no-password  PASS
+  post-checkout-new-user-paid         PASS
+  post-checkout-payment-denied        PASS
+
+  9 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 1 UNVERIFIED
+  security: 2 FIXED, 0 NOT FIXED
+```
+
+`post-checkout-card-not-string`: no original, um `card` numérico **derrubava o processo**
+(`TypeError: cc.startsWith is not a function`). O baseline registrou erro de transporte.
+</details>
 
 **Checklist de Validação**
 
@@ -734,29 +909,30 @@ completa):
 ## Checklist de Validação
 
 ### Fase 1 — Análise
-- [ ] Linguagem detectada corretamente
-- [ ] Framework detectado corretamente
-- [ ] Domínio da aplicação descrito corretamente
-- [ ] Número de arquivos analisados condiz com a realidade
+- [x] Linguagem detectada corretamente          (JavaScript, Node.js 24)
+- [x] Framework detectado corretamente          (Express 4.22.1, do lockfile)
+- [x] Domínio da aplicação descrito corretamente (venda de cursos: users, courses, enrollments, payments + relatório financeiro)
+- [x] Número de arquivos analisados condiz com a realidade   (3 arquivos em src/)
 
 ### Fase 2 — Auditoria
-- [ ] Relatório segue o template definido nos arquivos de referência
-- [ ] Cada finding tem arquivo e linhas exatos
-- [ ] Findings ordenados por severidade (CRITICAL → LOW)
-- [ ] Mínimo de 5 findings identificados
-- [ ] Detecção de APIs deprecated incluída (se aplicável)
-- [ ] Skill pausa e pede confirmação antes da Fase 3
+- [x] Relatório segue o template definido nos arquivos de referência (abre com o bloco da Fase 1)
+- [x] Cada finding tem arquivo e linhas exatos  (17/17 conferidos contra o original)
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados        (17)
+- [x] Detecção de APIs deprecated incluída      (--pending-deprecation nas rotas: nenhuma; npm audit/OSV.dev: advisories
+      nas transitivas do express e do sqlite3)
+- [x] Skill pausa e pede confirmação antes da Fase 3 (parou no [y/n]; respondido pelo autor: y)
 
 ### Fase 3 — Refatoração
-- [ ] Estrutura de diretórios segue padrão MVC
-- [ ] Configuração extraída para módulo de config (sem hardcoded)
-- [ ] Models criados para abstrair dados
-- [ ] Views/Routes separadas para visualização ou roteamento
-- [ ] Controllers concentram o fluxo da aplicação
-- [ ] Error handling centralizado
-- [ ] Entry point claro
-- [ ] Aplicação inicia sem erros
-- [ ] Endpoints originais respondem corretamente
+- [x] Estrutura de diretórios segue padrão MVC  (src/models, src/controllers, src/routes)
+- [x] Configuração extraída para módulo de config (src/config/index.js + .env.example)
+- [x] Models criados para abstrair dados        (repositories por entidade)
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado               (src/middlewares/errorHandler.js)
+- [x] Entry point claro                         (src/app.js)
+- [x] Aplicação inicia sem erros                (com sqlite3 5.x; o upgrade para 6.x não subiu e foi revertido)
+- [x] Endpoints originais respondem corretamente (9 PASS, 0 REGRESSION, 1 UNVERIFIED declarado)
 ```
 
 ### C.4 — Projeto 3 — `task-manager-api` (Python / Flask)
@@ -764,28 +940,142 @@ completa):
 **Estrutura antes → depois**
 
 ```
-(antes — a preencher a partir da Fase 1 da rodada)
+task-manager-api/                    (antes)
+├── app.py              config + app + blueprints + create_all na importação
+├── database.py
+├── seed.py
+├── models/             category, task, user
+├── routes/             task_routes, user_routes, report_routes — regra de negócio + persistência
+├── services/           notification_service.py — nunca importado
+├── utils/              helpers.py — quase tudo sem uso
+├── requirements.txt
+└── README.md
 ```
 
 ```
-(depois — a preencher a partir do bloco "New Project Structure" da Fase 3)
+task-manager-api/                    (depois)
+├── app.py                composition root: create_app(settings), main()
+├── database.py           extensão SQLAlchemy + commit_or_fail
+├── seed.py               senhas vindas da configuração
+├── requirements.txt      flask 3.1.3, flask-sqlalchemy 3.1.1, flask-cors 6.0.5
+├── .env.example · README.md
+├── config/settings.py
+├── models/               clock (utcnow), errors, task, user (KDF), category
+├── controllers/          common, task, user, category, report
+├── routes/               presenters (todo shape de resposta), task, user, category, report, system
+└── middlewares/error_handler.py
 ```
+
+`services/` e `utils/` foram removidos (código morto).
 
 **Validação comportamental (D4 — baseline-then-replay)**
 
-| PASS | REGRESSION | PRE-EXISTING FAILURE | UNVERIFIED |
-|---|---|---|---|
-| — | — | — | — |
-
-**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** —
-
-**Camadas existentes: reais ou nominais?** (teste de `04-architecture-guidelines.md` §5) — a preencher.
-
-**Logs da aplicação após a refatoração**
+| PASS | REGRESSION | PRE-EXISTING FAILURE | UNVERIFIED | Segurança |
+|---|---|---|---|---|
+| 53 | 0 | 0 | 0 | 6 FIXED · 0 NOT FIXED |
 
 ```
-(a preencher com a saída real do boot e do replay)
+  ✓ Application boots without errors
+  ✓ Public surface replayed: 53 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+    Security entries: 6 FIXED, 0 NOT FIXED
+  ○ Findings resolved: 21/28  (7 proposed, 0 unresolved)
+  ○ Anti-patterns remaining: 7 proposed-not-applied, 0 unresolved  (re-audit: 7 findings)
+    Re-audit passes: 2; fixed after re-audit: 4 (1 of them missed-in-phase-2)
+  ✓ Processes: 18 started, 18 stopped through their handles, 0 left running, 0 incidents
+    Isolation: container
+  ✓ Commands: 0 directory changes, 0 chained commands
 ```
+
+O shape não enxerga valores. Por isso um script à parte verificou, dentro do container do replay
+final:
+- a senha é mascarada nas respostas;
+- o hash guardado é scrypt;
+- contas antigas em MD5 ainda fazem login e são migradas no login;
+- `/console` responde 404.
+
+**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** 7.
+- AP-18: servidor de produção, que exige dependência nova. Debug desligado, fronteira de erro e remoção do console foram aplicados.
+- AP-19: `Access-Control-Allow-Private-Network: true` mantido como configuração explícita. O upgrade para flask-cors 6.0.5 foi aplicado.
+- AP-04 ×2: autoatribuição de `role` e token previsível. Não existe modelo de identidade.
+- AP-11: regras de produto (formato de cor, tamanhos máximos, prioridade inteira). As checagens de tipo e de corpo nulo foram aplicadas.
+- AP-20: regra de exclusão de categoria e `CHECK` sem ferramenta de migração.
+- AP-13: paginação.
+
+**Camadas existentes: reais ou nominais?** (teste de `04-architecture-guidelines.md` §5).
+**Nominais**, e a própria Fase 1 já disse isso: "models/, routes/, services/, utils/ exist, but route
+handlers hold validation, business rules, persistence and serialization; services/ and utils/ are
+not used by the routes". A refatoração manteve `models/` e `routes/`, criou `controllers/` e
+`routes/presenters.py`, ligou as rotas às regras do model e removeu `services/` e `utils/` em vez de
+preenchê-los.
+
+<details>
+<summary><b>Replay — reclassificação offline</b> (<code>probe.py compare --baseline baseline.json --current replay-final.json</code>)</summary>
+
+```
+  delete-category-3                        PASS
+  delete-category-missing                  PASS
+  delete-task-3                            PASS
+  delete-task-missing                      PASS
+  delete-user-3                            PASS
+  delete-user-missing                      PASS
+  get-categories                           PASS
+  get-health                               PASS
+  get-reports-summary                      PASS
+  get-reports-user-1                       PASS
+  get-reports-user-missing                 PASS
+  get-root                                 PASS
+  get-task-1                               PASS
+  get-task-missing                         PASS
+  get-tasks                                PASS
+  get-tasks-cors                           PASS
+  get-tasks-search                         PASS
+  get-tasks-search-priority-not-number     FIXED  - rejected with 400 (baseline: 500)
+  get-tasks-search-priority-user           PASS
+  get-tasks-stats                          PASS
+  get-user-1                               PASS
+  get-user-1-tasks                         PASS
+  get-user-missing                         PASS
+  get-user-missing-tasks                   PASS
+  get-users                                PASS
+  options-tasks-preflight                  PASS
+  options-tasks-preflight-private-network  PASS
+  post-categories                          PASS
+  post-categories-no-name                  PASS
+  post-login                               PASS
+  post-login-missing-fields                PASS
+  post-login-wrong-password                PASS
+  post-tasks                               PASS
+  post-tasks-bad-date                      PASS
+  post-tasks-bad-priority                  PASS
+  post-tasks-bad-status                    PASS
+  post-tasks-minimal                       PASS
+  post-tasks-missing-category              PASS
+  post-tasks-missing-user                  PASS
+  post-tasks-no-title                      PASS
+  post-tasks-priority-not-number           FIXED  - rejected with 400 (baseline: 500)
+  post-tasks-short-title                   PASS
+  post-users                               PASS
+  post-users-bad-email                     PASS
+  post-users-bad-role                      PASS
+  post-users-duplicate                     PASS
+  post-users-name-not-string               FIXED  - rejected with 400 (baseline: 201)
+  post-users-short-password                PASS
+  put-category-2                           PASS
+  put-category-description-object          FIXED  - rejected with 400 (baseline: 500)
+  put-category-missing                     PASS
+  put-category-null-body                   FIXED  - rejected with 400 (baseline: 500)
+  put-task-2                               PASS
+  put-task-2-clear-date                    PASS
+  put-task-bad-status                      PASS
+  put-task-missing                         PASS
+  put-task-title-not-string                FIXED  - rejected with 400 (baseline: 500)
+  put-user-2                               PASS
+  put-user-missing                         PASS
+
+  53 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+  security: 6 FIXED, 0 NOT FIXED
+```
+</details>
 
 **Checklist de Validação**
 
@@ -793,62 +1083,115 @@ completa):
 ## Checklist de Validação
 
 ### Fase 1 — Análise
-- [ ] Linguagem detectada corretamente
-- [ ] Framework detectado corretamente
-- [ ] Domínio da aplicação descrito corretamente
-- [ ] Número de arquivos analisados condiz com a realidade
+- [x] Linguagem detectada corretamente          (Python 3.13)
+- [x] Framework detectado corretamente          (Flask 3.0.0 + Flask-SQLAlchemy 3.1.1)
+- [x] Domínio da aplicação descrito corretamente (gestão de tarefas: users, categories, tasks, relatórios)
+- [x] Número de arquivos analisados condiz com a realidade   (15 arquivos .py)
 
 ### Fase 2 — Auditoria
-- [ ] Relatório segue o template definido nos arquivos de referência
-- [ ] Cada finding tem arquivo e linhas exatos
-- [ ] Findings ordenados por severidade (CRITICAL → LOW)
-- [ ] Mínimo de 5 findings identificados
-- [ ] Detecção de APIs deprecated incluída (se aplicável)
-- [ ] Skill pausa e pede confirmação antes da Fase 3
+- [x] Relatório segue o template definido nos arquivos de referência (abre com o bloco da Fase 1)
+- [x] Cada finding tem arquivo e linhas exatos  (28/28 conferidos contra o original)
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados        (28)
+- [x] Detecção de APIs deprecated incluída      (Tier A, warnings de runtime: datetime.utcnow → datetime.now(UTC);
+      Query.get → db.session.get)
+- [x] Skill pausa e pede confirmação antes da Fase 3 (parou no [y/n]; respondido pelo autor: y)
 
 ### Fase 3 — Refatoração
-- [ ] Estrutura de diretórios segue padrão MVC
-- [ ] Configuração extraída para módulo de config (sem hardcoded)
-- [ ] Models criados para abstrair dados
-- [ ] Views/Routes separadas para visualização ou roteamento
-- [ ] Controllers concentram o fluxo da aplicação
-- [ ] Error handling centralizado
-- [ ] Entry point claro
-- [ ] Aplicação inicia sem erros
-- [ ] Endpoints originais respondem corretamente
+- [x] Estrutura de diretórios segue padrão MVC  (models/, controllers/, routes/)
+- [x] Configuração extraída para módulo de config (config/settings.py + .env.example)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento (routes/ + presenters.py)
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado               (middlewares/error_handler.py)
+- [x] Entry point claro                         (app.py, create_app)
+- [x] Aplicação inicia sem erros                (exige SECRET_KEY no ambiente, documentado em .env.example)
+- [x] Endpoints originais respondem corretamente (53 PASS, 0 REGRESSION)
 ```
 
 ### C.5 — Critérios de aceite do enunciado (3/3 obrigatório)
 
 | Critério | Projeto 1 | Projeto 2 | Projeto 3 |
 |---|---|---|---|
-| Fase 1 detecta a stack corretamente | — | — | — |
-| Fase 2 encontra ≥ 5 findings | — | — | — |
-| Fase 2 inclui ≥ 1 CRITICAL ou HIGH | — | — | — |
-| Fase 3 — aplicação funciona após a refatoração | — | — | — |
+| Fase 1 detecta a stack corretamente | ✓ Python · Flask 3.1.1 · SQLite | ✓ Node · Express 4.22.1 · sqlite3 | ✓ Python · Flask 3.0.0 · SQLAlchemy · SQLite |
+| Fase 2 encontra ≥ 5 findings | ✓ 29 | ✓ 17 | ✓ 28 |
+| Fase 2 inclui ≥ 1 CRITICAL ou HIGH | ✓ 12 C · 7 H | ✓ 6 C · 5 H | ✓ 8 C · 7 H |
+| Fase 3 — aplicação funciona após a refatoração | ✓ 45 PASS, 0 REGRESSION | ✓ 9 PASS, 0 REGRESSION | ✓ 53 PASS, 0 REGRESSION |
+
+**3/3 em todos os critérios**, nas duas últimas rodadas. O enunciado pede ainda que a Fase 2
+reencontre ≥ 5 dos problemas da análise manual do projeto 1. Na rodada 5 reencontrou **20** com
+casamento completo, mais 4 parciais, de 25 (C.6).
 
 ### C.6 — Métricas de generalização (D8)
 
-Preenchidas a partir de `docs/evals/run-p<N>-iter<K>.md`, só depois de a seção A existir.
+Scorecards: [`run-p1-iter5`](docs/evals/run-p1-iter5.md), [`run-p2-iter5`](docs/evals/run-p2-iter5.md),
+[`run-p3-iter7`](docs/evals/run-p3-iter7.md). Rodada 4, para comparação:
+[`run-p1-iter4`](docs/evals/run-p1-iter4.md), [`run-p2-iter4`](docs/evals/run-p2-iter4.md),
+[`run-p3-iter6`](docs/evals/run-p3-iter6.md).
 
 | Métrica | O que responde | P1 | P2 | P3 |
 |---|---|---|---|---|
-| Recall vs. análise manual | Dos problemas que eu sei que existem, quantos ela achou? | — | — | — |
-| Falsos positivos | Quantos findings apontam para código correto? | — | — | — |
-| Findings inventados | Quantos citam arquivo/linha que não existe ou não contém aquilo? | — | — | — |
-| **Achados além do gabarito** | Quantos problemas legítimos ela achou que **não** estavam na análise manual? | — | — | — |
-| Regressões pós-refactor | Quantas entradas divergiram do baseline? | — | — | — |
-| Intervenções humanas | Quantas vezes precisei corrigir o rumo? | — | — | — |
+| Recall estrito | Dos problemas que eu sei que existem, quantos ela achou? | 20/25 (80%) | 16/21 (76%) | 19/23 (83%) |
+| Recall amplo (✓ + ◐) | Idem, contando os parciais | 24/25 (96%) | 18/21 (86%) | 21/23 (91%) |
+| Falsos positivos | Quantos findings apontam para código correto? | 0 | 0 | 0 |
+| Findings inventados | Quantos citam arquivo/linha que não existe ou não contém aquilo? | 0 | 0 | 0 |
+| **Achados além do gabarito** | Quantos problemas legítimos ela achou que **não** estavam na análise manual? | **3** | **2** (+1 na Fase 3) | **2** |
+| Regressões pós-refactor | Quantas entradas divergiram do baseline? | 0 | 0 | 0 |
+| Intervenções humanas | Quantas vezes precisei corrigir o rumo? | 0 | 0 | 0 |
 
-*Achados além do gabarito* é a métrica-chave: recall alto é trivialmente manipulável (basta escrever o
-catálogo a partir da análise manual para reencontrar 100% do que foi plantado), enquanto essa métrica
-mede o oposto — a capacidade de ver o que o autor do catálogo não viu. *Findings inventados* é sua
-contramétrica indispensável: sem ela, "achou 30 problemas" seria recompensado mesmo com 12
-alucinações.
+**Rodada 4 → rodada 5:**
+
+| | P1 | P2 | P3 |
+|---|---|---|---|
+| Recall estrito | 64% → **80%** | 67% → **76%** | 78% → **83%** |
+| Recall amplo | 84% → **96%** | 76% → **86%** | 87% → **91%** |
+| Entradas de segurança corrigidas | 5 → **9** | 0 → **2** | 2 → **6** |
+| Superfície exercitada (entradas) | 31 → **54** | 9 → **12** | 27 → **59** |
+
+**Por que o recall subiu, se o catálogo não mudou.** Entre as duas rodadas, o catálogo e a varredura
+de sinais ficaram intocados **de propósito** (contaminação declarada em
+[`round5-changes.md`](docs/rounds/round5-changes.md)). A D25/D26 mudou só a forma de rodar comandos
+e o formato do relatório. A única mudança que afeta detecção é a da camada 1 do AP-14, que passou a
+exercitar a superfície e o seed em vez de só importar o entry point. Ela explica o ganho do P3 no
+item 12, e mais nenhum. O resto do ganho é **variância entre execuções** do mesmo catálogo. Ela
+apareceu sobretudo em LOW e MEDIUM: log com e-mail, mapeamento duplicado, imports mortos,
+`this`/`self`. Isso é um dado sobre a skill, e não uma melhoria dela: duas execuções da mesma
+versão podem reportar conjuntos diferentes de achados menores.
+
+**Os achados além do gabarito.**
+- **P1:** advisories do `flask-cors` 5.0.1 e do `flask` 3.1.1; listagens sem limite.
+- **P2:** advisories nas transitivas do Express, como o ReDoS em `path-to-regexp`; `NODE_ENV` nunca definido, com stack trace a cada erro. Na Fase 3 apareceu ainda que o sqlite3 está sem manutenção upstream.
+- **P3:** `flask-cors` 4.0.0 com advisory HIGH alcançável; o módulo de relatórios hospedando a API de categorias.
+
+**O que continua não sendo visto:**
+- **P2:** a compra associada a conta alheia só pelo e-mail; o *callback hell*, que o catálogo descreve e a varredura não aplicou (correção adiada pela contaminação); o banco em memória.
+- **P1:** CORS aberto.
+- **P3:** `print` como log e condicionais verbosas.
+
+Nenhum CRITICAL ou HIGH do gabarito ficou sem ser visto, em nenhum dos três projetos, nas duas rodadas.
 
 ### C.7 — Comportamento em stacks diferentes
 
-A preencher após as três rodadas.
+- **Isolamento sem regra por stack.** Python rodou em `python:3.13-slim` e Node em `node:24` (glibc,
+  porque o addon nativo do `sqlite3` não tem build para musl). As duas escolhas saem de "imagem
+  oficial na versão detectada" mais a evidência do boot, e nenhuma está escrita na skill.
+- **O gate de dependência (D18) se comportou como desenhado nas duas stacks.**
+  - **P1:** o upgrade major do `flask-cors` (5 → 6) foi aplicado depois de o changelog ser lido e de o replay cobrir os headers de CORS.
+  - **P2:** o upgrade major do `sqlite3` (5 → 6) foi aplicado e replayed. A aplicação não subiu (o binário exige glibc 2.38), e o upgrade foi revertido e proposto. Uma regra de contrato pegou uma mudança de plataforma, e não de API.
+- **Deprecation: a evidência depende do caminho exercitado.** No P3, as duas APIs deprecated
+  apareceram já na Fase 2, como warnings com arquivo e linha, depois que a camada 1 passou a
+  exercitar a superfície. No Node, as rotas exercitadas com `--pending-deprecation` não emitiram
+  nada, e o resultado é coerente com isso.
+- **Um formato de captura para todas as stacks.** A reclassificação offline usou o mesmo `probe.py`
+  sobre as capturas dos três projetos, as do Node inclusive.
+- **O gate de contrato decidiu igual nas três stacks.** Autorização foi proposta nos três, pelo mesmo
+  motivo (sem modelo de identidade, D15). Mascarar segredos, parametrizar SQL e trocar o hash de
+  senha foram aplicados nos três.
+- **O teste "camada real ou nominal" produziu resultados diferentes conforme o ponto de partida.** Os
+  dois monolitos ganharam a árvore MVC inteira. O projeto parcialmente organizado manteve `models/`
+  e `routes/`, ganhou `controllers/` e perdeu `services/` e `utils/`, que eram camadas só de nome.
+- **Mesmo processo nos dois runtimes.** Prontidão por `proc wait` dentro do container e comandos de
+  container pelo shell nativo nos três projetos. A linha `Commands:` ficou em 0 / 0 nas duas stacks.
 
 ---
 
@@ -861,6 +1204,7 @@ A preencher após as três rodadas.
 | **Claude Code** | Instalado e autenticado. É a ferramenta escolhida entre as três aceitas pelo enunciado. |
 | **Git** | A skill assume que o alvo está versionado: a reescrita in-place (D9) usa o histórico como rede de segurança. |
 | **Runtime do alvo** | Python 3.8+ para alvos Python, Node 18+ para alvos Node. O harness roda no runtime do próprio alvo — **nada é instalado** para validar. |
+| **Runtime de container** (opcional, recomendado) | Docker ou equivalente. Com ele, original e refatorada rodam em containers descartáveis (D19). Sem ele, a skill roda no host e o relatório declara `Isolation: reduced (host)`. |
 | **Rede** (opcional) | Só para a consulta viva de APIs deprecated (AP-14, camada 2). Sem rede, use `--offline` e leia a ressalva em "Limitações conhecidas". |
 
 A skill **não** requer `jq`, `curl`, nem qualquer dependência adicional no projeto-alvo.
@@ -1053,10 +1397,10 @@ lacuna real, e quem depende de ordenação precisa asseverá-la numa entrada ded
 forma absorve a maior parte da variação de dados, mas uma coleção vazia numa execução e populada na
 outra muda o descritor do array. Use o mesmo estado nas duas, ou declare a diferença.
 
-**8. As contagens desta entrega ainda não existem.** As seções A e C estão vazias por decisão (D12) e
-por ausência de execuções, respectivamente. Enquanto estiverem assim, **nada neste documento prova
-que a skill funciona nos três projetos** — apenas que ela foi construída para isso, e como. A skill
-descreve o que verificou; esta seção descreve o que a entrega ainda não verificou.
+**8. A evidência da seção C é medida pelo próprio autor.** O gate da Fase 2 foi respondido por uma
+pessoa nas três execuções da rodada 5, mas essa pessoa é o autor da skill. O recall e os achados além do gabarito comparam a skill com a análise manual
+do mesmo autor, e o casamento ✓/◐/✗ é julgamento. Por isso cada linha está exposta nos scorecards
+de `docs/evals/`, para ser contestada, em vez de resumida num número só.
 
 ---
 
@@ -1065,6 +1409,6 @@ descreve o que verificou; esta seção descreve o que a entrega ainda não verif
 | Documento | O que é |
 |---|---|
 | [`instructions.md`](instructions.md) | O enunciado original do desafio, **preservado sem alterações** (era o `README.md` do repositório base). É a fonte da verdade sobre o que foi pedido. |
-| [`docs/decisions.md`](docs/decisions.md) | Registro ADR completo de D1–D14: contexto, alternativas rejeitadas, custos aceitos e as duas reversões (D6 e D13), com o caminho que levou a cada forma final. |
+| [`docs/decisions.md`](docs/decisions.md) | Registro ADR completo de D1–D26: contexto, alternativas rejeitadas, custos aceitos e as duas reversões (D6 e D13), com o caminho que levou a cada forma final. |
 | [`CLAUDE.md`](CLAUDE.md) | Especificação viva do projeto: requisitos extraídos do enunciado, escala de severidade canônica, contratos de saída das fases e o resumo das decisões. |
 | [`.claude/skills/refactor-arch/`](.claude/skills/refactor-arch/) | A skill em si — o entregável. |
