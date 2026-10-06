@@ -7,6 +7,9 @@ __pycache__/
 .venv/
 venv/
 
+# Claude Code agent worktrees
+.claude/worktrees/
+
 # SQLite
 *.db
 instance/
