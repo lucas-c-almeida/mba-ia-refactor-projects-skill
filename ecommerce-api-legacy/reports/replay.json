@@ -1,0 +1,276 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "capturedAt": "2026-10-08T18:27:57Z",
+  "results": {
+    "delete-api-users-1": {
+      "contentType": "text/html",
+      "destructive": true,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "delete-api-users-1",
+      "kind": "contract",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "delete-api-users-999": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "delete-api-users-999",
+      "kind": "contract",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-api-admin-financial-report": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "get-api-admin-financial-report",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-api-checkout-denied": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-api-checkout-denied",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Pagamento recusado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-api-checkout-existing-user": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-api-checkout-existing-user",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-api-checkout-missing-fields": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-api-checkout-missing-fields",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-api-checkout-new-user": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-api-checkout-new-user",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-api-checkout-new-user-no-password": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-api-checkout-new-user-no-password",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-api-checkout-unknown-course": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-api-checkout-unknown-course",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "sec-delete-api-users-1-anonymous": {
+      "contentType": "application/json",
+      "destructive": true,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "sec-delete-api-users-1-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "sec-get-api-admin-financial-report-anonymous": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "sec-get-api-admin-financial-report-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "sec-post-api-checkout-card-wrong-type": {
+      "contentType": "text/html",
+      "destructive": true,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {},
+      "id": "sec-post-api-checkout-card-wrong-type",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    }
+  },
+  "version": 3
+}

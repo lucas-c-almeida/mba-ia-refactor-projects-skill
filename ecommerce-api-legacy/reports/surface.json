@@ -1,0 +1,96 @@
+{
+  "version": 3,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:3000",
+  "entries": [
+    {
+      "id": "post-api-checkout-new-user",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Guilherme", "eml": "gui@fullcycle.com.br", "pwd": "senhaforte", "c_id": 2, "card": "4111222233334444" }
+    },
+    {
+      "id": "post-api-checkout-existing-user",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Leonan", "eml": "leonan@fullcycle.com.br", "pwd": "123", "c_id": 1, "card": "4111222233334444" }
+    },
+    {
+      "id": "post-api-checkout-new-user-no-password",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Sem Senha", "eml": "semsenha@teste.com", "c_id": 2, "card": "4999888877776666" }
+    },
+    {
+      "id": "post-api-checkout-denied",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Joao", "eml": "joao@teste.com", "pwd": "123", "c_id": 1, "card": "5111222233334444" }
+    },
+    {
+      "id": "post-api-checkout-missing-fields",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": {}
+    },
+    {
+      "id": "post-api-checkout-unknown-course",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Maria", "eml": "maria@teste.com", "pwd": "123", "c_id": 999, "card": "4111222233334444" }
+    },
+    {
+      "id": "get-api-admin-financial-report",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "headers": { "x-operator-token": "operator-secret-for-validation" }
+    },
+    {
+      "id": "delete-api-users-999",
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "headers": { "x-operator-token": "operator-secret-for-validation" }
+    },
+    {
+      "id": "delete-api-users-1",
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "headers": { "x-operator-token": "operator-secret-for-validation" },
+      "destructive": true
+    },
+    {
+      "id": "sec-get-api-admin-financial-report-anonymous",
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "kind": "security",
+      "finding": "AP-04",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-delete-api-users-1-anonymous",
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "destructive": true,
+      "kind": "security",
+      "finding": "AP-04",
+      "expect": "rejected"
+    },
+    {
+      "id": "sec-post-api-checkout-card-wrong-type",
+      "method": "POST",
+      "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Tipo Errado", "eml": "tipo@teste.com", "pwd": "123", "c_id": 1, "card": 4111222233334444 },
+      "destructive": true,
+      "kind": "security",
+      "finding": "AP-11",
+      "expect": "rejected"
+    }
+  ]
+}
