@@ -294,6 +294,11 @@ If the baseline cannot be captured, say so explicitly, continue, and mark the fi
     contract-changing: propose it. If it only rejects requests no legitimate client sends (the
     application already identifies callers and the check stops one principal from acting on
     another's resource; the value is invalid on its face), it is safe: apply it.
+    A **privileged operation** (runs caller-supplied queries or code, resets data in bulk, serves
+    maintenance or diagnostics, deletes accounts, reports across all principals) has no legitimate
+    anonymous caller, so it is safe even with no identity model: remove it, or guard it with an
+    operator credential from configuration, closed by default (RP-04). Business operations stay
+    contract-changing.
   - **Dependency upgrades.** Within the same major version: safe. A major version, or one whose
     changelog announces a behaviour change: safe only if the replay covers the behaviour that
     changes (contract headers included); otherwise propose it.

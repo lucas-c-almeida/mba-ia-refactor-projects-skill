@@ -277,6 +277,51 @@ model**, adding authentication rejects every current client, legitimate ones inc
 contract-changing, and the transformation is proposed — the identity model, the principals and the
 policy — not applied. Never invent a policy to make the fix applicable.
 
+**Exception — privileged operations (`04-architecture-guidelines.md` §6).** An operation that runs
+caller-supplied queries or code, resets data in bulk, serves maintenance or diagnostics, deletes
+accounts, or reports across every principal has no legitimate anonymous caller, so closing it is
+**safe and is applied**, with or without an identity model. Remove it, or add the operator guard
+below. Operations ordinary clients perform on their own data keep the rule above.
+
+**Before** (Node — destructive and arbitrary-query operations open to everyone)
+
+```js
+app.post('/maintenance/wipe', (req, res) => {
+  db.exec('DELETE FROM orders; DELETE FROM customers;');
+  res.json({ ok: true });
+});
+app.post('/maintenance/run', (req, res) => {
+  db.all(req.body.sql, (err, rows) => res.json(rows));   // the caller chooses what runs
+});
+app.get('/reports/revenue', (req, res) => res.json(revenueByCustomer()));
+```
+
+**After** — the arbitrary-query route is removed (unsafe by construction); the wipe is removed from
+the request surface (a maintenance command can replace it); the report is guarded, closed by default
+
+```js
+// config.js
+const operatorToken = process.env.OPERATOR_TOKEN || null;      // unset by default: guard stays closed
+
+// routes/guards.js
+const crypto = require('crypto');
+function requireOperator(req, res, next) {
+  const given = Buffer.from(req.get('x-operator-token') || '');
+  const want = Buffer.from(config.operatorToken || '');
+  const ok = want.length > 0 && given.length === want.length && crypto.timingSafeEqual(given, want);
+  if (!ok) return res.status(403).json({ error: 'forbidden' });
+  next();
+}
+
+// routes/reports.js
+router.get('/reports/revenue', requireOperator, reports.revenue);
+```
+
+Cover it with two entries in the surface inventory: anonymous → `kind: "security"`, `expect:
+"rejected"`; with the operator credential → an ordinary entry whose shape must match the baseline
+(`06-validation-protocol.md` §2.1). An operation removed from the surface is recorded in the report
+as removed, with the reason.
+
 Two moves: put the decision in one policy function, and move the enforcement onto the *operation*
 rather than onto one of its doors.
 

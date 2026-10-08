@@ -170,7 +170,10 @@ specific modern equivalent.
 
 **`Contract:`** — `safe` or `contract-changing`. This is the input to the Phase 3 gate
 (`04-architecture-guidelines.md` §6). If contract-changing, state exactly what an existing client
-would observe differently.
+would observe differently. A privileged operation left open (AP-04) is `safe`: its fix rejects only
+non-operators. Never write `contract-changing` for it because the application has no identity model.
+Such a finding cannot end under `PROPOSED, NOT APPLIED` for that reason; it is `resolved`, or
+`unresolved` if the transformation failed.
 
 **Severity deviation.** When the reported severity differs from the catalog default, the deviation
 must appear in `Description:` with its reason. A severity that moves without a stated reason looks

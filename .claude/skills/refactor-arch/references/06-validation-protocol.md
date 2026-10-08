@@ -419,6 +419,16 @@ Rules:
 - A fix whose effect is visible neither as a rejection nor as a neutralization (for example, a
   hash no longer returned, or output that is now escaped) cannot be a security entry. Verify it
   another way and say how.
+- **Privileged operations are the exception to the first rule.** Their anonymous call is
+  illegitimate by definition (`04-architecture-guidelines.md` §6), so when the fix removes or guards
+  one, its anonymous entry is filed as `kind: "security"`, `finding: "AP-04"`, `expect:
+  "rejected"` — baseline records the open answer, replay must answer `4xx` (a removed route
+  answers `404`, which counts). Filed as a contract entry it would come back `REGRESSION`, the
+  wrong label for a correct fix. For a **guarded** operation, also run the operator path: start the
+  replay with the credential set through the environment (`--env`), send it in the entry's
+  `headers`, and require the baseline's status and shape. If the harness run cannot carry the
+  credential, call the operation once by hand with it, and report that result as verified by hand —
+  never as passed by the replay.
 - A security entry whose finding ends up `PROPOSED, NOT APPLIED` is expected to come back
   `NOT FIXED`. Say so next to the result, so that nobody mistakes it for a failed fix.
 

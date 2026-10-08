@@ -231,9 +231,19 @@ the pattern that makes every other pattern in this catalog harder to fix.
 - An authorization check written but never reached: declared after the side effect, inside a branch
   that cannot run, or on a middleware that is registered after the route it should protect.
 - A commented-out or feature-flag-disabled guard.
+- A **privileged operation with no guard** (`04-architecture-guidelines.md` §6): a surface entry
+  that runs a query, command or code taken from the request; resets or destroys data in bulk;
+  serves maintenance or diagnostics; deletes accounts without an ownership notion; or reports across
+  every principal — reachable with no operator credential. Report it even when the application has
+  no identity model at all: that absence is the finding's cause, not its excuse.
 
 **Escalate** — already CRITICAL; flag as maximum urgency when the unprotected operation is
 destructive, escalates privilege, or exposes personal or financial data.
+
+**Contract.** Decided by the legitimate-use test (`04-architecture-guidelines.md` §6). A privileged
+operation is `safe`: Phase 3 removes or guards it. Business operations on a principal's own data in
+an application with no identity model are `contract-changing`: Phase 3 proposes the identity model.
+Split the two into separate findings when one file holds both, so each carries the right `Contract:`.
 
 **De-escalate to HIGH** — the surface is genuinely public by design (a read-only public catalog, a
 health endpoint) and exposes no principal-scoped data; or the check exists correctly at a single
