@@ -1,0 +1,1376 @@
+{
+  "baseUrl": "http://127.0.0.1:5000",
+  "capturedAt": "2026-10-08T18:39:36Z",
+  "results": {
+    "delete-produtos-10": {
+      "contentType": "application/json",
+      "destructive": true,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "delete-produtos-10",
+      "kind": "contract",
+      "like": null,
+      "method": "DELETE",
+      "path": "/produtos/10",
+      "shape": {
+        "properties": {
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "delete-produtos-9999": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "delete-produtos-9999",
+      "kind": "contract",
+      "like": null,
+      "method": "DELETE",
+      "path": "/produtos/9999",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-cors-path-com-mais": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "http://example.com"
+      },
+      "id": "get-cors-path-com-mais",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/produtos+x",
+      "shape": {
+        "lines": [
+          "<!doctype html>",
+          "<h<n>>Not Found</h<n>>",
+          "<html lang=en>",
+          "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+          "<title><n> Not Found</title>"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-cors-path-maiusculo": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "http://example.com"
+      },
+      "id": "get-cors-path-maiusculo",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/PRODUTOS",
+      "shape": {
+        "lines": [
+          "<!doctype html>",
+          "<h<n>>Not Found</h<n>>",
+          "<html lang=en>",
+          "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+          "<title><n> Not Found</title>"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-cors-produtos": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "http://example.com"
+      },
+      "id": "get-cors-produtos",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "ativo": "number",
+                "categoria": "string",
+                "criado_em": "string",
+                "descricao": "string",
+                "estoque": "number",
+                "id": "number",
+                "nome": "string",
+                "preco": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-health": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-health",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/health",
+      "shape": {
+        "properties": {
+          "ambiente": "string",
+          "counts": {
+            "properties": {
+              "pedidos": "number",
+              "produtos": "number",
+              "usuarios": "number"
+            },
+            "type": "object"
+          },
+          "database": "string",
+          "db_path": "string",
+          "debug": "boolean",
+          "secret_key": "string",
+          "status": "string",
+          "versao": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-pedidos": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-pedidos",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "criado_em": "string",
+                "id": "number",
+                "itens": {
+                  "items": {
+                    "properties": {
+                      "preco_unitario": "number",
+                      "produto_id": "number",
+                      "produto_nome": "string",
+                      "quantidade": "number"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": "string",
+                "total": "number",
+                "usuario_id": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-pedidos-usuario-2": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-pedidos-usuario-2",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/pedidos/usuario/2",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "criado_em": "string",
+                "id": "number",
+                "itens": {
+                  "items": {
+                    "properties": {
+                      "preco_unitario": "number",
+                      "produto_id": "number",
+                      "produto_nome": "string",
+                      "quantidade": "number"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "status": "string",
+                "total": "number",
+                "usuario_id": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-produtos": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-produtos",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "ativo": "number",
+                "categoria": "string",
+                "criado_em": "string",
+                "descricao": "string",
+                "estoque": "number",
+                "id": "number",
+                "nome": "string",
+                "preco": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-produtos-1": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-produtos-1",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/produtos/1",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "ativo": "number",
+              "categoria": "string",
+              "criado_em": "string",
+              "descricao": "string",
+              "estoque": "number",
+              "id": "number",
+              "nome": "string",
+              "preco": "number"
+            },
+            "type": "object"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-produtos-9999": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-produtos-9999",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/produtos/9999",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-produtos-busca": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-produtos-busca",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/produtos/busca?q=Mouse",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "ativo": "number",
+                "categoria": "string",
+                "criado_em": "string",
+                "descricao": "string",
+                "estoque": "number",
+                "id": "number",
+                "nome": "string",
+                "preco": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean",
+          "total": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-produtos-busca-filtros": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-produtos-busca-filtros",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/produtos/busca?q=a&categoria=informatica&preco_min=10&preco_max=1000",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "ativo": "number",
+                "categoria": "string",
+                "criado_em": "string",
+                "descricao": "string",
+                "estoque": "number",
+                "id": "number",
+                "nome": "string",
+                "preco": "number"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean",
+          "total": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-relatorios-vendas-operador": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-relatorios-vendas-operador",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/relatorios/vendas",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "desconto_aplicavel": "number",
+              "faturamento_bruto": "number",
+              "faturamento_liquido": "number",
+              "pedidos_aprovados": "number",
+              "pedidos_cancelados": "number",
+              "pedidos_pendentes": "number",
+              "ticket_medio": "number",
+              "total_pedidos": "number"
+            },
+            "type": "object"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-root": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-root",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/",
+      "shape": {
+        "properties": {
+          "endpoints": {
+            "properties": {
+              "health": "string",
+              "login": "string",
+              "pedidos": "string",
+              "produtos": "string",
+              "relatorios": "string",
+              "usuarios": "string"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "versao": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-rota-inexistente": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-rota-inexistente",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/nao-existe",
+      "shape": {
+        "lines": [
+          "<!doctype html>",
+          "<h<n>>Not Found</h<n>>",
+          "<html lang=en>",
+          "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+          "<title><n> Not Found</title>"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-usuarios": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-usuarios",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/usuarios",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": {
+              "properties": {
+                "criado_em": "string",
+                "email": "string",
+                "id": "number",
+                "nome": "string",
+                "senha": "string",
+                "tipo": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-usuarios-1": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-usuarios-1",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/usuarios/1",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "criado_em": "string",
+              "email": "string",
+              "id": "number",
+              "nome": "string",
+              "senha": "string",
+              "tipo": "string"
+            },
+            "type": "object"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-usuarios-9999": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-usuarios-9999",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/usuarios/9999",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "options-cors-produtos": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-headers": "content-type",
+        "access-control-allow-methods": "delete, get, head, options, patch, post, put",
+        "access-control-allow-origin": "http://example.com"
+      },
+      "id": "options-cors-produtos",
+      "kind": "contract",
+      "like": null,
+      "method": "OPTIONS",
+      "path": "/produtos",
+      "shape": "empty",
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-login": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-login",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "email": "string",
+              "id": "number",
+              "nome": "string",
+              "tipo": "string"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-login-incompleto": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-login-incompleto",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-login-invalido": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-login-invalido",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 401
+    },
+    "post-pedidos": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-pedidos",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "pedido_id": "number",
+              "total": "number"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "post-pedidos-estoque-insuficiente": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-pedidos-estoque-insuficiente",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-pedidos-produto-inexistente": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-pedidos-produto-inexistente",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-pedidos-vazio": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-pedidos-vazio",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-produtos": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-produtos",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "id": "number"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "post-produtos-categoria-invalida": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-produtos-categoria-invalida",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-produtos-sem-nome": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-produtos-sem-nome",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-usuarios": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-usuarios",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/usuarios",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "id": "number"
+            },
+            "type": "object"
+          },
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "post-usuarios-incompleto": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-usuarios-incompleto",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/usuarios",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "put-pedidos-1-status": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "put-pedidos-1-status",
+      "kind": "contract",
+      "like": null,
+      "method": "PUT",
+      "path": "/pedidos/1/status",
+      "shape": {
+        "properties": {
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "put-pedidos-1-status-invalido": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "put-pedidos-1-status-invalido",
+      "kind": "contract",
+      "like": null,
+      "method": "PUT",
+      "path": "/pedidos/1/status",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "put-produtos-1": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "put-produtos-1",
+      "kind": "contract",
+      "like": null,
+      "method": "PUT",
+      "path": "/produtos/1",
+      "shape": {
+        "properties": {
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "put-produtos-9999": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "put-produtos-9999",
+      "kind": "contract",
+      "like": null,
+      "method": "PUT",
+      "path": "/produtos/9999",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "sec-busca-aspa": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "neutralized",
+      "finding": "AP-02",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-busca-aspa",
+      "kind": "security",
+      "like": "get-produtos-busca",
+      "method": "GET",
+      "path": "/produtos/busca?q=a%27%29%29--",
+      "shape": {
+        "properties": {
+          "dados": {
+            "items": "empty",
+            "type": "array"
+          },
+          "sucesso": "boolean",
+          "total": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "sec-get-busca-preco-invalido": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-get-busca-preco-invalido",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/produtos/busca?preco_min=abc",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-get-console": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-18",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-get-console",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/console",
+      "shape": {
+        "lines": [
+          "<!doctype html>",
+          "<h<n>>Not Found</h<n>>",
+          "<html lang=en>",
+          "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+          "<title><n> Not Found</title>"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "sec-get-relatorios-vendas-anonimo": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-get-relatorios-vendas-anonimo",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/relatorios/vendas",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "sec-login-sqli": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-02",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-login-sqli",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "erro": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 401
+    },
+    "sec-post-admin-query": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-admin-query",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/admin/query",
+      "shape": {
+        "lines": [
+          "<!doctype html>",
+          "<h<n>>Not Found</h<n>>",
+          "<html lang=en>",
+          "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+          "<title><n> Not Found</title>"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "sec-post-admin-reset-db": {
+      "contentType": "text/html",
+      "destructive": true,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-admin-reset-db",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/admin/reset-db",
+      "shape": {
+        "lines": [
+          "<!doctype html>",
+          "<h<n>>Not Found</h<n>>",
+          "<html lang=en>",
+          "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+          "<title><n> Not Found</title>"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "sec-post-pedidos-quantidade-negativa": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-pedidos-quantidade-negativa",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/pedidos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-post-produtos-aspa": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "neutralized",
+      "finding": "AP-02",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-produtos-aspa",
+      "kind": "security",
+      "like": "post-produtos",
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "dados": {
+            "properties": {
+              "id": "number"
+            },
+            "type": "object"
+          },
+          "mensagem": "string",
+          "sucesso": "boolean"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "sec-post-produtos-json-malformado": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-produtos-json-malformado",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-post-produtos-preco-texto": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-produtos-preco-texto",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/produtos",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-post-usuarios-duplicado": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-20",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-usuarios-duplicado",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/usuarios",
+      "shape": {
+        "properties": {
+          "erro": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 409
+    }
+  },
+  "version": 3
+}
