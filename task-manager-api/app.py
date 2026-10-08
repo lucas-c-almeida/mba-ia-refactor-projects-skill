@@ -1,34 +1,72 @@
+"""Composition root: the only place that assembles the application (RP-06).
+
+Importing this module has no side effects. `create_app()` loads the configuration, builds the
+repositories and controllers, registers routes and the error boundary, and creates the schema.
+"""
+import logging
+
 from flask import Flask
 from flask_cors import CORS
+
+import models  # noqa: F401  (registers every model with the mapper before the schema is created)
+from config.settings import load_settings
+from controllers.category_controller import CategoryController
+from controllers.report_controller import ReportController
+from controllers.task_controller import TaskController
+from controllers.user_controller import UserController
 from database import db
-from routes.task_routes import task_bp
-from routes.user_routes import user_bp
-from routes.report_routes import report_bp
-import os, sys, json, datetime
+from middlewares.error_handler import register_error_handlers
+from models.category_repository import CategoryRepository
+from models.task_repository import TaskRepository
+from models.user_repository import UserRepository
+from routes.category_routes import create_category_blueprint
+from routes.report_routes import create_report_blueprint
+from routes.system_routes import create_system_blueprint
+from routes.task_routes import create_task_blueprint
+from routes.user_routes import create_user_blueprint
 
-app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'super-secret-key-123'
+def create_app(settings=None):
+    settings = settings or load_settings()
+    logging.basicConfig(level=logging.INFO)
 
-CORS(app)
-db.init_app(app)
+    app = Flask(__name__)
+    app.config['SQLALCHEMY_DATABASE_URI'] = settings.database_uri
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SECRET_KEY'] = settings.secret_key
+    app.config['OPERATOR_TOKEN'] = settings.operator_token
+    app.config['DEBUG_MODE'] = settings.debug
+    app.config['BIND_HOST'] = settings.host
+    app.config['BIND_PORT'] = settings.port
 
-app.register_blueprint(task_bp)
-app.register_blueprint(user_bp)
-app.register_blueprint(report_bp)
+    CORS(
+        app,
+        origins=settings.cors_origins,
+        allow_private_network=settings.cors_allow_private_network,
+    )
+    db.init_app(app)
 
-@app.route('/health')
-def health():
-    return {'status': 'ok', 'timestamp': str(datetime.datetime.now())}
+    tasks = TaskRepository(db.session)
+    users = UserRepository(db.session)
+    categories = CategoryRepository(db.session)
 
-@app.route('/')
-def index():
-    return {'message': 'Task Manager API', 'version': '1.0'}
+    app.register_blueprint(create_task_blueprint(TaskController(tasks, users, categories)))
+    app.register_blueprint(create_user_blueprint(UserController(users, tasks)))
+    app.register_blueprint(create_category_blueprint(CategoryController(categories, tasks)))
+    app.register_blueprint(create_report_blueprint(ReportController(tasks, users, categories)))
+    app.register_blueprint(create_system_blueprint())
+    register_error_handlers(app)
 
-with app.app_context():
-    db.create_all()
+    with app.app_context():
+        db.create_all()
+
+    return app
+
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    application = create_app()
+    application.run(
+        debug=application.config['DEBUG_MODE'],
+        host=application.config['BIND_HOST'],
+        port=application.config['BIND_PORT'],
+    )

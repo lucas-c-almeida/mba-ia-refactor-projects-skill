@@ -1,0 +1,510 @@
+## Phase 1 — Project Analysis
+```
+================================
+PHASE 1: PROJECT ANALYSIS
+================================
+Target:        .worktrees/p3/task-manager-api (absolute: D:\Study\MBA FullCycle\mba-ia-refactor-projects-skill\.worktrees\p3\task-manager-api)
+Language:      Python (host 3.13.2; run image python:3.13-slim)
+Framework:     Flask 3.0.0 (pinned in requirements.txt; no lockfile) + Flask-SQLAlchemy 3.1.1
+Dependencies:  flask==3.0.0, flask-sqlalchemy==3.1.1, flask-cors==4.0.0, marshmallow==3.20.1 (declared, never imported), requests==2.31.0 (declared, never imported), python-dotenv==1.0.0 (declared, never imported)
+Domain:        Task manager: users, categories and tasks (status, priority, due date, tags), with summary/per-user reports and login
+App type:      HTTP service
+Architecture:  Nominal layering: models/, routes/, services/, utils/ exist, but route handlers hold persistence, rules, serialization and validation; services/ and utils/ are unused leftovers; models import the shared db singleton
+Source files:  15 files analyzed (*.py authored; excluded: .claude/ tool config, reports/ audit output, caches, tasks.db)
+DB tables:     tasks, users, categories (SQLite, file tasks.db via Flask-SQLAlchemy)
+Boot:          python app.py (entry point runs app.run(debug=True, host=0.0.0.0, port=5000)); seed first: python seed.py
+Port:          5000 native (fixed in source, app.run); container mode so no override needed
+Runtime env:   Python 3.13 from run image; declared dependencies installed in the run copy's container from requirements.txt
+Isolation:     container (docker 28.5.2, image python:3.13-slim)
+================================
+```
+
+================================
+ARCHITECTURE AUDIT REPORT
+================================
+Project: task-manager-api
+Stack:   Python 3.13 + Flask 3.0.0 (Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.4 resolved, SQLite)
+Files:   15 analyzed | ~1160 lines of code
+Date:    2026-10-08 15:25
+Mode:    full
+Confirmation: --yes (auto-approved, no human review)
+Tree:    uncommitted changes present — the audit read the working tree as found (skill files modified; task-manager-api/.claude/ untracked)
+Runtime: installed the declared dependencies from requirements.txt into the container of the run copy (outside the target); resolved transitive: Werkzeug 3.1.9, SQLAlchemy 2.1.4, Jinja2 3.1.6, urllib3 2.8.0
+Isolation: container (docker 28.5.2, image python:3.13-slim)
+Scratch: environment scratch directory (C:\Users\lucas\AppData\Local\Temp\claude\D--Study-MBA-FullCycle-mba-ia-refactor-projects-skill\b35825d2-d654-455b-ad56-6dc436b8d6da\scratchpad\refactor-arch-task-manager-api-20261008-1500\)  (protocol §1.1)
+
+## Summary
+CRITICAL: 9 | HIGH: 7 | MEDIUM: 10 | LOW: 6
+
+## Findings
+
+### [CRITICAL] Hardcoded Secrets and Credentials   (AP-01)
+File: app.py:13-13
+Description: `app.config['SECRET_KEY'] = 'super-secret-key-123'` assigns a literal to a signing-key setting in the application entry point. It is a framework signing key (forgeable signed data), which is the aggravating case; severity stays at the CRITICAL default.
+Impact: Anyone who can read the repository, a fork or a container layer holds the key used to sign anything Flask signs; rotating it needs a code change and a deploy.
+Recommendation: Read the key from the environment in a single configuration module that fails loudly when it is missing, add `.env.example` with a placeholder, and rotate the leaked value; see RP-01.
+Contract: safe
+
+### [CRITICAL] Insecure Runtime Configuration   (AP-18)
+File: app.py:33-34
+Description: The entry point starts the framework development server with `app.run(debug=True, host='0.0.0.0', port=5000)`, unconditionally, on the path `python app.py` that the README documents as the way to run. Run at native configuration, a request that makes a handler fail answered with the Werkzeug interactive debugger page (observed: HTTP 500 body containing `<title>... // Werkzeug Debugger`, `EVALEX = true`, `EVALEX_TRUSTED = false`, full source frames). The console is PIN-gated (EVALEX_TRUSTED false), but the debugger, tracebacks and source are reachable from every interface. Escalated to CRITICAL per the catalog rule (interactive console offered and listener bound to all interfaces). No production server is declared anywhere (no Procfile, container command or documented alternative).
+Impact: A reachable interactive debugger turns any unhandled error into source disclosure and a code-execution surface guarded only by a PIN; the dev server is also not meant to carry production traffic.
+Recommendation: Resolve debug and the bind address from configuration with the previous bind value kept as an explicit setting and debug off by default (opt in through the environment); see RP-17. Switching to a production server is a new runtime dependency and is proposed, not applied.
+Contract: safe (debug off by default, settings externalized with the same bind address). The production server switch is contract-changing (new runtime dependency) and is only mentioned here as a proposal.
+
+### [CRITICAL] Known-Vulnerable Dependency   (AP-19)
+File: requirements.txt:3-3
+Description: `flask-cors==4.0.0` is the resolved version (installed metadata, Flask_Cors-4.0.0). OSV.dev returns GHSA-hxwh-jpp2-84pm (CVE-2024-6221, rated HIGH by GitHub; fixed in 4.0.2) and GHSA-84pr-m4jr-85g5 (CVE-2024-1681, log injection at debug log level, MODERATE; fixed in 4.0.1). Reachability established by observation: an `OPTIONS /tasks` preflight carrying `Origin` and `Access-Control-Request-Private-Network: true` answered `Access-Control-Allow-Private-Network: true` from the original running at native configuration, because `CORS(app)` (app.py:15) applies the library to every route. HIGH rating plus observed reachability escalates to CRITICAL per the catalog.
+Impact: Any web page can have the API declare itself reachable from a private-network context without the application ever opting in.
+Recommendation: Move to flask-cors 4.0.2, the lowest fixed version that closes both advisories on the same major line (patch upgrade); see RP-18. The three remaining moderate advisories need a major upgrade and are filed separately.
+Contract: safe (patch upgrade within major 4; the replay compares the Access-Control-* contract headers; the private-network preflight effect is verified by hand because it is a header change, not a rejection)
+
+### [CRITICAL] God Module / God Class   (AP-03)
+File: routes/report_routes.py:1-223
+Description: One module holds two unrelated domain concepts, reporting (lines 12-155: aggregate and per-user statistics) and the whole category CRUD (lines 157-223), and mixes persistence (driver/ORM calls in every handler), business rules (overdue and completion arithmetic, 30-43, 119-135), delivery (route registration and request parsing) and presentation (response dicts, 70-99). `summary_report` is ~90 lines. By the AP-03/AP-05 precedence rule the mixed handlers are named here and no separate AP-05 is filed for this module.
+Impact: Nothing in it can be tested without a database and a request context; a change to category CRUD sits in the same blast radius as the management report.
+Recommendation: Split by responsibility and concept: category routes, report routes, controllers for reports and categories, and models/repositories for the queries; see RP-03 and RP-05.
+Contract: safe
+
+### [CRITICAL] Missing or Bypassable Authorization   (AP-04)
+File: routes/report_routes.py:12-101
+Description: `GET /reports/summary` returns statistics aggregated across every principal (`user_productivity` lists every user's name, totals and completion rate, 53-68) with no caller check. This is a privileged operation under `04-architecture-guidelines.md` §6 (reports across all principals), so it has no legitimate anonymous caller even though the application has no identity model.
+Impact: Any anonymous caller reads the whole organisation's productivity data.
+Recommendation: Guard the operation with an operator credential read from configuration (environment variable, unset by default, so the guard fails closed with 403), compared in constant time; document the variable; see RP-04.
+Contract: safe (privileged operation, D27: only a non-operator observes the new 403)
+
+### [CRITICAL] Missing or Bypassable Authorization   (AP-04)
+File: routes/user_routes.py:134-151
+Description: `DELETE /users/<id>` deletes any account, and every task assigned to it (140-142, 145), on the caller's say-so; there is no notion of ownership because the application has no identity model, so there is no "own account" the caller could be acting on. Treated as a privileged operation (deletes an account with no ownership notion). Note for the reader: §6 also says a delete that could be a user's own action is a business operation; here no identity exists, so no action can be "own".
+Impact: Any anonymous caller can remove any user and all of that user's tasks, irreversibly.
+Recommendation: Guard it with the same operator credential, closed by default; see RP-04.
+Contract: safe (privileged operation, D27). A legitimate self-service account deletion would need the identity model proposed in the next finding.
+
+### [CRITICAL] Missing or Bypassable Authorization   (AP-04)
+File: routes/user_routes.py:185-211
+Description: The application has no identity model: `/login` checks credentials and returns `'token': 'fake-jwt-token-' + str(user.id)` (a predictable string that no handler ever verifies); no route reads an identity or a role, so every business operation (tasks, users, categories) is open to everyone. The role is also trusted straight from the request body in `POST /users` (52, 71-78) and `PUT /users/<id>` (119-122), so any caller can create or promote an admin.
+Impact: Horizontal and vertical escalation by changing one identifier or one body field; the issued token proves nothing.
+Recommendation: Introduce authentication (verified, expiring tokens), derive the principal from them, scope lookups and enforce a policy on the operation. This needs a product decision (principals, roles, policy), so it is proposed; see RP-04.
+Contract: contract-changing: every current client is anonymous and would receive 401/403; the login response would also gain a real token
+
+### [CRITICAL] Hardcoded Secrets and Credentials   (AP-01)
+File: seed.py:16-35
+Description: The documented setup command (`python seed.py`, README) writes three accounts into the runtime datastore with literal passwords (`'1234'` for an admin, `'abcd'`, `'pass'`) at lines 19, 26 and 33 — a known credential on a real account in every environment that runs it, found by position (a password argument), not by identifier name.
+Impact: Every deployment seeded with the documented command has an admin whose password is in the repository.
+Recommendation: Take the seed passwords from the environment; when one is unset, generate a random one and print it once instead of falling back to a literal; see RP-01.
+Contract: safe (the seed script is not part of the request surface; only the literal values of demo accounts change, and the operator can still choose them through the environment)
+
+### [CRITICAL] Hardcoded Secrets and Credentials   (AP-01)
+File: services/notification_service.py:7-10
+Description: `NotificationService.__init__` sets `self.email_user = 'taskmanager@gmail.com'` and `self.email_password = 'senha123'` (plus host and port literals) and logs in to SMTP with them (line 17). The whole module is unreferenced (see the dead-module finding), which does not remove the committed credential.
+Impact: A mail-account password in the repository history.
+Recommendation: Rotate the account password. The module is dead (nothing imports it), so removing it deletes the literal; if mail is wanted later, read credentials from configuration; see RP-01 and RP-16.
+Contract: safe
+
+### [HIGH] Hard-Wired Dependencies / No Composition Root   (AP-06)
+File: app.py:9-31
+Description: The application object is built at module level, and merely importing `app` configures it with literals (9-13), registers blueprints (18-20) and runs `db.create_all()` inside an app context at import time (30-31), creating the database file as a side effect of import. `seed.py` imports `app` (line 2) and therefore triggers all of it. Routes import the shared `db` singleton directly. No factory exists, so the app cannot be built twice in one process. Not escalated to CRITICAL: the infrastructure is an embedded file database, not live infrastructure.
+Impact: Nothing can be imported or tested in isolation, and startup order is implicit.
+Recommendation: Introduce `create_app()` in a composition root that loads configuration, wires controllers and registers blueprints and the error boundary, with no import-time effects; see RP-06.
+Contract: safe
+
+### [HIGH] Insecure Runtime Configuration   (AP-18)
+File: app.py:15-15
+Description: `CORS(app)` with defaults applies a permissive policy to the whole application. Observed from the original: a request with `Origin: http://evil.example` was answered with `Access-Control-Allow-Origin: http://evil.example` and `Vary: Origin`, i.e. the request origin is reflected unconditionally, on an API that accepts state-changing methods. No catalog de-escalation applies (the API is not read-only/public), so it stays at the HIGH default.
+Impact: Any site can call the API from a visitor's browser and read the answers.
+Recommendation: Read an origin allow-list from configuration; see RP-17. The default list is a team decision.
+Contract: contract-changing: narrowing the policy stops browser clients on origins that are not listed (propose the setting `APP_ALLOWED_ORIGINS` with the origins the team must supply)
+
+### [HIGH] Unsafe Handling of Credentials and Sensitive Data   (AP-08)
+File: models/user.py:16-25
+Description: `User.to_dict` serializes the whole account, including `'password'` (the stored hash), and is used by `GET /users/<id>`, `POST /users`, `PUT /users/<id>` and `POST /login`.
+Impact: Every account read or write returns the password hash, so a single response leak yields crackable credentials.
+Recommendation: Keep the field and its type but mask its value in every response; see RP-08. Removing the field is proposed (clients may read it).
+Contract: safe (masking a leaked secret while keeping the field and its type; removing the field would be contract-changing and is not done)
+
+### [HIGH] Unsafe Handling of Credentials and Sensitive Data   (AP-08)
+File: models/user.py:27-32
+Description: Passwords are stored as an unsalted MD5 digest (`hashlib.md5(pwd.encode()).hexdigest()`) and verified with a plain `==` comparison (not constant-time). A fast digest with no salt and no work factor; not escalated because the stored form is not reversible.
+Impact: A single database read exposes passwords that crack in seconds; identical passwords hash identically.
+Recommendation: Use a purpose-built password KDF with a per-credential salt and constant-time check, upgrading old digests transparently at the next successful login; see RP-08.
+Contract: safe (with upgrade-on-login, no client observes a difference)
+
+### [HIGH] Business Logic in the Delivery Layer   (AP-05)
+File: routes/task_routes.py:11-299
+Description: The task handlers contain domain decisions and persistence directly: the overdue rule (30-39, 71-80, 283-287), status/priority/title validation (96-114, 166-184), user and category lookups with the ORM (41-57, 116-124, 186-198), commits and rollbacks (146-154, 217-223), pagination-free `Task.query.all()`. `get_tasks` is ~50 lines nested four conditionals deep. The module has a single domain concept and is below the AP-03 threshold (299 lines), so by the precedence rule it is AP-05, not AP-03.
+Impact: The rules cannot be tested without a request context and cannot be reused by another entry point.
+Recommendation: Extract a task model (rules, serialization), a repository and a controller; make each handler read as parse, call, render; see RP-05.
+Contract: safe
+
+### [HIGH] Swallowed or Uncentralized Error Handling   (AP-09)
+File: routes/task_routes.py:61-63
+Description: Bare `except:` clauses return a canned 500 and discard the cause without logging (task_routes.py:61-63, 136-138, 236-238; user_routes.py:130-132, 149-151; report_routes.py:186-188, 207-209, 221-223), and the same try/except/rollback/jsonify block is copied into every write handler. No error handler is registered, so any other failure reaches the caller as the framework's default page: observed on `PUT /categories/1` with a `null` JSON body (`'name' in data` raises `TypeError`, report_routes.py:197), which answered the Werkzeug debugger page with the traceback and source.
+Impact: Failures are invisible to operators and, on the unhandled path, leak internals to callers.
+Recommendation: Add a small domain error taxonomy and one error boundary that logs the cause and answers a safe JSON body for unexpected failures, preserving every status and body the handlers already produce on purpose; see RP-09.
+Contract: safe (the application's own error bodies are kept; only the framework's default error output is replaced, with the same 500 status)
+
+### [HIGH] Business Logic in the Delivery Layer   (AP-05)
+File: routes/user_routes.py:10-211
+Description: The user handlers hold validation (email pattern 61 and 106, role list 71 and 120, password length 64 and 115), uniqueness checks via the ORM (67, 109), the cascading delete of a user's tasks (140-142), the overdue rule again (171-180), and a hand-built task dict (162-169) with a different field set than the task endpoints. Single domain concept, 211 lines: AP-05 by the precedence rule.
+Impact: Rules are untestable outside a request and diverge between modules.
+Recommendation: Extract a user model/repository and controller; see RP-05.
+Contract: safe
+
+### [MEDIUM] Missing Schema-Level Integrity Constraints   (AP-20)
+File: models/task.py:13-14
+Description: `tasks.user_id` and `tasks.category_id` declare foreign keys, but SQLite only enforces them with `PRAGMA foreign_keys=ON` per connection and the application never issues it, so the declarations count as absent. `DELETE /categories/<id>` (report_routes.py:211-223) removes the parent and no code removes, re-parents or refuses the tasks that still hold its id (orphans), while `DELETE /users/<id>` cascades in application code. `tasks.status`, `users.role` are closed sets stored as free text with no CHECK constraint (the application validates them only at two entry points). Not escalated: no identity or money is at stake.
+Impact: A second entry point or script can write dangling references or unknown statuses; orphaned tasks point at a deleted category.
+Recommendation: Enable foreign-key enforcement, choose and declare the delete behaviour, and add CHECK constraints through an idempotent migration (SQLite requires a table rebuild); see RP-19. First count the rows that violate each constraint.
+Contract: contract-changing: choosing what deleting a category does to its tasks (refuse, cascade or detach) changes `DELETE /categories/<id>`; enforcing foreign keys would make a delete that succeeds today fail
+
+### [MEDIUM] Deprecated or End-of-Life API Usage   (AP-14)
+File: models/task.py:15-16
+Description: `datetime.utcnow()` is deprecated: the Python 3.13 runtime emits `DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC)` (evidence tier A, forced with `PYTHONWARNINGS=always::DeprecationWarning` and `python -X dev`, exercised through seed and every route). Sites reported by the warnings: models/task.py:15-16 (column defaults, surfaced from SQLAlchemy's schema.py wrapper), models/user.py:14, models/category.py:11, models/task.py:52, routes/task_routes.py:31,72,215,285, routes/user_routes.py:172, routes/report_routes.py:35,42,45,71,133, seed.py:66,67,69,70,74. Modern equivalent named by the warning: `datetime.now(datetime.UTC)`; because the stored and compared values are naive UTC datetimes, the behaviour-preserving form is a naive value derived from it (`datetime.now(timezone.utc).replace(tzinfo=None)`). Severity MEDIUM: removal is announced and there are many call sites.
+Impact: Removal in a future Python release breaks every timestamp default and every overdue check at once.
+Recommendation: Route all "now" reads through one helper that returns the equivalent naive-UTC value from the successor API; see RP-14.
+Contract: safe (same naive-UTC values)
+
+### [MEDIUM] Known-Vulnerable Dependency   (AP-19)
+File: requirements.txt:3-3
+Description: The remaining flask-cors 4.0.0 advisories, all MODERATE per GitHub and all fixed only in 6.0.0 (a major upgrade from 4.x): GHSA-43qf-4rqw-9q2g (CVE-2024-6866, case-insensitive path matching), GHSA-7rxf-gvfg-47g4 (CVE-2024-6839, regex priority) and GHSA-8vgw-p6qm-5gr7 (CVE-2024-6844, `+` handling in paths). They concern resource-pattern matching; the application configures none (`CORS(app)` uses the single default pattern), so the vulnerable matching feature is demonstrably unused: MEDIUM. The upstream CHANGELOG fetched on 2026-10-08 does not document the 5.x and 6.0 releases, so the behaviour change of the major upgrade cannot be established from a cited source.
+Impact: If resource patterns are ever configured, the policy applied to a path may differ from the one written.
+Recommendation: Upgrade to 6.0.0 once the behaviour change between 4.0.2 and 6.0.0 is known and covered by the surface inventory (preflight and Origin entries); see RP-18, step 3.
+Contract: contract-changing: a major upgrade whose behaviour change cannot be established from a cited changelog, and the replay only covers the default policy; proposed
+
+### [MEDIUM] Known-Vulnerable Dependency   (AP-19)
+File: requirements.txt:4-5
+Description: `marshmallow==3.20.1` (GHSA-428g-f7cq-pgp5, CVE-2025-68480, MODERATE, fixed in 3.26.2) and `requests==2.31.0` (GHSA-9hjg-9r4m-mvj7 fixed in 2.32.4; GHSA-9wx4-h78v-vm56 fixed in 2.32.0; GHSA-gc5v-m9x4-r6x2 fixed in 2.33.0; all MODERATE). Neither package is imported anywhere in the source (searched every `*.py`), so the vulnerable code is demonstrably unused: MEDIUM. Reported once here and not again as dead declarations (AP-17).
+Impact: Dead weight that still ships and still shows up in every vulnerability scan of the project.
+Recommendation: Remove both declarations (nothing imports them); the advisories then no longer apply; see RP-18 and RP-16.
+Contract: safe (nothing imports them)
+
+### [MEDIUM] Known-Vulnerable Dependency   (AP-19)
+File: requirements.txt:6-6
+Description: `python-dotenv==1.0.0`: GHSA-mf9w-mj56-hr94 (CVE-2026-28684, MODERATE, symlink following in `set_key`/`unset_key`; fixed in 1.2.2, same major). The package is not imported by the source, but Flask loads `.env` files through it when it is installed, and `set_key`/`unset_key` are never called, so the vulnerable feature is unused: MEDIUM.
+Impact: Low exposure today; the version is unsupported for the fix.
+Recommendation: Raise the pin to 1.2.2 (minor upgrade within major 1); see RP-18.
+Contract: safe (same major; the replay boots and exercises the app with the new pin)
+
+### [MEDIUM] Unbounded Resources and Leaked Handles   (AP-13)
+File: routes/task_routes.py:14-14
+Description: List endpoints read whole tables into memory with no limit and no pagination parameter: `Task.query.all()` (task_routes.py:14, 266, 281), `User.query.all()` (user_routes.py:12, 53 in report_routes.py), `Category.query.all()` (report_routes.py:159). Growth is caller-driven (anyone can create rows through the unauthenticated writes) but not caller-controlled per request, so it stays MEDIUM.
+Impact: Latency and memory grow with the data volume.
+Recommendation: Add bounded pagination with a default limit; see RP-13.
+Contract: contract-changing: adding pagination changes what `GET /tasks`, `/users`, `/categories` and `/tasks/search` return for large datasets; proposed
+
+### [MEDIUM] Duplicated Logic   (AP-12)
+File: routes/task_routes.py:30-39
+Description: The overdue rule (`due_date` in the past and status not done or cancelled) is written out in seven places (task_routes.py:30-39, 71-80, 283-287; user_routes.py:171-180; report_routes.py:34-43, 132-135; models/task.py:50-60, unused), the status list in five (task_routes.py:110, 177; models/task.py:39; utils/helpers.py:75,110), the role list and the email regex in three each, and the record-to-response mapping by hand in four with different field sets (task_routes.py:17-28 repeats `Task.to_dict`; user_routes.py:162-169 is a subset). The overdue copies still agree; the serializers differ in fields on purpose of the existing contract and are not unified.
+Impact: A rule change has to be made seven times and the eighth is forgotten.
+Recommendation: One overdue and one status rule in the task model, one validation constant per closed set; keep each endpoint's response shape; see RP-12.
+Contract: safe
+
+### [MEDIUM] N+1 and Query-Inside-Loop Access   (AP-10)
+File: routes/task_routes.py:41-57
+Description: `get_tasks` fetches the related user and category per task inside the loop (`User.query.get`, `Category.query.get`). Same pattern: `len(u.tasks)` lazy relation per user (user_routes.py:22), a task query per user (report_routes.py:55-60) and a count query per category (report_routes.py:161-164); plus whole-table reads filtered in application code (overdue counts: task_routes.py:281-287, report_routes.py:30-43) and five separate count queries for priorities (report_routes.py:24-28).
+Impact: Round trips grow with the data; the list endpoints degrade first.
+Recommendation: Join or batch by key and aggregate in the datastore, preserving ordering; see RP-10.
+Contract: safe
+
+### [MEDIUM] Missing Boundary Validation   (AP-11)
+File: routes/task_routes.py:102-114
+Description: Fields are used with no type check: `priority < 1` on a non-number raises `TypeError` (observed class: answers the framework 500 page), `len(title)` on a non-string, `int(priority)` / `int(user_id)` on query strings in `/tasks/search` (task_routes.py:260-264), `re.match(..., email)` on a non-string (user_routes.py:61, 106), `'name' in data` on a `null` body (report_routes.py:197), `len(data['password'])` on a non-string (user_routes.py:115). Malformed requests become server errors instead of client errors; no domain bound is missing in a way that persists corrupt state (no escalation).
+Impact: Operators cannot tell an attack or client bug from a server defect; clients get an HTML traceback.
+Recommendation: Validate type and presence once at the boundary and answer 400 with the existing error shape; do not add new limits (those are product decisions); see RP-11.
+Contract: safe for values invalid on their face (non-numeric priority, non-string title/email, null body); stricter limits are not applied
+
+### [MEDIUM] Dead Code and Commented-Out Code   (AP-17)
+File: utils/helpers.py:1-116
+Description: The module is a grab-bag (formatting, regex, uuid, logging, date parsing, constants) of which nothing is used: `report_routes.py:7` imports `format_date` and `calculate_percentage` but never calls them, and `process_task_data` (57-108) re-implements, with different rules (strip, int cast, a second date format), the create/update validation that lives in the handlers. Escalated to MEDIUM: it is a second, stale implementation of live behaviour, so a reader may modify the wrong one. Unused imports inside it: os, json, sys, math, hashlib.
+Impact: Readers trust the helper's rules while the handlers apply different ones.
+Recommendation: Delete the module and its import, keeping the constants that the live code needs in the model layer; see RP-16.
+Contract: safe
+
+### [LOW] Dead Code and Commented-Out Code   (AP-17)
+File: app.py:7-7
+Description: Unused imports and unreferenced members: `os, sys, json` in app.py:7; `json, os, sys, time` in routes/task_routes.py:7; `hashlib, json` in routes/user_routes.py:6 (`datetime` is used); `json` in routes/report_routes.py:8; `json` in models/task.py:3; and the never-called model methods `Task.validate_status`, `Task.validate_priority`, `Task.is_overdue` (models/task.py:38-60) and `User.is_admin` (models/user.py:34-38). (`Task.is_overdue` is superseded by the live copies listed under duplicated logic.)
+Impact: Noise that suggests behaviour the code does not have.
+Recommendation: Delete them; see RP-16.
+Contract: safe
+
+### [LOW] Known-Vulnerable Dependency   (AP-19)
+File: requirements.txt:1-1
+Description: `flask==3.0.0`: GHSA-68rp-wp8r-4726 (CVE-2026-27205, LOW, session without `Vary: Cookie` when accessed through `in`; fixed in 3.1.3). The application never uses `session`, so the path is unreachable; rated LOW by its source.
+Impact: None observable today.
+Recommendation: Pin 3.1.3 (minor upgrade within major 3); see RP-18.
+Contract: safe (same major; the replay exercises the whole surface)
+
+### [LOW] Misleading Names and Inconsistent Structure   (AP-16)
+File: routes/report_routes.py:24-28
+Description: Counts named `p1` ... `p5` stand for priorities that the response then calls `critical`, `high`, `medium`, `low` and `minimal` (70-89), with single-letter loop names `t` and `u` across 33-68 and `cat`/`c` for the same entity in the category handlers; the mapping from number to label exists only in the response literal.
+Impact: A reader has to reverse-engineer which counter is which.
+Recommendation: Name the counters by what they hold, via a priority-label table; see RP-16.
+Contract: safe
+
+### [LOW] Deprecated or End-of-Life API Usage   (AP-14)
+File: routes/task_routes.py:67-67
+Description: `Query.get()` is legacy: SQLAlchemy 2.1.4 emits `LegacyAPIWarning: The Query.get() method is considered legacy as of the 1.x series of SQLAlchemy and becomes a legacy construct in 2.0. The method is now available as Session.get()` (tier A, forced warnings, every route exercised). Sites: routes/task_routes.py:42,51,67,117,122,158,188,195,227; routes/user_routes.py:29,94,136,155; routes/report_routes.py:105,192,213. The warning itself names `Session.get()`; it is a drop-in successor for a primary-key lookup (`db.session.get(Model, id)`). Still supported, so LOW.
+Impact: Removal would break every lookup by id; today only a warning.
+Recommendation: Replace with `db.session.get(Model, id)` in the model/repository layer; see RP-14.
+Contract: safe (same lookup, same result for a missing id: `None`)
+
+### [LOW] Magic Values   (AP-15)
+File: routes/task_routes.py:96-113
+Description: Unnamed literals decide behaviour: title bounds 3 and 200 (96, 99, 167, 169), priority range 1 to 5 (113, 182), password minimum 4 (user_routes.py:64, 115), `7` days window (report_routes.py:45), default colour `'#000000'` (report_routes.py:180), the token prefix `'fake-jwt-token-'` (user_routes.py:210), and the repeated status and role strings. Not escalated.
+Impact: Nobody can tell whether changing a bound is safe.
+Recommendation: Named constants in the model layer; see RP-15.
+Contract: safe
+
+### [LOW] Dead Code and Commented-Out Code   (AP-17)
+File: services/notification_service.py:1-48
+Description: The module is never imported (searched every `*.py`; the only match for `NotificationService` is its own definition). It also holds an in-memory list as a notification store (a mutable collection that would accumulate across requests if it were used), and `smtplib.SMTP(host, port)` with no timeout (line 15), both unreachable.
+Impact: A second, unused implementation of sending mail that carries a credential.
+Recommendation: Delete the module and the empty `services/` package; see RP-16.
+Contract: safe
+
+## Catalog Coverage
+
+| Entry | Signals checked | Result |
+|---|---|---|
+| AP-01 | name-pattern literals in code (`SECRET_KEY`, `email_password`); credential literals in data and seed (password arguments); URL with inline credentials; high-entropy literals; framework signing key literal; committed `.env`/key files (none; `.gitignore` lists `.env`); working-credential defaults | 3 findings: SECRET_KEY, seed.py, notification_service.py |
+| AP-02 | input concatenated into driver calls (all queries are ORM expressions or bound `like`); interpolation in statements (the `f'%{query}%'` is a bound LIKE parameter, not a statement); ORM raw escape hatches (none); dynamic identifiers (none); shell/process execution (none); unsafe deserialization/templates (none); path traversal (none) | none |
+| AP-03 | 3+ responsibility categories per module; size over ~300 lines with 2+ categories; units over ~50 lines or nesting deeper than 3; unrelated domain concepts in one file; low-cohesion classes; grab-bag modules (`helpers`: filed as dead code); afferent coupling | 1 finding: report_routes.py |
+| AP-04 | unauthenticated principal-scoped entries; id-only lookups; delivery-only enforcement; role taken from request; unverified tokens; unreachable guard; commented-out guard; privileged operations with no guard | 3 findings |
+| AP-05 | domain decisions in handlers; persistence in handlers; handlers over ~30 lines; request objects deep in the stack; duplicated rule across handlers; pass-through services | 2 findings: task_routes.py, user_routes.py (report_routes.py is AP-03) |
+| AP-06 | collaborators built inside functions; import-time side effects (`create_all` at import); no assembly point; clock/filesystem direct in rules; domain importing concrete drivers; configuration read at point of use | 1 finding |
+| AP-07 | reassigned module-level variables (none); request-scoped data in globals (none); in-memory store of record (only in the dead module); mutable defaults (none); unbounded caches (none); monkey-patching (none); in-process counters (none) | none (the in-memory notification list is reported under the dead module) |
+| AP-08 | reversible password storage; fast unsalted digest (MD5); constant/missing salt; non-constant-time comparison; sensitive values in logs (none); whole-record serialization (password hash); TLS verification disabled (none); token expiry/rotation | 2 findings |
+| AP-09 | empty/log-only/success-on-failure catches; over-broad catches (bare `except:`); repeated error mapping; no centralized handler (observed default page); internals in response bodies (observed); sentinel errors; partial writes without transaction; exceptions for control flow | 1 finding |
+| AP-10 | driver call in loop or in a function called from a loop; per-element related fetch; lazy relation inside iteration; repeated reads where one set query answers; remote call in loop; whole table filtered in memory; write loop per element | 1 finding |
+| AP-11 | unchecked input fields; optional input dereferenced; unconstrained pagination; numeric parsing without failure path; validation on one entry only; validation after use; domain invariants; body size bound; ad-hoc scattered validation | 1 finding |
+| AP-12 | structurally identical 10+ line blocks; same rule in several places (overdue, statuses, roles, email regex); repeated validation/serialization; hand-written mappings; copy-and-modify divergence; repeated constants; repeated conditions | 1 finding |
+| AP-13 | acquire/release pairs; handles without release on failure; connection per call; outbound call without timeout (dead module only); retries; unbounded reads; unbounded accumulators; background tasks; recursion | 1 finding (list endpoints); the SMTP timeout is in the dead module |
+| AP-14 | forced detectors (`PYTHONWARNINGS=always::DeprecationWarning`, `python -X dev`), exercising seed, every route in-process and the server boot; deprecated manifest entries (PyPI yanked flag for all six pins: none yanked); superseded constructs | 2 findings: utcnow (tier A), Query.get (tier A) |
+| AP-15 | unexplained numeric literals; unitless durations; repeated enumerated strings; repeated literals; numeric codes; positional indexes; environment-specific literals inline | 1 finding |
+| AP-16 | names contradicting behaviour; non-descriptive identifiers; several names per concept; mixed conventions; mixed languages in identifiers; misplaced files; stale comments; boolean parameters | 1 finding |
+| AP-17 | commented-out code (none); unreachable branches; unreferenced units; unused imports and declared dependencies (requests, marshmallow reported under AP-19); unused parameters; constant flags; unregistered endpoints; parallel old copies (none) | 3 findings |
+| AP-18 | debug flag literal on the start path; dev server as production server; all-interface bind with debug; internals in error output (observed); reflecting/credentialed cross-origin policy (observed reflection); diagnostic surfaces (Werkzeug debugger); protective defaults off | 2 findings |
+| AP-19 | OSV.dev lookup per resolved direct and transitive package (13 packages queried 2026-10-08); manifest-range vs lock (no lockfile; pins are exact, versions read from installed metadata); reachability of each advisory | 5 findings (flask-cors x2, requests+marshmallow, python-dotenv, flask) |
+| AP-20 | identity columns without uniqueness (`users.email` has `unique=True`); foreign keys declared but not enforced; delete of a parent with no child rule (category); money in floating point (none); nullable required columns; closed sets as free text | 1 finding |
+
+## Dependency and Deprecated API Verification
+
+| Item | Version in use | Check | Evidence tier | Source | Looked up | Result |
+|---|---|---|---|---|---|---|
+| `datetime.datetime.utcnow()` | Python 3.13.15 | deprecation | A | runtime `DeprecationWarning` with stack trace (forced detectors) | n/a — local | AP-14 finding (MEDIUM) |
+| SQLAlchemy `Query.get()` | SQLAlchemy 2.1.4 | deprecation | A | runtime `LegacyAPIWarning` naming `Session.get()` | n/a — local | AP-14 finding (LOW) |
+| flask | 3.0.0 | advisory + yanked | B | OSV.dev querybatch (GHSA-68rp-wp8r-4726, LOW), PyPI JSON (not yanked) | 2026-10-08 | AP-19 LOW |
+| flask-sqlalchemy | 3.1.1 | advisory + yanked | B | OSV.dev, PyPI JSON (not yanked) | 2026-10-08 | no issue found |
+| flask-cors | 4.0.0 | advisory + yanked | B | OSV.dev (GHSA-hxwh-jpp2-84pm HIGH, GHSA-84pr-m4jr-85g5, GHSA-43qf-4rqw-9q2g, GHSA-7rxf-gvfg-47g4, GHSA-8vgw-p6qm-5gr7); PyPI JSON (not yanked); reachability of the private-network header observed on the original | 2026-10-08 | AP-19 CRITICAL + MEDIUM |
+| marshmallow | 3.20.1 | advisory + yanked | B | OSV.dev (GHSA-428g-f7cq-pgp5), PyPI JSON (not yanked) | 2026-10-08 | AP-19 MEDIUM |
+| requests | 2.31.0 | advisory + yanked | B | OSV.dev (GHSA-9hjg-9r4m-mvj7, GHSA-9wx4-h78v-vm56, GHSA-gc5v-m9x4-r6x2), PyPI JSON (not yanked) | 2026-10-08 | AP-19 MEDIUM |
+| python-dotenv | 1.0.0 | advisory + yanked | B | OSV.dev (GHSA-mf9w-mj56-hr94), PyPI JSON (not yanked) | 2026-10-08 | AP-19 MEDIUM |
+| werkzeug 3.1.9, jinja2 3.1.6, sqlalchemy 2.1.4, urllib3 2.8.0, certifi 2026.7.22, idna 3.20, charset-normalizer 3.5.2 | resolved (installed metadata) | advisory | B | OSV.dev querybatch (empty results for these seven) | 2026-10-08 | no issue found |
+| flask-cors CHANGELOG (6.0.0 behaviour change) | 4.0.0 to 6.0.0 | changelog | C | https://raw.githubusercontent.com/corydolphin/flask-cors/main/CHANGELOG.md — the file documents only up to 4.0.1 and "Unreleased" | 2026-10-08 | behaviour change of the major upgrade UNVERIFIED (see finding) |
+
+Not looked up: the transitive packages markupsafe, itsdangerous, click, blinker, packaging, typing-extensions (not queried; not covered).
+
+## Execution Log
+
+| # | Phase | Action | Mode | Handle | Command | Result |
+|---|---|---|---|---|---|---|
+| 1 | 2 | start | container | refactor-arch-task-manager-api-20261008-1500-1 | `docker run -d ... python:3.13-slim sleep infinity` (run-1 mounted at /app, scripts at /skill, reports at /reports) | running |
+| 2 | 2 | exec (install) | container | same | `pip install -r requirements.txt` | installed |
+| 3 | 2 | exec (seed) | container | same | `python -X dev seed.py` with `PYTHONWARNINGS=always::DeprecationWarning` | ok |
+| 4 | 2 | start (attempt) | container | same | `exec -d ... python /skill/proc.py start ... -- python -X dev app.py` | did not start: `proc` could not read the process start time inside the slim image (exit 2); it stopped its own child |
+| 5 | 2 | start (attempt) | container | same | same command in the foreground | exit 2, same error; `proc` stopped its child |
+| 6 | 2 | start | container | same | `exec -d ... python -X dev app.py` | ready on port 5000 (`proc wait`, exit 0) |
+| 7 | 2 | exec (in-process) | container | same | `python -X dev depcheck.py` (Flask test client over every route, outside the server process) | warnings collected |
+| 8 | 2 | exec (requests) | container | same | `python hit.py ...` x2 (CORS preflight, default error page) | observed |
+| 9 | 2 | stop | container | refactor-arch-task-manager-api-20261008-1500-1 | `docker rm -f refactor-arch-task-manager-api-20261008-1500-1` | removed; no container of this target remains (checked by name) |
+| 10 | 3 | start, boot, stop | container | ...-1500-2 | original from run-2: install, `python seed.py`, `exec -d python app.py`, `proc wait`, `probe capture` (41 entries); `docker rm -f` | ready; captured; removed |
+| 11-14 | 3 | start, boot, stop | container | ...-1500-3, -4, -5, -6 | original from run-3..run-6, one fresh boot each: `capture --only delete-tasks-10`, `delete-users-3-operator`, `delete-users-3-anonymous`, `delete-categories-4` with `--merge`; `docker rm -f` each | ready; captured; removed |
+| 15 | 3 | start, boot, stop | container | ...-1500-7 | refactored-1: smoke replay after the first transformation set (36 PASS, 5 FIXED); a by-hand preflight showed the private-network header still `true`; `docker rm -f` | ready; removed (optional smoke check, not counted) |
+| 16-20 | 3 | start, boot, stop | container | ...-1500-8 .. -12 | refactored-2..6: first full replay (main + 4 destructive, each on its own boot); by-hand checks in -8 (legacy digest upgrade); `docker rm -f` each | ready; 39 PASS, 0 REGRESSION; removed (superseded by the final replay) |
+| 21 | 3 | start, boot, stop | container | ...-1500-13 | refactored-7: re-audit pass 1 (detectors on: seed, every route in-process, boot; `CORS_ALLOW_PRIVATE_NETWORK=false` preflight check); `docker rm -f` | ready; removed |
+| 22 | 3 | start, boot, stop | container | ...-1500-14 | original from run-7: late capture of 3 security entries (`capture --only ... --merge`, protocol §4.3); `docker rm -f` | ready; captured; removed |
+| 23-27 | 3 | start, boot, stop | container | ...-1500-15 .. -19 | refactored-8..12: FINAL full replay (main + 4 destructive, each on its own fresh boot) and re-audit pass 2 (detectors on, in -15); `docker rm -f` each | ready; 39 PASS, 0 REGRESSION, 9 FIXED, 0 NOT FIXED; removed |
+| 28 | 3 | cleanup | container / snapshot | n/a | `docker ps -a --filter name=refactor-arch-task-manager-api-` listed nothing; the snapshot directory was deleted after pass 2 | 0 containers left, snapshot deleted |
+
+## Verification Coverage
+DEGRADED — the following checks did not run, and the findings above do not cover them:
+  - Server-mode deprecation output: a container exec started with `-d` discards its stderr and `proc` could not run inside the image (rows 4-5), so the server process's own startup warnings were not captured; the same code paths were exercised in-process with the Flask test client (row 7) and through the seed script, which covers every route and the models.
+  - Transitive packages markupsafe, itsdangerous, click, blinker, packaging, typing-extensions were not queried against OSV.dev.
+  - Behaviour change of flask-cors 4.0.2 to 6.0.0: no changelog entry was available (see the AP-19 finding).
+NOTE — Run identifier: the label `refactor-arch.run=20261008-1500` was also carried by a container of a different target running in parallel in the same minute; this run only acted on containers it named itself (`refactor-arch-task-manager-api-...`) and never listed by that label. Later containers of this run use the label `refactor-arch.run=20261008-1500-task-manager-api`.
+NOTE — D27 interpretation: the account-deletion route is treated as a privileged operation because the application has no identity model, so no "own account" exists to which the "a delete that could be a user's own action" exception could apply; reported as an ambiguity in the skill text, not worked around.
+Scratch root: the environment's own scratch directory (option 1 of protocol §1.1), no approval-prompting temp directory involved. Dependency directories excluded from copies: none present in the target (`.claude/` and `__pycache__` excluded).
+
+================================
+Total: 32 findings
+================================
+
+Confirmation: --yes (auto-approved, no human review)
+
+---
+
+# Phase 3 — Refactoring (appended to audit-latest.md only)
+
+Scope: all severities (`--yes` behaves as `y`), public-contract gate applied. Confirmation: --yes (auto-approved, no human review).
+Layout chosen: HTTP service, MVC literal. Persistence lives in the model layer as repositories (`models/*_repository.py`), uniformly; `routes/` is the View layer, `controllers/` holds the use cases, `middlewares/` the error boundary and the operator guard, `config/` the only reader of the environment, `app.py` the composition root (`create_app()`).
+
+## Corrections to the Phase 2 text, found while applying it
+
+- **flask-cors 4.0.2 does not close GHSA-hxwh-jpp2-84pm by itself.** The Phase 2 recommendation said the patch upgrade closes both advisories. Observed on the upgraded application: a preflight carrying `Access-Control-Request-Private-Network: true` was still answered `Access-Control-Allow-Private-Network: true`. The installed source (flask_cors/core.py:60, extension.py:142-156) shows the fix is an option, `allow_private_network`, whose default is still `True`. The upgrade is applied (it closes GHSA-84pr-m4jr-85g5 and makes the option available), the option is exposed as `CORS_ALLOW_PRIVATE_NETWORK` with today's default, and the by-hand check with the option off answered `Access-Control-Allow-Private-Network: false`. Turning it off narrows the cross-origin policy, so the default is a proposal (below). The finding's `Contract:` is therefore contract-changing for its remaining part, and the finding is counted as `proposed`.
+- The production-server half of the AP-18 debug finding was always a new runtime dependency (contract-changing); debug is now off by default, so the finding is counted as `proposed` for the part that remains.
+
+## Findings, final state
+
+| # | Finding | State |
+|---|---|---|
+| 1 | [CRITICAL] AP-01 app.py:13 SECRET_KEY | resolved: read from `SECRET_KEY`; a random per-process key when unset (nothing uses sessions). Rotate the leaked value |
+| 2 | [CRITICAL] AP-18 app.py:33-34 debug + bind | proposed: debug is off by default and opt-in (`APP_DEBUG`), bind address kept (`APP_HOST`); the dev server is still what `python app.py` starts |
+| 3 | [CRITICAL] AP-19 flask-cors 4.0.0 | proposed: 4.0.2 applied (GHSA-84pr closed); the private-network header default stays `true` until the team decides |
+| 4 | [CRITICAL] AP-03 routes/report_routes.py | resolved: split into report/category routes, controllers, repositories |
+| 5 | [CRITICAL] AP-04 GET /reports/summary | resolved (D27): operator guard, closed by default |
+| 6 | [CRITICAL] AP-04 DELETE /users/<id> | resolved (D27): operator guard, closed by default |
+| 7 | [CRITICAL] AP-04 no identity model | proposed |
+| 8 | [CRITICAL] AP-01 seed.py | resolved: passwords from `SEED_*_PASSWORD`, else random and printed once |
+| 9 | [CRITICAL] AP-01 notification_service.py | resolved: module deleted (dead). Rotate the mail account password |
+| 10 | [HIGH] AP-06 app.py:9-31 | resolved: `create_app()`, no import-time effects |
+| 11 | [HIGH] AP-18 app.py:15 CORS | proposed: policy read from `CORS_ORIGINS` / `CORS_ALLOW_PRIVATE_NETWORK` with today's values |
+| 12 | [HIGH] AP-08 password in responses | resolved: field kept, value masked |
+| 13 | [HIGH] AP-08 MD5 | resolved: werkzeug scrypt, transparent upgrade on login (verified by hand) |
+| 14 | [HIGH] AP-05 task_routes.py | resolved |
+| 15 | [HIGH] AP-09 error handling | resolved: taxonomy + one boundary |
+| 16 | [HIGH] AP-05 user_routes.py | resolved |
+| 17 | [MEDIUM] AP-20 schema constraints | proposed |
+| 18 | [MEDIUM] AP-14 utcnow | resolved: `models/clock.py` |
+| 19 | [MEDIUM] AP-19 flask-cors 6.0.0 | proposed |
+| 20 | [MEDIUM] AP-19 requests + marshmallow | resolved: removed from the manifest |
+| 21 | [MEDIUM] AP-19 python-dotenv | resolved: pin 1.2.2 |
+| 22 | [MEDIUM] AP-13 unbounded reads | proposed |
+| 23 | [MEDIUM] AP-12 duplication | resolved |
+| 24 | [MEDIUM] AP-10 N+1 | resolved |
+| 25 | [MEDIUM] AP-11 validation | resolved (after the fix loop, below) |
+| 26 | [MEDIUM] AP-17 utils/helpers.py | resolved: deleted |
+| 27 | [LOW] AP-17 unused imports/methods | resolved |
+| 28 | [LOW] AP-19 flask | resolved: pin 3.1.3 |
+| 29 | [LOW] AP-16 report names | resolved |
+| 30 | [LOW] AP-14 Query.get | resolved: `Session.get` in the repositories |
+| 31 | [LOW] AP-15 magic values | resolved |
+| 32 | [LOW] AP-17 notification service | resolved: deleted with `services/` |
+
+resolved 25, proposed 7, unresolved 0 (25 + 7 + 0 = 32).
+
+## Re-audit
+
+Pass 1 (full: detectors forced on for seed, every route in-process and boot; OSV.dev re-queried for the 12 resolved packages on 2026-10-08, PyPI pins unchanged). Findings: 7 matching items already under `PROPOSED, NOT APPLIED` (recorded in 3b before the pass) and 2 unresolved, both `missed-in-phase-2`, both contract-safe:
+- [MEDIUM] AP-11 (`controllers/*`): a JSON array/object sent for a text or boolean field (task `description`, `user_id`/`category_id`, `tags`; user `name`, `active`; category `name`/`description`/`color`) was not refused at the boundary and ended as a 500 from the datastore. Not among the sites cited in Phase 2.
+- [LOW] AP-16 (`seed.py`, `models/category.py`): single-letter and numbered identifiers (`u1`..`c4`, `t`, `td`, `d`) across a long scope. Not among the sites cited in Phase 2.
+Both were fixed (arrays/objects refused with 400 after the existing checks so the order of the intentional errors is unchanged; seed identifiers renamed). Three security entries were added and captured against the original first (`post-tasks-description-list`, `put-users-2-active-text`, `post-categories-name-list`; baseline 500 each, protocol §4.3). Then the full replay was run again (final result below), and pass 2 was run.
+
+Pass 2 (full; detectors on, every route exercised in-process: no deprecation warnings; the pins are unchanged since pass 1, so the OSV.dev result of pass 1 stands). Findings: 7, all matching `PROPOSED, NOT APPLIED` items (AP-04 identity model; AP-18 dev server; AP-18 cross-origin default; AP-19 private-network default; AP-19 flask-cors 6.0.0; AP-13 pagination; AP-20 constraints), 0 unresolved.
+
+Considered and not filed (declared so the reader can judge): `hashlib.md5` in `models/user.py` only verifies legacy digests and is never written (RP-08's migration path); `models` subclass the ORM base `db.Model` (the model layer is the ORM entity layer per the guidelines); `seed.py` prints a generated password once to the operator's terminal by design; `PLACEHOLDER_TOKEN_PREFIX` and `MASKED_PASSWORD` match the secret name pattern but are public, non-secret literals; `ResourceWarning: unclosed database` at interpreter exit under `-X dev` exists in the original too and is not a catalog item.
+
+================================
+PHASE 3: REFACTORING COMPLETE
+================================
+## New Project Structure
+```
+task-manager-api/
+├── app.py                       composition root: create_app()
+├── database.py                  db = SQLAlchemy()
+├── seed.py
+├── requirements.txt
+├── README.md
+├── .env.example
+├── config/
+│   ├── __init__.py
+│   └── settings.py
+├── models/
+│   ├── __init__.py
+│   ├── category.py
+│   ├── category_repository.py
+│   ├── clock.py
+│   ├── errors.py
+│   ├── repository.py
+│   ├── statistics.py
+│   ├── task.py
+│   ├── task_repository.py
+│   ├── user.py
+│   └── user_repository.py
+├── controllers/
+│   ├── __init__.py
+│   ├── category_controller.py
+│   ├── report_controller.py
+│   ├── task_controller.py
+│   ├── user_controller.py
+│   └── validation.py
+├── routes/
+│   ├── __init__.py
+│   ├── category_routes.py
+│   ├── report_routes.py
+│   ├── system_routes.py
+│   ├── task_routes.py
+│   └── user_routes.py
+├── middlewares/
+│   ├── __init__.py
+│   ├── error_handler.py
+│   └── operator_guard.py
+└── reports/                     audit output, surface.json, baseline.json, current.json
+```
+Removed: `services/` (dead module with a credential), `utils/` (dead grab-bag). `.claude/` (this skill's copy) not shown.
+
+## Validation
+  ✓ Application boots without errors
+  ✓ Public surface replayed: 39 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+    Security entries: 9 FIXED, 0 NOT FIXED
+  ○ Findings resolved: 25/32  (7 proposed, 0 unresolved)
+  ○ Anti-patterns remaining: 7 proposed-not-applied, 0 unresolved  (re-audit: 7 findings)
+    Re-audit passes: 2; fixed after re-audit: 2 (2 of them missed-in-phase-2)
+  ✓ Processes: 19 started, 19 stopped through their handles, 0 left running, 0 incidents
+    Isolation: container
+  ✓ Commands: 0 directory changes, 0 chained commands
+
+## Proposed, Not Applied
+### [CRITICAL] Insecure Runtime Configuration   (AP-18)
+File: app.py:33-34
+Reason not applied: replacing the development server needs a production server the application does not depend on today (a new runtime dependency); an exact change to what whoever deploys it must install.
+Proposed change: pick and declare a production server (for example a WSGI server) and start `create_app()` with it; the debug part is already fixed (`APP_DEBUG`, default false).
+
+### [CRITICAL] Known-Vulnerable Dependency   (AP-19)
+File: requirements.txt:3-3
+Reason not applied: closing GHSA-hxwh-jpp2-84pm needs `CORS_ALLOW_PRIVATE_NETWORK=false`, which stops answering private-network preflights with `true`; that narrows the cross-origin policy (a browser client relying on it would stop working). The upgrade to 4.0.2 itself is applied.
+Proposed change: set `CORS_ALLOW_PRIVATE_NETWORK=false` (verified by hand to answer `false`), after confirming no private-network client depends on it. Security entry: none (the effect is a header value, not a rejection); verified by hand.
+
+### [CRITICAL] Missing or Bypassable Authorization   (AP-04)
+File: routes/user_routes.py:185-211
+Reason not applied: the application has no identity model; adding authentication rejects every current client, and `POST /users` / `PUT /users/<id>` trust a role from the body.
+Proposed change: define the principals and policy; issue verified, expiring tokens at `/login`; derive the principal from the token; scope lookups and enforce a policy on each business operation (RP-04); take the role out of the request body.
+
+### [HIGH] Insecure Runtime Configuration   (AP-18)
+File: app.py:15-15
+Reason not applied: narrowing the cross-origin policy stops browser clients on origins not listed.
+Proposed change: set `CORS_ORIGINS` to the allowed origins (comma-separated); the setting exists and defaults to any origin, as before.
+
+### [MEDIUM] Missing Schema-Level Integrity Constraints   (AP-20)
+File: models/task.py:13-14
+Reason not applied: choosing what deleting a category does to its tasks changes `DELETE /categories/<id>`; enabling foreign keys would make a delete that succeeds today fail; CHECK constraints on SQLite need a table rebuild.
+Proposed change: count the violating rows first, then enable `PRAGMA foreign_keys=ON`, pick refuse/cascade/detach for category deletes, and add CHECK constraints through an idempotent migration run where `create_all()` runs today.
+
+### [MEDIUM] Known-Vulnerable Dependency   (AP-19)
+File: requirements.txt:3-3
+Reason not applied: flask-cors 6.0.0 is a major upgrade whose behaviour change cannot be established from a cited changelog (the upstream CHANGELOG fetched on 2026-10-08 has no 5.x/6.x entries); the replay covers only the default policy.
+Proposed change: read the 4.0.2 to 6.0.0 release notes, add surface entries for the behaviour that changes, then move to 6.0.0.
+
+### [MEDIUM] Unbounded Resources and Leaked Handles   (AP-13)
+File: routes/task_routes.py:14-14
+Reason not applied: pagination changes what `GET /tasks`, `/users`, `/categories`, `/tasks/search` return for large datasets.
+Proposed change: add `limit`/`offset` with a default limit (and an opt-out if clients need the full list).
+
+## Verification Coverage
+DEGRADED — the following did not run or ran reduced:
+  - Server-mode deprecation output (Phase 2 and re-audit): a container `exec -d` discards stderr and `proc` could not run inside the image (Execution Log rows 4-5); the same code was exercised in-process with the Flask test client, seed and boot. The by-hand private-network check and legacy-digest check ran as one-off scripts, not through the replay (a header value and a stored hash are not visible to the shape comparison).
+  - Transitive packages markupsafe, itsdangerous, click, blinker, typing-extensions: queried in the re-audit (pass 1) but not in the Phase 2 lookup; none returned an advisory then. `packaging` (a marshmallow dependency) is no longer installed and was never queried.
+  - flask-cors 4.0.2 to 6.0.0 behaviour change: no upstream changelog entry was available.
+  - Operator-guard path: the guarded routes were replayed with the credential set through the environment (`OPERATOR_TOKEN=replay-operator-token`, test value written in `reports/surface.json`); the anonymous calls answered 403.
+  - By-hand: DELETE with a wrong token answered 403 (single request on a smoke container).
+INCIDENT: none. NOTE: the VCS rule of SKILL.md (no add/commit) was set aside only for the final `git add -A` and commit that the caller asked for explicitly.
+================================
