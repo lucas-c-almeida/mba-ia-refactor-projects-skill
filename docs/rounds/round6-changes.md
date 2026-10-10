@@ -33,6 +33,23 @@ muda é a coluna `resolved` versus `proposed`, e é isso que o scorecard da roda
 | W7 | `Contract:` e a re-auditoria: AP-04 de operação privilegiada não termina em `proposed` por falta de identidade. | `03-report-template.md` |
 | W8 | Entrada de segurança para a operação privilegiada: anônimo → rejeitado; com credencial de operador → mesmo shape do baseline. Reaproveita `kind: "security"` (D17). | `06-validation-protocol.md` |
 
+## Emenda 1 (2026-10-10) — fronteira privilegiada/negócio
+
+Depois da primeira execução (três subagentes, `--yes`), as leituras divergiram nos casos cinzentos:
+exclusão de conta foi privilegiada num projeto e de negócio noutro; "agrega todos os principais"
+foi lido como listagem em um e como relatório em outro. Escolhida a opção **B (esclarecer)**:
+
+| # | Mudança |
+|---|---|
+| E1 | Exclusão de **conta** (entidade que guarda credencial ou que o login autentica) por id da requisição, sem modelo de identidade, é privilegiada: não existe "conta do próprio chamador". |
+| E2 | **Agregado gerencial** (totais, receita, rollups por cliente) é privilegiado. Listagem ou consulta simples de registros, incluindo listagem de contas, **não é**; a credencial exposta é mascarada (AP-08) e o acesso é proposto. |
+| E3 | Lista explícita do que **não** torna privilegiada: CRUD/delete de registro de domínio, listagem/consulta, login, cadastro, checkout. |
+| E4 | Mesmo texto replicado em `SKILL.md`, RP-04 e AP-04. |
+
+A rodada é repetida nos projetos 1 e 3 (os que divergiram). O 2 não é repetido: as duas rotas
+protegidas lá são classificadas igual sob o texto novo (relatório agregado e exclusão de conta).
+Evidência anterior preservada nos branches `round6/p1`, `round6/p2`, `round6/p3`.
+
 ## Fora desta rodada
 
 Modelo de identidade, ownership e papéis para operações de negócio continuam propostas (D15).

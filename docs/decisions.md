@@ -1401,8 +1401,14 @@ com a credencial, ou rotulado como verificado à mão.
 *Sempre proteger*: deixa em pé um executor de SQL arbitrário atrás de um segredo único. *Aplicar
 autenticação completa*: inventa política de produto, exatamente o que a D7 proíbe.
 
-**Custo aceito.** A fronteira privilegiada/negócio tem um caso cinzento (exclusão de conta); a regra
-manda propor quando ambíguo. Remover uma rota muda o contrato para o uso anônimo ilegítimo, e isso é o
+**Emenda 1 (2026-10-10).** A primeira execução mostrou que o texto permitia leituras divergentes
+(exclusão de conta, agregados). Escolhida a opção de esclarecer, não a de estreitar: exclusão de
+**conta** sem modelo de identidade e **agregado gerencial** são privilegiados; CRUD de registro de
+domínio, listagens (contas incluídas), login e checkout não são. Estreitar teria devolvido ao estado
+aberto exatamente as rotas que o avaliador criticou.
+
+**Custo aceito.** A fronteira privilegiada/negócio ainda é um julgamento, agora com critérios
+escritos; a regra manda propor quando ambíguo. Remover uma rota muda o contrato para o uso anônimo ilegítimo, e isso é o
 objetivo. A guarda desligada por padrão exige que o operador configure a variável para reabilitar a
 operação, e o relatório diz qual.
 

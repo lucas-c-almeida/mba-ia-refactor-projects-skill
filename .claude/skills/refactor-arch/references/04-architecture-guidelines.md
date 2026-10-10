@@ -238,15 +238,29 @@ these signals is observable in the code:
 
 - it executes a query, command or code that arrives in the request (the caller chooses what runs);
 - it destroys or resets data in bulk — truncating, dropping or reseeding tables or collections,
-  wiping a store — or deletes an account or record on the caller's say-so with no ownership notion;
+  wiping a store;
+- it deletes or deactivates an **account** — the entity that holds credentials or that sign-in
+  authenticates — by an identifier taken from the request, in an application with no identity model.
+  With no identity model there is no "caller's own account", so the deletion cannot be anyone's
+  legitimate self-service action. (Where an identity model exists, deleting one's own account is a
+  business operation, and deleting another's is the ownership check of the second row);
 - it exists for maintenance, diagnostics or operations: a path or name under an administrative,
   internal, debug, maintenance, reset or seed namespace, or a debug console;
-- it returns data aggregated across every principal (a management or financial report).
+- it returns a **management aggregate** computed across principals — totals, revenue or activity
+  summaries, per-customer rollups — that no single principal could need about the others.
 
-A business operation, by contrast, is one that the application's own users perform on their own
-data: listing, creating or editing the domain's records, signing in, checking out. Those stay
-under the first row. When the signals are ambiguous — a delete that could be a user's own action —
-it is a business operation: propose.
+What does **not** make an operation privileged, however destructive or broad it looks:
+
+- deleting, editing or creating an ordinary **domain record** (a catalog item, a task, a category,
+  an order line): users manage those in normal use, and a client that does so anonymously today is
+  legitimate;
+- a plain **listing or lookup** of records, including a listing of the accounts themselves. It may
+  be a disclosure problem, but closing it rejects clients that read it today. The credential field in
+  such a response is fixed by masking (catalog AP-08); the access question is proposed;
+- signing in, registering, checking out.
+
+Those stay under the first row. When the signals are ambiguous — a delete that could be a user's own
+action on their own records — it is a business operation: propose.
 
 How to fix a privileged operation, in order of preference:
 

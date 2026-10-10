@@ -295,10 +295,12 @@ If the baseline cannot be captured, say so explicitly, continue, and mark the fi
     application already identifies callers and the check stops one principal from acting on
     another's resource; the value is invalid on its face), it is safe: apply it.
     A **privileged operation** (runs caller-supplied queries or code, resets data in bulk, serves
-    maintenance or diagnostics, deletes accounts, reports across all principals) has no legitimate
-    anonymous caller, so it is safe even with no identity model: remove it, or guard it with an
-    operator credential from configuration, closed by default (RP-04). Business operations stay
-    contract-changing.
+    maintenance or diagnostics, deletes an account by request id when no identity model exists,
+    computes a management aggregate across principals) has no legitimate anonymous caller, so it is
+    safe even with no identity model: remove it, or guard it with an operator credential from
+    configuration, closed by default (RP-04). Business operations stay contract-changing: ordinary
+    domain-record changes and deletes, plain listings and lookups (account listings included),
+    sign-in, registration, checkout. The exact boundary is `04-architecture-guidelines.md` §6.
   - **Dependency upgrades.** Within the same major version: safe. A major version, or one whose
     changelog announces a behaviour change: safe only if the replay covers the behaviour that
     changes (contract headers included); otherwise propose it.

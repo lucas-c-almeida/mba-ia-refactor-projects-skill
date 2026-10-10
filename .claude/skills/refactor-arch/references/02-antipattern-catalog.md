@@ -233,8 +233,8 @@ the pattern that makes every other pattern in this catalog harder to fix.
 - A commented-out or feature-flag-disabled guard.
 - A **privileged operation with no guard** (`04-architecture-guidelines.md` §6): a surface entry
   that runs a query, command or code taken from the request; resets or destroys data in bulk;
-  serves maintenance or diagnostics; deletes accounts without an ownership notion; or reports across
-  every principal — reachable with no operator credential. Report it even when the application has
+  serves maintenance or diagnostics; deletes an account by request id where no identity model
+  exists; or computes a management aggregate across principals — reachable with no operator credential. Report it even when the application has
   no identity model at all: that absence is the finding's cause, not its excuse.
 
 **Escalate** — already CRITICAL; flag as maximum urgency when the unprotected operation is
