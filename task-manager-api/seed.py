@@ -1,11 +1,25 @@
-"""Script para popular o banco com dados iniciais"""
-from app import app, db
+"""Script para popular o banco com dados iniciais
+
+Passwords for the seeded accounts come from the environment (no credential lives in
+the source): SEED_ADMIN_PASSWORD, SEED_USER_PASSWORD and SEED_MANAGER_PASSWORD.
+"""
+from datetime import timedelta
+
+from app import create_app
+from config.settings import required
+from database import db
+from models.clock import utc_now
 from models.task import Task
 from models.user import User
 from models.category import Category
-from datetime import datetime, timedelta
+
 
 def seed_data():
+    admin_password = required('SEED_ADMIN_PASSWORD')
+    user_password = required('SEED_USER_PASSWORD')
+    manager_password = required('SEED_MANAGER_PASSWORD')
+
+    app = create_app()
     with app.app_context():
 
         Task.query.delete()
@@ -16,21 +30,21 @@ def seed_data():
         u1 = User()
         u1.name = 'João Silva'
         u1.email = 'joao@email.com'
-        u1.set_password('1234')
+        u1.set_password(admin_password)
         u1.role = 'admin'
         db.session.add(u1)
 
         u2 = User()
         u2.name = 'Maria Santos'
         u2.email = 'maria@email.com'
-        u2.set_password('abcd')
+        u2.set_password(user_password)
         u2.role = 'user'
         db.session.add(u2)
 
         u3 = User()
         u3.name = 'Pedro Oliveira'
         u3.email = 'pedro@email.com'
-        u3.set_password('pass')
+        u3.set_password(manager_password)
         u3.role = 'manager'
         db.session.add(u3)
 
@@ -62,16 +76,17 @@ def seed_data():
 
         db.session.commit()
 
+        now = utc_now()
         tasks_data = [
-            {'title': 'Implementar autenticação JWT', 'description': 'Adicionar autenticação real com JWT', 'status': 'pending', 'priority': 1, 'user_id': u1.id, 'category_id': c1.id, 'due_date': datetime.utcnow() - timedelta(days=3)},
-            {'title': 'Criar tela de login', 'description': 'Tela de login responsiva', 'status': 'in_progress', 'priority': 2, 'user_id': u2.id, 'category_id': c2.id, 'due_date': datetime.utcnow() + timedelta(days=5)},
+            {'title': 'Implementar autenticação JWT', 'description': 'Adicionar autenticação real com JWT', 'status': 'pending', 'priority': 1, 'user_id': u1.id, 'category_id': c1.id, 'due_date': now - timedelta(days=3)},
+            {'title': 'Criar tela de login', 'description': 'Tela de login responsiva', 'status': 'in_progress', 'priority': 2, 'user_id': u2.id, 'category_id': c2.id, 'due_date': now + timedelta(days=5)},
             {'title': 'Configurar CI/CD', 'description': 'Pipeline com GitHub Actions', 'status': 'done', 'priority': 2, 'user_id': u3.id, 'category_id': c3.id, 'tags': 'devops,ci,github'},
-            {'title': 'Corrigir bug no filtro de busca', 'description': 'Filtro não funciona com caracteres especiais', 'status': 'pending', 'priority': 1, 'user_id': u1.id, 'category_id': c4.id, 'due_date': datetime.utcnow() - timedelta(days=1)},
-            {'title': 'Adicionar paginação na API', 'description': 'Endpoints retornam todos os registros', 'status': 'pending', 'priority': 3, 'user_id': u1.id, 'category_id': c1.id, 'due_date': datetime.utcnow() + timedelta(days=10)},
+            {'title': 'Corrigir bug no filtro de busca', 'description': 'Filtro não funciona com caracteres especiais', 'status': 'pending', 'priority': 1, 'user_id': u1.id, 'category_id': c4.id, 'due_date': now - timedelta(days=1)},
+            {'title': 'Adicionar paginação na API', 'description': 'Endpoints retornam todos os registros', 'status': 'pending', 'priority': 3, 'user_id': u1.id, 'category_id': c1.id, 'due_date': now + timedelta(days=10)},
             {'title': 'Escrever testes unitários', 'description': 'Cobertura mínima de 80%', 'status': 'pending', 'priority': 2, 'user_id': u2.id, 'category_id': c1.id},
             {'title': 'Documentar API com Swagger', 'description': 'Gerar documentação automática', 'status': 'cancelled', 'priority': 4, 'user_id': u3.id, 'category_id': c1.id},
             {'title': 'Refatorar models', 'description': 'Melhorar organização dos models', 'status': 'in_progress', 'priority': 3, 'user_id': u2.id, 'category_id': c1.id, 'tags': 'refactor,tech-debt'},
-            {'title': 'Configurar monitoramento', 'description': 'Prometheus + Grafana', 'status': 'pending', 'priority': 4, 'user_id': u3.id, 'category_id': c3.id, 'due_date': datetime.utcnow() + timedelta(days=20)},
+            {'title': 'Configurar monitoramento', 'description': 'Prometheus + Grafana', 'status': 'pending', 'priority': 4, 'user_id': u3.id, 'category_id': c3.id, 'due_date': now + timedelta(days=20)},
             {'title': 'Melhorar validações de input', 'description': 'Usar marshmallow ou pydantic', 'status': 'pending', 'priority': 3, 'user_id': u1.id, 'category_id': c1.id, 'tags': 'improvement,validation'},
         ]
 

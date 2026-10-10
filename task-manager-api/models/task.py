@@ -1,6 +1,7 @@
 from database import db
-from datetime import datetime
-import json
+from models.clock import utc_now
+from models.constants import DEFAULT_PRIORITY, DEFAULT_STATUS, FINAL_STATUSES
+
 
 class Task(db.Model):
     __tablename__ = 'tasks'
@@ -8,12 +9,12 @@ class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(50), default='pending')
-    priority = db.Column(db.Integer, default=3)
+    status = db.Column(db.String(50), default=DEFAULT_STATUS)
+    priority = db.Column(db.Integer, default=DEFAULT_PRIORITY)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     due_date = db.Column(db.DateTime, nullable=True)
     tags = db.Column(db.String(500), nullable=True)
 
@@ -35,26 +36,9 @@ class Task(db.Model):
         data['tags'] = self.tags.split(',') if self.tags else []
         return data
 
-    def validate_status(self, new_status):
-        valid = ['pending', 'in_progress', 'done', 'cancelled']
-        if new_status in valid:
-            return True
-        else:
+    def is_overdue(self, now=None):
+        """The one overdue rule: past its due date and neither done nor cancelled."""
+        if not self.due_date:
             return False
-
-    def validate_priority(self, p):
-        if p >= 1 and p <= 5:
-            return True
-        return False
-
-    def is_overdue(self):
-        if self.due_date:
-            if self.due_date < datetime.utcnow():
-                if self.status != 'done' and self.status != 'cancelled':
-                    return True
-                else:
-                    return False
-            else:
-                return False
-        else:
-            return False
+        now = now if now is not None else utc_now()
+        return self.due_date < now and self.status not in FINAL_STATUSES
