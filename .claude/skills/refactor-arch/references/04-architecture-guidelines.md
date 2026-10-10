@@ -244,10 +244,21 @@ these signals is observable in the code:
   With no identity model there is no "caller's own account", so the deletion cannot be anyone's
   legitimate self-service action. (Where an identity model exists, deleting one's own account is a
   business operation, and deleting another's is the ownership check of the second row);
+
+  **What "identity model" means here: verification, not issuance.** An application has an identity
+  model only when at least one operation **verifies** a credential, session or token that a client
+  presents, and decides something from it. Sign-in endpoints that return a token no operation ever
+  checks, a role or user id read from the request body, and a "current user" the code never
+  establishes do **not** make an identity model: no client depends on presenting anything, so the
+  first row's reasoning ("every current client would be rejected") is exactly as true as with no
+  login at all;
 - it exists for maintenance, diagnostics or operations: a path or name under an administrative,
   internal, debug, maintenance, reset or seed namespace, or a debug console;
-- it returns a **management aggregate** computed across principals — totals, revenue or activity
-  summaries, per-customer rollups — that no single principal could need about the others.
+- it returns a **management aggregate** — revenue, sales or other financial figures, or activity
+  per customer or per user, rollups that name or rank principals — which no single principal could
+  need about the others. An aggregate that is only a **count of records by state** or a
+  catalog-wide total with no financial or per-principal content is a plain read: business
+  operation, propose.
 
 What does **not** make an operation privileged, however destructive or broad it looks:
 

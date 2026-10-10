@@ -234,7 +234,8 @@ the pattern that makes every other pattern in this catalog harder to fix.
 - A **privileged operation with no guard** (`04-architecture-guidelines.md` §6): a surface entry
   that runs a query, command or code taken from the request; resets or destroys data in bulk;
   serves maintenance or diagnostics; deletes an account by request id where no identity model
-  exists; or computes a management aggregate across principals — reachable with no operator credential. Report it even when the application has
+  exists (no operation verifies a presented credential); or computes a management aggregate carrying
+  financial figures or per-principal rollups — reachable with no operator credential. Report it even when the application has
   no identity model at all: that absence is the finding's cause, not its excuse.
 
 **Escalate** — already CRITICAL; flag as maximum urgency when the unprotected operation is

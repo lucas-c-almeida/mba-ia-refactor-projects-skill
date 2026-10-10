@@ -295,8 +295,11 @@ If the baseline cannot be captured, say so explicitly, continue, and mark the fi
     application already identifies callers and the check stops one principal from acting on
     another's resource; the value is invalid on its face), it is safe: apply it.
     A **privileged operation** (runs caller-supplied queries or code, resets data in bulk, serves
-    maintenance or diagnostics, deletes an account by request id when no identity model exists,
-    computes a management aggregate across principals) has no legitimate anonymous caller, so it is
+    maintenance or diagnostics, deletes an account by request id when no identity model exists —
+    meaning no operation verifies a presented credential; an issued but never-checked token does not
+    count — or computes a management aggregate: financial figures or per-principal rollups; a plain count
+    of records by state is a read, not this) has no legitimate
+    anonymous caller, so it is
     safe even with no identity model: remove it, or guard it with an operator credential from
     configuration, closed by default (RP-04). Business operations stay contract-changing: ordinary
     domain-record changes and deletes, plain listings and lookups (account listings included),

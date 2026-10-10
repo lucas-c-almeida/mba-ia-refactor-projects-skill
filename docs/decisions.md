@@ -1407,6 +1407,12 @@ autenticação completa*: inventa política de produto, exatamente o que a D7 pr
 domínio, listagens (contas incluídas), login e checkout não são. Estreitar teria devolvido ao estado
 aberto exatamente as rotas que o avaliador criticou.
 
+**Emenda 2 (2026-10-10).** Repetir o projeto 3 divergiu da primeira execução: o app emite um token
+que nenhuma rota verifica, e a definição de "modelo de identidade" (login, sessão ou token) deixou a
+exclusão de conta de fora. Passou a valer **verificação, não emissão**: sem operação que verifique
+credencial apresentada, não há identidade para o primeiro cenário da tabela. E o agregado gerencial
+é definido por conteúdo (financeiro ou por principal), de modo que contagem por estado é leitura.
+
 **Custo aceito.** A fronteira privilegiada/negócio ainda é um julgamento, agora com critérios
 escritos; a regra manda propor quando ambíguo. Remover uma rota muda o contrato para o uso anônimo ilegítimo, e isso é o
 objetivo. A guarda desligada por padrão exige que o operador configure a variável para reabilitar a

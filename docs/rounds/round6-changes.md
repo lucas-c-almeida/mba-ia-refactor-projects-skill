@@ -50,6 +50,20 @@ A rodada é repetida nos projetos 1 e 3 (os que divergiram). O 2 não é repetid
 protegidas lá são classificadas igual sob o texto novo (relatório agregado e exclusão de conta).
 Evidência anterior preservada nos branches `round6/p1`, `round6/p2`, `round6/p3`.
 
+## Emenda 2 (2026-10-10) — identidade é verificação; agregado por conteúdo
+
+A repetição do projeto 3 divergiu da primeira: a exclusão de conta ficou proposta porque o app
+emite um token no login que nenhuma rota verifica, e o texto definia modelo de identidade como
+"login, sessão ou token". Também ficou aberta a classificação de contagens globais.
+
+| # | Mudança |
+|---|---|
+| E5 | **Modelo de identidade = verificação, não emissão.** Só há modelo de identidade quando alguma operação verifica uma credencial apresentada e decide algo a partir dela. Token emitido e nunca conferido, papel lido do corpo e "usuário atual" nunca estabelecido não contam. |
+| E6 | **Agregado gerencial por conteúdo:** valores financeiros (receita, vendas) ou rollups por cliente/usuário são privilegiados; contagem de registros por estado, sem conteúdo financeiro ou por principal, é leitura simples (negócio). |
+
+Repetição: só o projeto 3 (o 1 convergiu e nenhum dos dois pontos o altera: o relatório de vendas
+tem conteúdo financeiro e continua privilegiado).
+
 ## Fora desta rodada
 
 Modelo de identidade, ownership e papéis para operações de negócio continuam propostas (D15).

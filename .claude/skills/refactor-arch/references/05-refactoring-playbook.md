@@ -279,8 +279,8 @@ policy — not applied. Never invent a policy to make the fix applicable.
 
 **Exception — privileged operations (`04-architecture-guidelines.md` §6).** An operation that runs
 caller-supplied queries or code, resets data in bulk, serves maintenance or diagnostics, deletes an
-account by request id when no identity model exists, or computes a management aggregate across
-principals has no legitimate anonymous caller, so closing it is **safe and is applied**, with or
+account by request id when no identity model exists (no operation verifies a presented credential),
+or computes a management aggregate (financial figures or per-principal rollups) has no legitimate anonymous caller, so closing it is **safe and is applied**, with or
 without an identity model. Remove it, or add the operator guard below. Ordinary domain-record
 changes and deletes, plain listings and lookups, sign-in and checkout keep the rule above — the
 boundary is in the guidelines §6.
