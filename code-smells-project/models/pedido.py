@@ -1,162 +1,87 @@
-"""Order: status enumeration, item validation, total computation and persistence
-(AP-02, AP-10, AP-11, AP-12, AP-15)."""
+"""Orders: domain rules and persistence."""
+from errors import ValidationError
+from models.money import from_centavos
 
-from collections import namedtuple
-
-from models.errors import FALHA, BusinessRuleError, ValidationError
-
-
-class StatusPedido:
-    PENDENTE = "pendente"
-    APROVADO = "aprovado"
-    ENVIADO = "enviado"
-    ENTREGUE = "entregue"
-    CANCELADO = "cancelado"
-
-    TODOS = (PENDENTE, APROVADO, ENVIADO, ENTREGUE, CANCELADO)
-
-
+STATUS_INICIAL = "pendente"
+STATUS_APROVADO = "aprovado"
+STATUS_CANCELADO = "cancelado"
+STATUS_VALIDOS = [STATUS_INICIAL, STATUS_APROVADO, "enviado", "entregue", STATUS_CANCELADO]
 PRODUTO_DESCONHECIDO = "Desconhecido"
 
-ItemPedido = namedtuple("ItemPedido", "produto_id quantidade")
-
-
-def _inteiro(valor):
-    """An integer identifier, as a client sends it (number or digit string); None otherwise."""
-    if isinstance(valor, bool):
-        return None
-    if isinstance(valor, int):
-        return valor
-    if isinstance(valor, str) and valor.strip().isdigit():
-        return int(valor)
-    return None
-
-
-def normalizar_usuario_id(valor):
-    usuario_id = _inteiro(valor)
-    if usuario_id is None:
-        raise ValidationError("Usuario ID inválido")
-    return usuario_id
-
-
-def validar_itens(itens):
-    """Boundary invariants of an order line (AP-11): known product id, positive integer quantity."""
-    if not isinstance(itens, list):
-        raise ValidationError("Itens do pedido inválidos")
-    validos = []
-    for item in itens:
-        if not isinstance(item, dict):
-            raise ValidationError("Item de pedido inválido")
-        produto_id = _inteiro(item.get("produto_id"))
-        if produto_id is None:
-            raise ValidationError("Produto inválido no pedido")
-        quantidade = item.get("quantidade")
-        if isinstance(quantidade, bool) or not isinstance(quantidade, int) or quantidade <= 0:
-            raise ValidationError("Quantidade deve ser um inteiro positivo")
-        validos.append(ItemPedido(produto_id, quantidade))
-    return validos
-
-
-def calcular_total(itens, produtos):
-    """Check every line against its product, in order, and sum price x quantity.
-
-    Stock is checked against the quantity requested so far for that product across the whole
-    order, so repeating a product in several lines cannot take its stock below zero.
-    """
-    total = 0
-    solicitado = {}
-    for item in itens:
-        produto = produtos.get(item.produto_id)
-        if produto is None:
-            raise BusinessRuleError(
-                "Produto " + str(item.produto_id) + " não encontrado", extra=FALHA
-            )
-        solicitado[item.produto_id] = solicitado.get(item.produto_id, 0) + item.quantidade
-        if produto["estoque"] < solicitado[item.produto_id]:
-            raise BusinessRuleError("Estoque insuficiente para " + produto["nome"], extra=FALHA)
-        total = total + (produto["preco"] * item.quantidade)
-    return total
-
-
-_SELECT_PEDIDOS_COM_ITENS = (
-    "SELECT p.id, p.usuario_id, p.status, p.total, p.criado_em, "
-    "       i.id AS item_id, i.produto_id, i.quantidade, i.preco_unitario, "
-    "       pr.nome AS produto_nome "
-    "  FROM pedidos p "
-    "  LEFT JOIN itens_pedido i ON i.pedido_id = p.id "
-    "  LEFT JOIN produtos pr ON pr.id = i.produto_id "
+_LISTAGEM = (
+    "SELECT p.id AS id, p.usuario_id AS usuario_id, p.status AS status,"
+    " p.total_centavos AS total_centavos, p.criado_em AS criado_em,"
+    " i.produto_id AS produto_id, i.quantidade AS quantidade,"
+    " i.preco_unitario_centavos AS preco_unitario_centavos,"
+    " pr.id AS produto_existente, pr.nome AS produto_nome"
+    " FROM pedidos p"
+    " LEFT JOIN itens_pedido i ON i.pedido_id = p.id"
+    " LEFT JOIN produtos pr ON pr.id = i.produto_id"
 )
+_ORDEM = " ORDER BY p.id, i.id"
 
 
-def _agrupar_pedidos(linhas):
-    pedidos = []
-    por_id = {}
-    for linha in linhas:
-        pedido = por_id.get(linha["id"])
+def verificar_linha(produto, produto_id, quantidade):
+    """Rules for one order line: the product exists and its stock covers the quantity."""
+    if produto is None:
+        raise ValidationError("Produto " + str(produto_id) + " não encontrado", sucesso=False)
+    if produto["estoque"] < quantidade:
+        raise ValidationError("Estoque insuficiente para " + produto["nome"], sucesso=False)
+
+
+def _agrupar(rows):
+    pedidos = {}
+    for row in rows:
+        pedido = pedidos.get(row["id"])
         if pedido is None:
             pedido = {
-                "id": linha["id"],
-                "usuario_id": linha["usuario_id"],
-                "status": linha["status"],
-                "total": linha["total"],
-                "criado_em": linha["criado_em"],
+                "id": row["id"],
+                "usuario_id": row["usuario_id"],
+                "status": row["status"],
+                "total": from_centavos(row["total_centavos"]),
+                "criado_em": row["criado_em"],
                 "itens": [],
             }
-            por_id[linha["id"]] = pedido
-            pedidos.append(pedido)
-        if linha["item_id"] is None:
-            continue
-        nome = linha["produto_nome"]
-        pedido["itens"].append({
-            "produto_id": linha["produto_id"],
-            "produto_nome": nome if nome is not None else PRODUTO_DESCONHECIDO,
-            "quantidade": linha["quantidade"],
-            "preco_unitario": linha["preco_unitario"],
-        })
-    return pedidos
+            pedidos[row["id"]] = pedido
+        if row["produto_id"] is not None:
+            existe = row["produto_existente"] is not None
+            pedido["itens"].append({
+                "produto_id": row["produto_id"],
+                "produto_nome": row["produto_nome"] if existe else PRODUTO_DESCONHECIDO,
+                "quantidade": row["quantidade"],
+                "preco_unitario": from_centavos(row["preco_unitario_centavos"]),
+            })
+    return list(pedidos.values())
 
 
 class PedidoRepository:
-    def __init__(self, conexao):
-        self._conexao = conexao
+    def __init__(self, get_connection):
+        self._get_connection = get_connection
 
-    def criar(self, usuario_id, total, linhas):
-        """Insert the order, its lines and the stock decrements in one transaction (AP-09, AP-10).
-
-        `linhas` is a list of (produto_id, quantidade, preco_unitario).
-        """
-        conexao = self._conexao()
-        with conexao:
-            cursor = conexao.execute(
-                "INSERT INTO pedidos (usuario_id, status, total) VALUES (?, ?, ?)",
-                (usuario_id, StatusPedido.PENDENTE, total),
-            )
-            pedido_id = cursor.lastrowid
-            conexao.executemany(
-                "INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario) "
-                "VALUES (?, ?, ?, ?)",
-                [(pedido_id, produto_id, quantidade, preco) for produto_id, quantidade, preco in linhas],
-            )
-            conexao.executemany(
-                "UPDATE produtos SET estoque = estoque - ? WHERE id = ?",
-                [(quantidade, produto_id) for produto_id, quantidade, _ in linhas],
-            )
+    def inserir(self, usuario_id, total_centavos, linhas):
+        """Insert an order and its lines; ``linhas`` are (produto_id, quantidade, centavos)."""
+        connection = self._get_connection()
+        cursor = connection.execute(
+            "INSERT INTO pedidos (usuario_id, status, total_centavos) VALUES (?, ?, ?)",
+            (usuario_id, STATUS_INICIAL, total_centavos))
+        pedido_id = cursor.lastrowid
+        connection.executemany(
+            "INSERT INTO itens_pedido (pedido_id, produto_id, quantidade,"
+            " preco_unitario_centavos) VALUES (?, ?, ?, ?)",
+            [(pedido_id, produto_id, quantidade, preco_unitario_centavos)
+             for produto_id, quantidade, preco_unitario_centavos in linhas])
         return pedido_id
 
     def listar_todos(self):
-        linhas = self._conexao().execute(
-            _SELECT_PEDIDOS_COM_ITENS + "ORDER BY p.id, i.id"
-        ).fetchall()
-        return _agrupar_pedidos(linhas)
+        rows = self._get_connection().execute(_LISTAGEM + _ORDEM).fetchall()
+        return _agrupar(rows)
 
     def listar_por_usuario(self, usuario_id):
-        linhas = self._conexao().execute(
-            _SELECT_PEDIDOS_COM_ITENS + "WHERE p.usuario_id = ? ORDER BY p.id, i.id",
-            (usuario_id,),
-        ).fetchall()
-        return _agrupar_pedidos(linhas)
+        rows = self._get_connection().execute(
+            _LISTAGEM + " WHERE p.usuario_id = ?" + _ORDEM, (usuario_id,)).fetchall()
+        return _agrupar(rows)
 
-    def atualizar_status(self, pedido_id, status):
-        conexao = self._conexao()
-        with conexao:
-            conexao.execute("UPDATE pedidos SET status = ? WHERE id = ?", (status, pedido_id))
+    def atualizar_status(self, pedido_id, novo_status):
+        self._get_connection().execute(
+            "UPDATE pedidos SET status = ? WHERE id = ?", (novo_status, pedido_id))
+        return True

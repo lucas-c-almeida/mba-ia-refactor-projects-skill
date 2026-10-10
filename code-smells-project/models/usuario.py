@@ -1,68 +1,59 @@
-"""User: serialization and persistence (AP-02, AP-08, AP-20)."""
-
+"""Users: domain constants and persistence."""
 import sqlite3
 
-from models.errors import ValidationError
+from errors import ConflictError
 
 TIPO_PADRAO = "cliente"
-
-# The password field stays in the response (its shape is contract) but its value is never sent.
+# The credential keeps its field in the account responses, but its value is never read back.
 SENHA_MASCARADA = "********"
 
-CAMPOS = ("id", "nome", "email", "senha", "tipo", "criado_em")
-CAMPOS_LOGIN = ("id", "nome", "email", "tipo")
+_COLUNAS = "id, nome, email, senha, tipo, criado_em"
 
 
-def usuario_para_dict(linha):
-    dados = {campo: linha[campo] for campo in CAMPOS}
-    dados["senha"] = SENHA_MASCARADA
-    return dados
-
-
-def usuario_autenticado_para_dict(linha):
-    return {campo: linha[campo] for campo in CAMPOS_LOGIN}
+def _para_dict(row):
+    return {
+        "id": row["id"],
+        "nome": row["nome"],
+        "email": row["email"],
+        "senha": SENHA_MASCARADA,
+        "tipo": row["tipo"],
+        "criado_em": row["criado_em"],
+    }
 
 
 class UsuarioRepository:
-    def __init__(self, conexao):
-        self._conexao = conexao
+    def __init__(self, get_connection):
+        self._get_connection = get_connection
 
-    def listar_todos(self):
-        linhas = self._conexao().execute("SELECT * FROM usuarios").fetchall()
-        return [usuario_para_dict(linha) for linha in linhas]
+    def listar(self):
+        rows = self._get_connection().execute(
+            "SELECT " + _COLUNAS + " FROM usuarios ORDER BY id").fetchall()
+        return [_para_dict(row) for row in rows]
 
-    def obter_por_id(self, usuario_id):
-        linha = self._conexao().execute(
-            "SELECT * FROM usuarios WHERE id = ?", (usuario_id,)
-        ).fetchone()
-        return usuario_para_dict(linha) if linha else None
+    def buscar_por_id(self, usuario_id):
+        row = self._get_connection().execute(
+            "SELECT " + _COLUNAS + " FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+        return _para_dict(row) if row else None
 
-    def existe(self, usuario_id):
-        linha = self._conexao().execute(
-            "SELECT 1 FROM usuarios WHERE id = ?", (usuario_id,)
-        ).fetchone()
-        return linha is not None
+    def buscar_credenciais_por_email(self, email):
+        """Rows (id, nome, email, senha armazenada, tipo) that answer to this e-mail."""
+        return self._get_connection().execute(
+            "SELECT " + _COLUNAS + " FROM usuarios WHERE email = ? ORDER BY id", (email,)).fetchall()
 
     def existe_email(self, email):
-        linha = self._conexao().execute(
-            "SELECT 1 FROM usuarios WHERE email = ?", (email,)
-        ).fetchone()
-        return linha is not None
+        row = self._get_connection().execute(
+            "SELECT 1 FROM usuarios WHERE email = ?", (email,)).fetchone()
+        return row is not None
 
-    def listar_por_email(self, email):
-        """Rows with this email, oldest first: the order in which login used to match them."""
-        return self._conexao().execute(
-            "SELECT * FROM usuarios WHERE email = ? ORDER BY id", (email,)
-        ).fetchall()
-
-    def criar(self, nome, email, senha_hash, tipo=TIPO_PADRAO):
-        conexao = self._conexao()
+    def criar(self, nome, email, senha_armazenada, tipo=TIPO_PADRAO):
         try:
-            with conexao:
-                cursor = conexao.execute(
-                    "INSERT INTO usuarios (nome, email, senha, tipo) VALUES (?, ?, ?, ?)",
-                    (nome, email, senha_hash, tipo),
-                )
-        except sqlite3.IntegrityError as exc:
-            raise ValidationError("Email já cadastrado") from exc
+            cursor = self._get_connection().execute(
+                "INSERT INTO usuarios (nome, email, senha, tipo) VALUES (?, ?, ?, ?)",
+                (nome, email, senha_armazenada, tipo))
+        except sqlite3.IntegrityError:
+            raise ConflictError("Email já cadastrado")
         return cursor.lastrowid
+
+    def atualizar_senha(self, usuario_id, senha_armazenada):
+        self._get_connection().execute(
+            "UPDATE usuarios SET senha = ? WHERE id = ?", (senha_armazenada, usuario_id))

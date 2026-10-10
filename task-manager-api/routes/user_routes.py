@@ -1,52 +1,47 @@
-"""User and login routes: parse -> call one controller method -> render."""
 from flask import Blueprint, jsonify, request
 
-from routes import presenters
+from middlewares.guards import require_operator
+from routes import serializers
 
 
-def create_user_blueprint(controller, clock):
-    bp = Blueprint('users', __name__)
+def create_user_blueprint(controller):
+    user_bp = Blueprint('users', __name__)
 
-    @bp.route('/users', methods=['GET'])
+    @user_bp.route('/users', methods=['GET'])
     def get_users():
-        return jsonify([presenters.user_list_item(user, count)
-                        for user, count in controller.list_users()]), 200
+        return jsonify([serializers.user_list_item(u, n) for u, n in controller.list_users()]), 200
 
-    @bp.route('/users/<int:user_id>', methods=['GET'])
+    @user_bp.route('/users/<int:user_id>', methods=['GET'])
     def get_user(user_id):
         user, tasks = controller.get_user(user_id)
-        data = presenters.user_dict(user)
-        data['tasks'] = [presenters.task_dict(t) for t in tasks]
-        return jsonify(data), 200
+        return jsonify(serializers.user_with_tasks(user, tasks)), 200
 
-    @bp.route('/users', methods=['POST'])
+    @user_bp.route('/users', methods=['POST'])
     def create_user():
-        user = controller.create(request.get_json())
-        return jsonify(presenters.user_dict(user)), 201
+        return jsonify(serializers.user(controller.create(request.get_json()))), 201
 
-    @bp.route('/users/<int:user_id>', methods=['PUT'])
+    @user_bp.route('/users/<int:user_id>', methods=['PUT'])
     def update_user(user_id):
-        user = controller.update(user_id, request.get_json())
-        return jsonify(presenters.user_dict(user)), 200
+        controller.get_user(user_id)  # 404 before the body is read, as it always was
+        return jsonify(serializers.user(controller.update(user_id, request.get_json()))), 200
 
-    @bp.route('/users/<int:user_id>', methods=['DELETE'])
+    @user_bp.route('/users/<int:user_id>', methods=['DELETE'])
+    @require_operator  # privileged: removes an account and its tasks by request id
     def delete_user(user_id):
         controller.delete(user_id)
         return jsonify({'message': 'Usuário deletado com sucesso'}), 200
 
-    @bp.route('/users/<int:user_id>/tasks', methods=['GET'])
+    @user_bp.route('/users/<int:user_id>/tasks', methods=['GET'])
     def get_user_tasks(user_id):
-        now = clock()
-        return jsonify([presenters.user_task_item(t, now)
-                        for t in controller.user_tasks(user_id)]), 200
+        return jsonify([serializers.user_task_item(t) for t in controller.user_tasks(user_id)]), 200
 
-    @bp.route('/login', methods=['POST'])
+    @user_bp.route('/login', methods=['POST'])
     def login():
-        user, token = controller.login(request.get_json())
+        user = controller.login(request.get_json())
         return jsonify({
             'message': 'Login realizado com sucesso',
-            'user': presenters.user_dict(user),
-            'token': token,
+            'user': serializers.user(user),
+            'token': 'fake-jwt-token-' + str(user.id),
         }), 200
 
-    return bp
+    return user_bp

@@ -1,67 +1,29 @@
-'use strict';
-
 const sqlite3 = require('sqlite3');
 
-// Promise wrapper over one sqlite3 connection. Persistence code only: no HTTP, no rules.
-class Database {
-    constructor(connection) {
-        this.connection = connection;
-        this.transactionQueue = Promise.resolve();
-    }
+// Thin promise wrapper over the sqlite3 driver. Receives nothing and has no import-time effects.
+function openDatabase(filename = ':memory:') {
+    const raw = new sqlite3.Database(filename);
 
-    static open(file) {
-        return new Promise((resolve, reject) => {
-            const connection = new sqlite3.Database(file, (err) => {
-                if (err) reject(err);
-                else resolve(new Database(connection));
+    return {
+        run(sql, params = []) {
+            return new Promise((resolve, reject) => {
+                raw.run(sql, params, function onRun(err) {
+                    if (err) return reject(err);
+                    return resolve({ lastID: this.lastID, changes: this.changes });
+                });
             });
-        });
-    }
-
-    run(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.connection.run(sql, params, function onRun(err) {
-                if (err) reject(err);
-                else resolve({ lastID: this.lastID, changes: this.changes });
+        },
+        get(sql, params = []) {
+            return new Promise((resolve, reject) => {
+                raw.get(sql, params, (err, row) => (err ? reject(err) : resolve(row)));
             });
-        });
-    }
-
-    get(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.connection.get(sql, params, (err, row) => (err ? reject(err) : resolve(row)));
-        });
-    }
-
-    all(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.connection.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
-        });
-    }
-
-    exec(sql) {
-        return new Promise((resolve, reject) => {
-            this.connection.exec(sql, (err) => (err ? reject(err) : resolve()));
-        });
-    }
-
-    // Runs `work` inside BEGIN/COMMIT. Transactions are queued, because a single connection
-    // cannot hold two of them at once and concurrent requests would otherwise interleave.
-    transaction(work) {
-        const result = this.transactionQueue.then(async () => {
-            await this.run('BEGIN IMMEDIATE');
-            try {
-                const value = await work();
-                await this.run('COMMIT');
-                return value;
-            } catch (err) {
-                await this.run('ROLLBACK');
-                throw err;
-            }
-        });
-        this.transactionQueue = result.catch(() => undefined);
-        return result;
-    }
+        },
+        all(sql, params = []) {
+            return new Promise((resolve, reject) => {
+                raw.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
+            });
+        },
+    };
 }
 
-module.exports = { Database };
+module.exports = { openDatabase };

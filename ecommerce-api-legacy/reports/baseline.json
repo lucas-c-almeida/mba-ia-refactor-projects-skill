@@ -1,15 +1,15 @@
 {
   "baseUrl": "http://127.0.0.1:3000",
-  "capturedAt": "2026-10-01T19:01:44Z",
+  "capturedAt": "2026-10-08T18:09:26Z",
   "results": {
-    "delete-user-1": {
+    "delete-api-users-1": {
       "contentType": "text/html",
       "destructive": true,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "delete-user-1",
+      "id": "delete-api-users-1",
       "kind": "contract",
       "like": null,
       "method": "DELETE",
@@ -23,18 +23,18 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "delete-user-non-numeric-id": {
+    "delete-api-users-999": {
       "contentType": "text/html",
       "destructive": false,
       "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
+      "expect": null,
+      "finding": null,
       "headers": {},
-      "id": "delete-user-non-numeric-id",
-      "kind": "security",
+      "id": "delete-api-users-999",
+      "kind": "contract",
       "like": null,
       "method": "DELETE",
-      "path": "/api/users/abc",
+      "path": "/api/users/999",
       "shape": {
         "lines": [
           "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
@@ -44,14 +44,14 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-admin-financial-report": {
+    "get-api-admin-financial-report": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "get-admin-financial-report",
+      "id": "get-api-admin-financial-report",
       "kind": "contract",
       "like": null,
       "method": "GET",
@@ -79,81 +79,35 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-unknown-route": {
+    "post-api-checkout-denied": {
       "contentType": "text/html",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "get-unknown-route",
-      "kind": "contract",
-      "like": null,
-      "method": "GET",
-      "path": "/api/does-not-exist",
-      "shape": {
-        "lines": [
-          "<!DOCTYPE html>",
-          "</body>",
-          "</head>",
-          "</html>",
-          "<body>",
-          "<head>",
-          "<html lang=\"en\">",
-          "<meta charset=\"utf-<n>\">",
-          "<pre>Cannot GET /api/does-not-exist</pre>",
-          "<title>Error</title>"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 404
-    },
-    "post-checkout-card-not-string": {
-      "contentType": null,
-      "destructive": false,
-      "error": "TypeError: UND_ERR_SOCKET",
-      "expect": "rejected",
-      "finding": "AP-11",
-      "headers": null,
-      "id": "post-checkout-card-not-string",
-      "kind": "security",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": null,
-      "state": "ERROR",
-      "status": null
-    },
-    "post-checkout-course-not-found": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {},
-      "id": "post-checkout-course-not-found",
+      "id": "post-api-checkout-denied",
       "kind": "contract",
       "like": null,
       "method": "POST",
       "path": "/api/checkout",
       "shape": {
         "lines": [
-          "Curso não encontrado"
+          "Pagamento recusado"
         ],
         "type": "text"
       },
       "state": "OBSERVED",
-      "status": 404
+      "status": 400
     },
-    "post-checkout-existing-user-paid": {
+    "post-api-checkout-existing-user": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "post-checkout-existing-user-paid",
+      "id": "post-api-checkout-existing-user",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -168,30 +122,14 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "post-checkout-malformed-json": {
-      "contentType": null,
-      "destructive": false,
-      "error": "the body is the framework's default error page with a stack trace, which the AP-18 fix replaces on purpose (guidelines §6, error contract); a text-skeleton comparison would report the intended fix as a regression. Status verified out of band before and after.",
-      "expect": null,
-      "finding": null,
-      "headers": null,
-      "id": "post-checkout-malformed-json",
-      "kind": "contract",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": null,
-      "state": "SKIPPED",
-      "status": null
-    },
-    "post-checkout-missing-fields": {
+    "post-api-checkout-missing-fields": {
       "contentType": "text/html",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "post-checkout-missing-fields",
+      "id": "post-api-checkout-missing-fields",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -205,14 +143,14 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "post-checkout-new-user-no-password": {
+    "post-api-checkout-new-user": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "post-checkout-new-user-no-password",
+      "id": "post-api-checkout-new-user",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -227,14 +165,14 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "post-checkout-new-user-paid": {
+    "post-api-checkout-new-user-no-password": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "post-checkout-new-user-paid",
+      "id": "post-api-checkout-new-user-no-password",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -249,26 +187,98 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "post-checkout-payment-denied": {
+    "post-api-checkout-unknown-course": {
       "contentType": "text/html",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "post-checkout-payment-denied",
+      "id": "post-api-checkout-unknown-course",
       "kind": "contract",
       "like": null,
       "method": "POST",
       "path": "/api/checkout",
       "shape": {
         "lines": [
-          "Pagamento recusado"
+          "Curso não encontrado"
         ],
         "type": "text"
       },
       "state": "OBSERVED",
-      "status": 400
+      "status": 404
+    },
+    "sec-delete-api-users-1-anonymous": {
+      "contentType": "text/html",
+      "destructive": true,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "sec-delete-api-users-1-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "sec-get-api-admin-financial-report-anonymous": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "sec-get-api-admin-financial-report-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "sec-post-api-checkout-card-wrong-type": {
+      "contentType": null,
+      "destructive": true,
+      "error": "TypeError: UND_ERR_SOCKET",
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": null,
+      "id": "sec-post-api-checkout-card-wrong-type",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": null,
+      "state": "ERROR",
+      "status": null
     }
   },
   "version": 3

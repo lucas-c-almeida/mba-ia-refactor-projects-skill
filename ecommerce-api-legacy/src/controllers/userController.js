@@ -1,14 +1,14 @@
-'use strict';
+const { DependencyError } = require('../errors');
 
 class UserController {
-    constructor({ users }) {
-        this.users = users;
-    }
+    constructor({ users }) { this.users = users; }
 
-    // Deletes the user row only. What happens to the user's enrollments and payments is a
-    // product decision, proposed in the audit report rather than decided here.
-    async deleteUser(id) {
-        await this.users.deleteById(id);
+    async remove(id) {
+        try {
+            await this.users.deleteById(id);
+        } catch (err) {
+            throw new DependencyError('Erro DB', err);
+        }
     }
 }
 

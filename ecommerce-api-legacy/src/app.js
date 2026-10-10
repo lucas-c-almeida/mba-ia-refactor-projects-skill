@@ -1,68 +1,60 @@
-'use strict';
-
-// Composition root: the only place that names concrete implementations and wires them.
+// Composition root: the only place that names concrete implementations and wires them together.
 const express = require('express');
-
 const { loadConfig } = require('./config');
-const { Database } = require('./models/database');
-const { createSchema, seed } = require('./models/schema');
-const {
-    CourseRepository,
-    UserRepository,
-    EnrollmentRepository,
-    PaymentRepository,
-    AuditLogRepository,
-    FinancialReportRepository,
-} = require('./models/repositories');
+const { openDatabase } = require('./models/database');
+const { initializeSchema } = require('./models/schema');
+const { passwords } = require('./models/passwordHasher');
+const { UserRepository } = require('./models/userRepository');
+const { CourseRepository } = require('./models/courseRepository');
+const { EnrollmentRepository } = require('./models/enrollmentRepository');
+const { ReportRepository } = require('./models/reportRepository');
 const { CheckoutController } = require('./controllers/checkoutController');
 const { ReportController } = require('./controllers/reportController');
 const { UserController } = require('./controllers/userController');
-const checkoutRoutes = require('./routes/checkoutRoutes');
-const reportRoutes = require('./routes/reportRoutes');
-const userRoutes = require('./routes/userRoutes');
-const errorHandler = require('./middlewares/errorHandler');
+const { requireOperator } = require('./middlewares/requireOperator');
+const { errorBoundary } = require('./middlewares/errorBoundary');
+const { checkoutRoutes } = require('./views/checkoutRoutes');
+const { adminRoutes } = require('./views/adminRoutes');
 
-function createApp({ db, logger }) {
+function createApp({ config, db, logger = console }) {
     const users = new UserRepository(db);
-
-    const checkoutController = new CheckoutController({
-        db,
-        courses: new CourseRepository(db),
-        users,
-        enrollments: new EnrollmentRepository(db),
-        payments: new PaymentRepository(db),
-        auditLog: new AuditLogRepository(db),
-        logger,
-    });
-    const reportController = new ReportController({ reports: new FinancialReportRepository(db) });
-    const userController = new UserController({ users });
+    const courses = new CourseRepository(db);
+    const enrollments = new EnrollmentRepository(db);
+    const reports = new ReportRepository(db);
 
     const app = express();
+    app.disable('x-powered-by');
     app.use(express.json());
-    app.use(checkoutRoutes(checkoutController));
-    app.use(reportRoutes(reportController));
-    app.use(userRoutes(userController));
-    app.use(errorHandler(logger));
+
+    const router = express.Router();
+    checkoutRoutes(router, new CheckoutController({ users, courses, enrollments, passwords, logger }));
+    adminRoutes(router, {
+        reportController: new ReportController({ reports }),
+        userController: new UserController({ users }),
+        operatorGuard: requireOperator(config.operatorToken),
+    });
+    app.use(router);
+
+    app.use(errorBoundary(logger));
     return app;
 }
 
-async function start() {
+async function main() {
     const config = loadConfig();
-    const logger = console;
-    const db = await Database.open(config.databaseFile);
-    await createSchema(db);
-    await seed(db);
+    const db = openDatabase(':memory:');
+    await initializeSchema(db, passwords);
 
-    createApp({ db, logger }).listen(config.port, () => {
-        logger.info(`Frankenstein LMS rodando na porta ${config.port}...`);
+    const app = createApp({ config, db });
+    app.listen(config.port, () => {
+        console.log(`Frankenstein LMS rodando na porta ${config.port}...`);
     });
 }
 
 if (require.main === module) {
-    start().catch((err) => {
-        console.error('failed to start', err);
+    main().catch((err) => {
+        console.error(err);
         process.exit(1);
     });
 }
 
-module.exports = { createApp, start };
+module.exports = { createApp };

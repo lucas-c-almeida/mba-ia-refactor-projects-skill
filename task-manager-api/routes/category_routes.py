@@ -1,34 +1,28 @@
-"""Category routes: parse -> call one controller method -> render."""
 from flask import Blueprint, jsonify, request
 
-from routes import presenters
+from routes import serializers
 
 
 def create_category_blueprint(controller):
-    bp = Blueprint('categories', __name__)
+    category_bp = Blueprint('categories', __name__)
 
-    @bp.route('/categories', methods=['GET'])
+    @category_bp.route('/categories', methods=['GET'])
     def get_categories():
-        result = []
-        for category, task_count in controller.list_categories():
-            data = presenters.category_dict(category)
-            data['task_count'] = task_count
-            result.append(data)
-        return jsonify(result), 200
+        return jsonify([serializers.category_with_count(c, n)
+                        for c, n in controller.list_categories()]), 200
 
-    @bp.route('/categories', methods=['POST'])
+    @category_bp.route('/categories', methods=['POST'])
     def create_category():
-        category = controller.create(request.get_json())
-        return jsonify(presenters.category_dict(category)), 201
+        return jsonify(serializers.category(controller.create(request.get_json()))), 201
 
-    @bp.route('/categories/<int:category_id>', methods=['PUT'])
-    def update_category(category_id):
-        category = controller.update(category_id, request.get_json())
-        return jsonify(presenters.category_dict(category)), 200
+    @category_bp.route('/categories/<int:cat_id>', methods=['PUT'])
+    def update_category(cat_id):
+        controller.get_category(cat_id)  # 404 before the body is read, as it always was
+        return jsonify(serializers.category(controller.update(cat_id, request.get_json()))), 200
 
-    @bp.route('/categories/<int:category_id>', methods=['DELETE'])
-    def delete_category(category_id):
-        controller.delete(category_id)
+    @category_bp.route('/categories/<int:cat_id>', methods=['DELETE'])
+    def delete_category(cat_id):
+        controller.delete(cat_id)
         return jsonify({'message': 'Categoria deletada'}), 200
 
-    return bp
+    return category_bp

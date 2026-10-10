@@ -1,58 +1,52 @@
-"""Sales report: the discount rule and the aggregate query (AP-10, AP-15)."""
+"""Sales report: the discount rule (pure) and the aggregate query."""
+from decimal import ROUND_HALF_UP, Decimal
 
-from models.pedido import StatusPedido
+from models.money import CASAS_DECIMAIS, CENTAVOS_POR_UNIDADE, from_centavos
+from models.pedido import STATUS_APROVADO, STATUS_CANCELADO, STATUS_INICIAL
 
-# Discount tiers on gross revenue: (revenue strictly above, rate). Checked from the highest down.
-FAIXAS_DESCONTO = (
-    (10000, 0.1),
-    (5000, 0.05),
-    (1000, 0.02),
+# (revenue above, discount rate): the first tier that applies wins.
+FAIXAS_DE_DESCONTO = (
+    (Decimal("10000"), Decimal("0.10")),
+    (Decimal("5000"), Decimal("0.05")),
+    (Decimal("1000"), Decimal("0.02")),
 )
-CASAS_DECIMAIS = 2
 
 
-def calcular_desconto(faturamento):
-    for limite, taxa in FAIXAS_DESCONTO:
+def calcular_desconto_centavos(faturamento_centavos):
+    faturamento = Decimal(faturamento_centavos) / CENTAVOS_POR_UNIDADE
+    for limite, taxa in FAIXAS_DE_DESCONTO:
         if faturamento > limite:
-            return faturamento * taxa
+            desconto = Decimal(faturamento_centavos) * taxa
+            return int(desconto.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     return 0
 
 
-def montar_relatorio(total_pedidos, faturamento, pendentes, aprovados, cancelados):
-    if faturamento is None:
-        faturamento = 0
-    desconto = calcular_desconto(faturamento)
+def montar_relatorio(total_pedidos, faturamento_centavos, pedidos_por_status):
+    desconto_centavos = calcular_desconto_centavos(faturamento_centavos)
     return {
         "total_pedidos": total_pedidos,
-        "faturamento_bruto": round(faturamento, CASAS_DECIMAIS),
-        "desconto_aplicavel": round(desconto, CASAS_DECIMAIS),
-        "faturamento_liquido": round(faturamento - desconto, CASAS_DECIMAIS),
-        "pedidos_pendentes": pendentes,
-        "pedidos_aprovados": aprovados,
-        "pedidos_cancelados": cancelados,
-        "ticket_medio": round(faturamento / total_pedidos, CASAS_DECIMAIS) if total_pedidos > 0 else 0,
+        "faturamento_bruto": from_centavos(faturamento_centavos),
+        "desconto_aplicavel": from_centavos(desconto_centavos),
+        "faturamento_liquido": from_centavos(faturamento_centavos - desconto_centavos),
+        "pedidos_pendentes": pedidos_por_status.get(STATUS_INICIAL, 0),
+        "pedidos_aprovados": pedidos_por_status.get(STATUS_APROVADO, 0),
+        "pedidos_cancelados": pedidos_por_status.get(STATUS_CANCELADO, 0),
+        "ticket_medio": (
+            round(faturamento_centavos / CENTAVOS_POR_UNIDADE / total_pedidos, CASAS_DECIMAIS)
+            if total_pedidos > 0 else 0),
     }
 
 
 class RelatorioRepository:
-    def __init__(self, conexao):
-        self._conexao = conexao
+    def __init__(self, get_connection):
+        self._get_connection = get_connection
 
-    def totais_vendas(self):
-        """One aggregate query instead of five."""
-        linha = self._conexao().execute(
-            "SELECT COUNT(*) AS total_pedidos, "
-            "       SUM(total) AS faturamento, "
-            "       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS pendentes, "
-            "       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS aprovados, "
-            "       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS cancelados "
-            "  FROM pedidos",
-            (StatusPedido.PENDENTE, StatusPedido.APROVADO, StatusPedido.CANCELADO),
-        ).fetchone()
-        return (
-            linha["total_pedidos"],
-            linha["faturamento"],
-            linha["pendentes"],
-            linha["aprovados"],
-            linha["cancelados"],
-        )
+    def vendas(self):
+        rows = self._get_connection().execute(
+            "SELECT status, COUNT(*) AS pedidos, COALESCE(SUM(total_centavos), 0) AS centavos"
+            " FROM pedidos GROUP BY status").fetchall()
+        por_status = {row["status"]: row["pedidos"] for row in rows}
+        return montar_relatorio(
+            sum(row["pedidos"] for row in rows),
+            sum(row["centavos"] for row in rows),
+            por_status)

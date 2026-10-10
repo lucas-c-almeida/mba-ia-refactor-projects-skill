@@ -1,10 +1,9 @@
-'use strict';
+// Small error taxonomy owned by the domain. The messages are the bodies the API has always sent.
 
-// Error taxonomy. `message` is the exact text the application has always answered with,
-// so the observable status and body of every intentional error are unchanged.
 class AppError extends Error {
-    constructor(message, status) {
-        super(message);
+    constructor(message, status, cause) {
+        super(message, cause === undefined ? undefined : { cause });
+        this.name = this.constructor.name;
         this.status = status;
     }
 }
@@ -13,20 +12,17 @@ class ValidationError extends AppError {
     constructor(message = 'Bad Request') { super(message, 400); }
 }
 
+class BusinessRuleError extends AppError {
+    constructor(message) { super(message, 400); }
+}
+
 class NotFoundError extends AppError {
     constructor(message) { super(message, 404); }
 }
 
-class PaymentDeclinedError extends AppError {
-    constructor(message = 'Pagamento recusado') { super(message, 400); }
+// A failed dependency (the datastore). The original error travels as `cause` and is logged at the boundary.
+class DependencyError extends AppError {
+    constructor(message, cause) { super(message, 500, cause); }
 }
 
-// A datastore failure at a step whose failure text is part of the contract.
-class PersistenceError extends AppError {
-    constructor(message, cause) {
-        super(message, 500);
-        this.cause = cause;
-    }
-}
-
-module.exports = { AppError, ValidationError, NotFoundError, PaymentDeclinedError, PersistenceError };
+module.exports = { AppError, ValidationError, BusinessRuleError, NotFoundError, DependencyError };

@@ -1,80 +1,33 @@
-'use strict';
-
-const { hashPassword, generatePassword } = require('./password');
-const { toCents } = require('./money');
-const { PaymentStatus } = require('./payment');
-
-// Schema, created at boot as before (the datastore is in-memory by default).
-// Money in integer cents; users.email unique, since checkout identifies users by it (AP-20).
-// Foreign keys and the delete rule for a user's enrollments and payments are a product
-// decision and are proposed, not applied (see the audit report).
-const SCHEMA = `
-CREATE TABLE users (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    pass TEXT NOT NULL
-);
-CREATE TABLE courses (
-    id INTEGER PRIMARY KEY,
-    title TEXT NOT NULL,
-    price_cents INTEGER NOT NULL,
-    active INTEGER NOT NULL
-);
-CREATE TABLE enrollments (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    course_id INTEGER NOT NULL
-);
-CREATE TABLE payments (
-    id INTEGER PRIMARY KEY,
-    enrollment_id INTEGER NOT NULL,
-    amount_cents INTEGER NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('${PaymentStatus.PAID}', '${PaymentStatus.DENIED}'))
-);
-CREATE TABLE audit_logs (
-    id INTEGER PRIMARY KEY,
-    action TEXT,
-    created_at DATETIME
-);
-`;
-
-// Initial catalogue and sample enrollment, as the original seeded them. The seeded account
-// gets an unguessable password instead of a literal one (AP-01).
-const SEED_USER = { name: 'Leonan', email: 'leonan@fullcycle.com.br' };
+// Money is stored as integer minor units (cents); the API still shows decimal numbers (RP-19).
 const SEED_COURSES = [
-    { title: 'Clean Architecture', price: 997.0, active: 1 },
-    { title: 'Docker', price: 497.0, active: 1 },
+    { title: 'Clean Architecture', priceCents: 99700 },
+    { title: 'Docker', priceCents: 49700 },
 ];
 
-async function createSchema(db) {
-    await db.exec(SCHEMA);
+// Creates the tables and the sample data. users.email is unique: it is the lookup identity, and
+// payments.status is a closed set.
+async function initializeSchema(db, passwords) {
+    await db.run('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT UNIQUE, pass TEXT)');
+    await db.run('CREATE TABLE courses (id INTEGER PRIMARY KEY, title TEXT, price INTEGER, active INTEGER)');
+    await db.run('CREATE TABLE enrollments (id INTEGER PRIMARY KEY, user_id INTEGER, course_id INTEGER)');
+    await db.run(
+        "CREATE TABLE payments (id INTEGER PRIMARY KEY, enrollment_id INTEGER, amount INTEGER, status TEXT CHECK (status IN ('PAID', 'DENIED')))",
+    );
+    await db.run('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY, action TEXT, created_at DATETIME)');
+
+    // The sample user gets a random, unknown secret: no credential literal exists in the code.
+    const sampleHash = await passwords.hash(passwords.generateSecret());
+    await db.run('INSERT INTO users (name, email, pass) VALUES (?, ?, ?)', ['Leonan', 'leonan@fullcycle.com.br', sampleHash]);
+
+    for (const course of SEED_COURSES) {
+        await db.run('INSERT INTO courses (title, price, active) VALUES (?, ?, 1)', [course.title, course.priceCents]);
+    }
+
+    const enrollment = await db.run('INSERT INTO enrollments (user_id, course_id) VALUES (1, 1)');
+    await db.run(
+        'INSERT INTO payments (enrollment_id, amount, status) VALUES (?, ?, ?)',
+        [enrollment.lastID, SEED_COURSES[0].priceCents, 'PAID'],
+    );
 }
 
-async function seed(db) {
-    const pass = await hashPassword(generatePassword());
-    await db.transaction(async () => {
-        const user = await db.run(
-            'INSERT INTO users (name, email, pass) VALUES (?, ?, ?)',
-            [SEED_USER.name, SEED_USER.email, pass],
-        );
-        const courseIds = [];
-        for (const course of SEED_COURSES) {
-            const inserted = await db.run(
-                'INSERT INTO courses (title, price_cents, active) VALUES (?, ?, ?)',
-                [course.title, toCents(course.price), course.active],
-            );
-            courseIds.push(inserted.lastID);
-        }
-        const enrollment = await db.run(
-            'INSERT INTO enrollments (user_id, course_id) VALUES (?, ?)',
-            [user.lastID, courseIds[0]],
-        );
-        await db.run(
-            'INSERT INTO payments (enrollment_id, amount_cents, status) VALUES (?, ?, ?)',
-            [enrollment.lastID, toCents(SEED_COURSES[0].price), PaymentStatus.PAID],
-        );
-    });
-}
-
-module.exports = { createSchema, seed };
+module.exports = { initializeSchema };

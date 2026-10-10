@@ -1,37 +1,29 @@
-"""The application's error taxonomy, owned by the domain (AP-09).
-
-Each error carries the message the API already returns; the mapping from `code` to an HTTP
-status lives in one place, middlewares/error_handler.py.
-"""
+"""Domain error taxonomy. Mapped to protocol responses in one place (middlewares/error_handler.py)."""
 
 
 class AppError(Exception):
-    code = 'internal_error'
-
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
+    status = 500
 
 
 class ValidationError(AppError):
-    code = 'invalid_input'
-
-
-class NotFoundError(AppError):
-    code = 'not_found'
-
-
-class ConflictError(AppError):
-    code = 'conflict'
+    status = 400
 
 
 class AuthenticationError(AppError):
-    code = 'not_authenticated'
+    status = 401
 
 
 class ForbiddenError(AppError):
-    code = 'forbidden'
+    status = 403
+
+
+class NotFoundError(AppError):
+    status = 404
+
+
+class ConflictError(AppError):
+    status = 409
 
 
 class PersistenceError(AppError):
-    code = 'persistence_failure'
+    status = 500
