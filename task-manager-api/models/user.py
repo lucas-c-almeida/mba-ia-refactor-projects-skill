@@ -1,19 +1,28 @@
 import hashlib
 import hmac
-import re
-
-from werkzeug.security import check_password_hash, generate_password_hash
+import os
 
 from database import db
 from models.clock import utc_now
-from models.constants import DEFAULT_ROLE
+from models.constants import DEFAULT_ROLE, USER_ROLES
 
-_PASSWORD_METHOD = 'pbkdf2:sha256'
-_LEGACY_DIGEST = re.compile(r'^[0-9a-f]{32}$')
+PASSWORD_SCHEME = 'pbkdf2_sha256'
+PASSWORD_ITERATIONS = 600_000
+SALT_BYTES = 16
+LEGACY_DIGEST_LENGTH = 32  # an unsalted MD5 hex digest written by earlier versions
+MASKED_PASSWORD = '********'
+
+
+def _derive(password, salt, iterations):
+    return hashlib.pbkdf2_hmac('sha256', password.encode(), salt, iterations)
 
 
 class User(db.Model):
     __tablename__ = 'users'
+    __table_args__ = (
+        db.CheckConstraint(
+            'role IN (%s)' % ', '.join("'%s'" % r for r in USER_ROLES), name='ck_users_role'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -23,16 +32,37 @@ class User(db.Model):
     active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=utc_now)
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'email': self.email,
+            # The stored credential is never returned; the field and its type are kept.
+            'password': MASKED_PASSWORD,
+            'role': self.role,
+            'active': self.active,
+            'created_at': str(self.created_at),
+        }
+
     def set_password(self, pwd):
-        self.password = generate_password_hash(pwd, method=_PASSWORD_METHOD)
+        salt = os.urandom(SALT_BYTES)
+        digest = _derive(pwd, salt, PASSWORD_ITERATIONS)
+        self.password = '%s$%d$%s$%s' % (PASSWORD_SCHEME, PASSWORD_ITERATIONS, salt.hex(), digest.hex())
+
+    def _is_legacy_digest(self):
+        return len(self.password) == LEGACY_DIGEST_LENGTH and '$' not in self.password
 
     def check_password(self, pwd):
-        """Verify a password. A digest stored by the previous scheme is still accepted once,
-        and replaced by a salted hash (the caller commits): no flag day for existing accounts."""
-        if _LEGACY_DIGEST.match(self.password or ''):
+        if self._is_legacy_digest():
             legacy = hashlib.md5(pwd.encode()).hexdigest()
-            if hmac.compare_digest(self.password, legacy):
-                self.set_password(pwd)
-                return True
+            return hmac.compare_digest(self.password, legacy)
+        try:
+            _, iterations, salt_hex, digest_hex = self.password.split('$')
+            expected = _derive(pwd, bytes.fromhex(salt_hex), int(iterations))
+            return hmac.compare_digest(expected.hex(), digest_hex)
+        except ValueError:
             return False
-        return check_password_hash(self.password, pwd)
+
+    def needs_password_upgrade(self):
+        """True while the stored credential is still the legacy unsalted digest."""
+        return self._is_legacy_digest()

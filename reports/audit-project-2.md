@@ -3,18 +3,19 @@
 ================================
 PHASE 1: PROJECT ANALYSIS
 ================================
-Target:        .worktrees/p2/ecommerce-api-legacy
-Language:      JavaScript (Node.js v24.12.0 on the host; the run uses the official node:24.12.0 image)
+Target:        .worktrees/clean-p2/ecommerce-api-legacy
+Language:      JavaScript (Node.js; host v24.12.0, no engines field; run image node 24)
 Framework:     Express 4.22.1 (resolved from package-lock.json; manifest range ^4.18.2)
 Dependencies:  express ^4.18.2, sqlite3 ^5.1.6 (resolved 5.1.7); no dev dependencies
-Domain:        LMS API with course checkout: users, courses, enrollments, payments, audit log, financial report
-Architecture:  None — a single class (persistence, schema/seed, business rules, routes) plus a "utils" bin; no real layers
-Source files:  3 files analyzed (~180 lines). Excluded: node_modules, .claude/ (tool/agent config, includes this skill), reports/ (audit output), package-lock.json, api.http, README.md (not authored source)
-DB tables:     users, courses, enrollments, payments, audit_logs (SQLite in-memory, DDL + seed inside the class)
-Boot:          node src/app.js   (package.json "start": "node src/app.js"; same runtime invocation)
-Port:          3000 (literal in src/utils.js config; no override exists in code -> native port, container mode)
-Runtime env:   Node 24.12.0 from the official image; declared dependencies installed with npm ci from package-lock.json inside the run copy
-Isolation:     container (docker 28.5.2, image node:24.12.0)
+Domain:        Online-course LMS with a card checkout (users, courses, enrollments, payments, audit log) and an admin financial report
+App type:      HTTP service (3 routes: POST /api/checkout, GET /api/admin/financial-report, DELETE /api/users/:id)
+Architecture:  None — one class holds schema, seed, routing, business rules and persistence; the "utils" module is a grab-bag; the entry point only wires it
+Source files:  3 files analyzed (~180 lines; excluded: node_modules, .claude/, reports/, lockfile and docs)
+DB tables:     users, courses, enrollments, payments, audit_logs (SQLite, in-memory, schema created and seeded in code at boot)
+Boot:          node src/app.js (same as `npm start`)
+Port:          3000 — fixed literal in source (config.port); no override exists; container mode, so the native port is used
+Runtime env:   Node 24 from the official image; declared dependencies installed with `npm ci` from package-lock.json inside the run copy (outside the target)
+Isolation:     container (docker 28.5.2, image node:24-bookworm-slim)
 ================================
 ```
 
@@ -22,337 +23,330 @@ Isolation:     container (docker 28.5.2, image node:24.12.0)
 ARCHITECTURE AUDIT REPORT
 ================================
 Project: ecommerce-api-legacy
-Stack:   JavaScript + Express 4.22.1 + sqlite3 5.1.7
+Stack:   JavaScript (Node.js) + Express 4.22.1 + sqlite3 5.1.7
 Files:   3 analyzed | ~180 lines of code
-Date:    2026-10-08 15:01
-Mode:    full (live lookups via npm registry and npm audit; OSV.dev not queried — see Verification Coverage)
-Confirmation: --yes (auto-approved, no human review)
-Scope applied: all severities (default)
-Tree:    uncommitted changes present — the audit read the working tree as found (the skill files in the worktree and the target's .claude/ copy were uncommitted; the application source was unmodified)
-Runtime: installed the declared dependencies with npm ci from package-lock.json inside a run copy (container /app), outside the target
-Isolation: container (docker 28.5.2, image node:24.12.0)
-Scratch: environment scratch directory (outside the target)
-
-The Phase 2 findings below are the audit as it stood at the gate (identical to audit-20261008-1501.md). The Phase 3 sections follow at the end.
+Date:    2026-10-12 21:50
+Mode:    full
+Confirmation: y (human-reviewed, answer relayed by the orchestrating session from the user's direct reply)
+Scope:   all findings (y); contract-changing items proposed, not applied
+Tree:    clean at d39a5cb
+Runtime: installed the declared dependencies from package-lock.json (npm ci) into node_modules inside the run copy, under the scratch root, outside the target
+Isolation: container (docker 28.5.2, image node:24-bookworm-slim)
+Scratch: environment scratch directory (C:\Users\lucas\AppData\Local\Temp\claude\D--Study-MBA-FullCycle-mba-ia-refactor-projects-skill\b35825d2-d654-455b-ad56-6dc436b8d6da\scratchpad\refactor-arch-ecommerce-api-legacy-clean-p2-20261012-2144\); the node_modules directory, .claude/ and VCS directories were excluded from every copy
 
 ## Summary
-CRITICAL: 5 | HIGH: 9 | MEDIUM: 2 | LOW: 5
+CRITICAL: 3 | HIGH: 9 | MEDIUM: 4 | LOW: 5
 
 ## Findings
 
 ### [CRITICAL] God Module / God Class   (AP-03)
 File: src/AppManager.js:1-141
-Description: One class holds persistence (sqlite handle opened in the constructor, lines 5-8; every query), schema and seed data (10-23), business rules (payment approval, user creation, report assembly, 43-76 and 80-129) and delivery (route registration and request parsing, 25-137) for three unrelated domain concepts (checkout, financial reporting, user removal). Under the AP-03/AP-05 precedence rule the mixed handlers are filed here and not as AP-05.
-Impact: Nothing can be instantiated or tested without a database and an Express app; every change touches one file that every request passes through.
-Recommendation: Split by responsibility into config, models (database, repositories, rules), controllers and routes; see RP-03 and RP-05.
+Description: One class holds five responsibility categories: persistence and schema/seed (lines 7-22, every driver call), delivery (route registration, request parsing and status codes, lines 25-137), business rules (card-prefix payment decision at 46-48, create-user-on-checkout at 66-72, revenue summation at 108-110), configuration reads (45) and response formatting (60, 112-115, 135). `setupRoutes` is a single 113-line unit nesting callbacks up to eight levels deep. The module also covers three unrelated domain concepts (checkout, reporting, account removal). The handlers carry the rules and the persistence, so no separate AP-05 is filed for this module (precedence rule). `src/utils.js:1-25` is the leftover bin it leans on: configuration, a write-only cache and a password routine share no theme. Default severity kept (the module is also the home of AP-04, AP-08 and AP-09 sites).
+Impact: Nothing can be tested without a database and a server; every change touches the same 141 lines; the three routes cannot evolve independently.
+Recommendation: Split by responsibility: models (schema, repositories, payment and enrollment rules), controllers (one use case per route), routes (parse, call, render), config, middlewares; see RP-03 and RP-05.
 Contract: safe
 
-### [CRITICAL] Unsafe Handling of Credentials and Sensitive Data   (AP-08)
-File: src/AppManager.js:45-45
-Description: The checkout logs the whole card number and the payment gateway key (a live-looking literal) on every purchase: console.log(`Processando cartão ${cc} na chave ${config.paymentGatewayKey}`). Escalated to CRITICAL: payment data and a credential written to a log.
-Impact: Card numbers and the gateway key leak to every log sink and outlive the request.
-Recommendation: Stop logging the card and the key; log only a non-sensitive event; see RP-08.
-Contract: safe
-
-### [CRITICAL] Missing or Bypassable Authorization — privileged report   (AP-04)
-File: src/AppManager.js:80-129
-Description: GET /api/admin/financial-report returns every course with revenue and every student's name and amount paid, to any anonymous caller. It sits under an admin namespace and aggregates across all principals, so it is a privileged operation (guidelines section 6) even though the application has no identity model.
-Impact: Anyone reaching the port reads the whole company's revenue and customer list.
-Recommendation: Guard it with an operator credential read from configuration, closed by default (403 when unset); see RP-04.
-Contract: safe (privileged operation: only non-operators observe the 403)
-
-### [CRITICAL] Missing or Bypassable Authorization — privileged account deletion   (AP-04)
-File: src/AppManager.js:131-137
-Description: DELETE /api/users/:id deletes any user by id on an anonymous caller's say-so, with no ownership notion; the answer even admits it leaves enrollments and payments dangling. Privileged operation (deletes accounts with no ownership notion).
-Impact: Any caller can delete any account, destroying data and orphaning paid enrollments, with no trace.
-Recommendation: Guard it with the same operator credential, closed by default; see RP-04.
-Contract: safe (privileged operation)
+### [CRITICAL] Missing or Bypassable Authorization — privileged operations   (AP-04)
+File: src/AppManager.js:80-137
+Description: Two privileged operations are open to any anonymous caller. `GET /api/admin/financial-report` (80-129) returns revenue per course and the name and amount paid of every student: a management aggregate (financial figures plus a per-principal rollup). `DELETE /api/users/:id` (131-137) deletes an account by an identifier taken from the request. The application has no identity model: no operation verifies a presented credential, session or token (a password hash is stored at registration, but nothing ever compares it and no token is issued).
+Impact: Anyone who can reach the port reads the company's financial figures and every customer's name, and can delete any customer account by guessing integer ids.
+Recommendation: Guard both with an operator credential read from configuration and compared in constant time, closed by default (answers 403 when unset); do not invent users or roles. See RP-04 (privileged-operation exception).
+Contract: safe (04-architecture-guidelines.md §6, privileged operation: "returns a management aggregate" and "deletes an account by request id where no identity model exists"; only non-operators observe the new 403)
 
 ### [CRITICAL] Hardcoded Secrets and Credentials   (AP-01)
 File: src/utils.js:1-7
-Description: The config object holds string literals for a database user and password (dbUser, dbPass), a payment gateway key (paymentGatewayKey, a pk_live_ value) and a mail user (smtpUser), plus the port, all in source.
-Impact: Anyone with the repository holds the credentials; rotating them needs a code change and deploy, and history keeps them.
-Recommendation: Read every value from the environment in a single config module that fails loudly when required values are missing; add an example file; rotate the exposed values (only the owner can); see RP-01.
+Description: The configuration object holds string literals for `dbUser`, `dbPass` ("senha_super_secreta_prod_123"), `paymentGatewayKey` (a `pk_live_`-prefixed key) and `smtpUser`. The seed at `src/AppManager.js:18` inserts a user whose password is the literal `'123'`, and `src/AppManager.js:68` falls back to the literal `"123456"` as the password of a new account when the request carries none; both reach the runtime datastore at every boot or registration. `dbUser`, `dbPass` and `smtpUser` are never read (see AP-17).
+Impact: Every copy of the repository carries a production-looking payment key and database password; rotation needs a code change; the seed account has a known password in every environment.
+Recommendation: Move the real values to environment variables read once in a config module (no secret literal anywhere), delete the unused ones, replace the seed and fallback passwords with generated, hashed secrets. Rotate the payment key and the database password. See RP-01.
 Contract: safe
 
 ### [HIGH] Hard-Wired Dependencies / No Composition Root   (AP-06)
 File: src/AppManager.js:4-8
-Description: The constructor opens its own database handle (new sqlite3.Database(':memory:')), configuration is read from the utils module at the point of use (line 45), and src/app.js:8-10 instantiates and wires everything at module load with no factory or composition root.
-Impact: No unit can receive a test double; the app cannot be constructed twice in a process.
-Recommendation: Inject the database and configuration through a createApp factory used as the composition root; see RP-06.
+Description: The class constructor opens its own database (`new sqlite3.Database(':memory:')`, line 7); the handler reads module-level configuration at the point of use (line 45); `src/app.js:8-14` builds the manager, creates the schema and binds the port in the loaded module body. No single place assembles the object graph and nothing can receive a test double for the database.
+Impact: Controllers cannot be exercised without a real database; swapping the datastore means editing the class; start-up order is implicit.
+Recommendation: A composition root that loads config, opens the database, builds repositories and controllers, registers routes and the error boundary, then listens. See RP-06.
 Contract: safe
 
-### [HIGH] Missing Schema-Level Integrity Constraints   (AP-20)
+### [HIGH] Missing Schema-Level Integrity Constraints — identity and money   (AP-20)
 File: src/AppManager.js:12-15
-Description: users.email is the lookup identity (line 40 selects one user by it) but has no uniqueness constraint, so two concurrent first checkouts of one email can insert two users (check-then-insert, lines 40-69); enrollments.user_id and course_id and payments.enrollment_id are joined on but declare no foreign keys, and deleting a user (line 131-137) leaves their enrollments and payments orphaned; money (courses.price, payments.amount) is stored as REAL (binary floating point). Escalated to HIGH: identity can be duplicated and orphans are created today.
-Impact: A login-name collision picks the wrong account; orphaned payments point at nobody; sums can drift by fractions of a cent.
-Recommendation: Add UNIQUE on users.email and store money as integer minor units, keeping the decimal number at the boundary; the delete behaviour toward children (refuse, cascade, detach) is a product decision and is proposed with the count of orphans; see RP-19.
-Contract: contract-changing for the foreign-key / delete rule (deleting a user that has enrollments would be refused, cascaded or detached; today it succeeds and orphans); the unique constraint and the money storage are safe
+Description: `users.email` is the column checkout looks accounts up by (`SELECT id FROM users WHERE email = ?`, line 40, taking one row) but the table declares no uniqueness; two concurrent checkouts for a new e-mail both pass the check and both insert (check-then-insert, lines 40-72). `courses.price` (13) and `payments.amount` (15) are `REAL`, and the report sums them in binary floating point (line 109). Escalated from MEDIUM: identity and money can be corrupted, as stated.
+Impact: Two accounts can answer to one sign-in e-mail; revenue totals can drift by fractions of a cent.
+Recommendation: Add a unique index on `users.email` through an idempotent statement run where the schema is created today, and move money to integer minor units internally while the response keeps the same number type and format. See RP-19.
+Contract: safe (uniqueness on a column the application already treats as an identity; the money type change stays inside the layers, the response keeps the numeric type)
 
-### [HIGH] Hardcoded Secrets and Credentials — seeded accounts   (AP-01)
-File: src/AppManager.js:18-18
-Description: The seed script inserts a user with the literal plaintext password '123' into the runtime datastore on every boot; line 68 also gives every user created without a password the default password "123456" (via the weak hash). Severity reported at HIGH instead of the CRITICAL default: no endpoint reads the password column back, so the account cannot currently be used to sign in (the plaintext storage is also AP-08).
-Impact: A known credential exists in every environment; once any sign-in is added it is a working back door.
-Recommendation: Seed the sample user with a random unusable secret hashed with the real KDF and generate the default password for password-less users the same way; see RP-01 and RP-08.
+### [HIGH] Unsafe Handling of Credentials and Sensitive Data — card number and key in the log   (AP-08)
+File: src/AppManager.js:45-45
+Description: `console.log` writes the full card number and the payment gateway key on every checkout.
+Impact: Card data and the gateway key land in every log sink; log access becomes payment-data access. Kept at HIGH: the log is stdout and nothing here shows it is shipped off-host.
+Recommendation: Remove the log line (or log only a masked suffix and the outcome). See RP-08.
 Contract: safe
 
-### [HIGH] Missing Boundary Validation   (AP-11)
-File: src/AppManager.js:29-35
-Description: The checkout only tests that usr, eml, c_id and card are truthy; it never checks types. A card that is not a string reaches cc.startsWith (line 46) inside a database callback and throws an uncaught TypeError. Severity raised from the MEDIUM default to HIGH: one anonymous request terminates the whole process (verified by sending it in the baseline run).
-Impact: Any caller can take the service down with one request; malformed input is a crash, not a client error.
-Recommendation: Validate the types of usr, eml, pwd, c_id and card at the boundary and answer 400 with the existing message; see RP-11.
-Contract: safe (a value of the wrong type is invalid on its face; no legitimate client sends it)
-
-### [HIGH] Missing or Bypassable Authorization — checkout ignores the password   (AP-04)
-File: src/AppManager.js:40-75
-Description: The checkout looks up the user by email and, when it exists, enrolls and charges under that account without ever checking the supplied pwd (it is only used when creating a user). Reported at HIGH rather than CRITICAL: the purchase flow is public by design and the caller pays with their own card; the effect is attributing an enrollment to someone else's account.
-Impact: Anyone who knows an email can add enrollments and payments to that account.
-Recommendation: Verify the password of an existing account, which needs an identity model and a product decision on existing seed users; see RP-04.
-Contract: contract-changing: clients that today send a wrong or empty pwd for an existing email would now be rejected
-Note: this is a business operation in an application with no identity model, so it stays under the legitimate-use test's first row.
+### [HIGH] Missing or Bypassable Authorization — checkout never verifies the account   (AP-04)
+File: src/AppManager.js:66-75
+Description: Checkout looks the account up by e-mail (line 40); when it exists, the supplied password is never compared and the purchase is attributed to that account (73-75). Any anonymous caller can buy as, and write payment records for, any registered e-mail. De-escalated from CRITICAL to HIGH: the only effect is attributing an enrollment and a payment to the named account; nothing readable is exposed.
+Impact: A caller can enrol a stranger's account and attach payments to it.
+Recommendation: Introduce an identity model (verify the password with a one-way KDF at checkout, or require a session) and enforce it on this operation. This requires deciding who the principals are, and rejects checkouts that anonymous clients send today. See RP-04.
+Contract: contract-changing: a checkout for an existing e-mail with a missing or wrong password, accepted today, would be rejected (new 401/403)
 
 ### [HIGH] Swallowed or Uncentralized Error Handling   (AP-09)
-File: src/AppManager.js:57-62
-Description: The audit-log insert callback ignores its error and answers 200 success; the user delete (133-136) ignores its error and always answers that the user was deleted; the report callbacks (92-94, 104-106) dereference results without checking err, so a database error throws inside a callback and crashes the process; the error-to-response mapping (res.status(500).send("Erro ...")) is repeated per call site (41, 51, 55, 69) and no error middleware exists.
-Impact: Failures are reported as success or kill the process; diagnosis is impossible.
-Recommendation: A domain error taxonomy and one error boundary with preserved status codes and message bodies; see RP-09.
-Contract: safe (the intentional error statuses and bodies are kept)
+File: src/AppManager.js:131-137
+Description: The delete handler ignores `err` and always answers with a success message (131-137). Elsewhere errors are ignored or unchecked: the audit insert's `err` is dropped (57-61); `err` is ignored on the enrollment read at 92 and then `enrollments.length` is dereferenced (93), and on the user and payment reads (104-106); the user insert at 69 happens before the payment decision at 46-48, so a denied card leaves a user behind (observed: the denied-card request answered 400 and the account stays), and enrollment, payment and audit rows are written with no transaction (50-62). A wrong-typed `card` or `pwd` throws inside a driver callback with no handler and kills the process (observed in the container: the request got a socket error and every later request was refused). No error middleware exists; each handler formats its own text error (35, 38, 41, 51, 55, 70, 83).
+Impact: Failures are invisible or fatal: the service reports success while doing nothing, a single malformed request is a remote kill switch, and partial checkouts leave inconsistent data.
+Recommendation: A small error taxonomy, one error-boundary middleware that preserves the current statuses and text bodies, awaited repository calls so no callback can throw unhandled, and a transaction around the checkout writes. See RP-09.
+Contract: safe (the intentional error statuses and bodies are preserved verbatim; the DB-failure path of the delete route is not reachable by a legitimate request)
 
-### [HIGH] Insecure Runtime Configuration   (AP-18)
+### [HIGH] Missing Schema-Level Integrity Constraints — orphans on delete   (AP-20)
+File: src/AppManager.js:131-137
+Description: `user_id`, `course_id` and `enrollment_id` (lines 14-15) refer to other tables with no foreign key, and the account delete (133) has no rule for the user's enrollments and payments; the response text itself says they stay dirty in the database (135). Escalated from MEDIUM: charges stay attached to a deleted customer.
+Impact: Enrollments and payments point at nobody; the report prints them as "Unknown".
+Recommendation: Declare the foreign keys (and enable them for the connection) and choose what a user delete does to children (refuse, cascade, detach). See RP-19.
+Contract: contract-changing: every choice changes what the delete route does today (refusing makes it fail for users with enrollments; cascading removes payment history that the report shows)
+
+### [HIGH] Insecure Runtime Configuration — framework default error page   (AP-18)
 File: src/app.js:5-6
-Description: No error handler is registered, so the framework's default one answers. Observed on the original: POST /api/checkout with a truncated JSON body answers 400 text/html containing the stack trace with server file paths (for example /app/node_modules/body-parser/lib/types/json.js:92:19); the X-Powered-By: Express header is also sent.
-Impact: Internals are mapped for an attacker on every malformed request.
-Recommendation: Register the centralized error boundary (status preserved), disable the X-Powered-By header; see RP-17 and RP-09.
-Contract: safe (the framework default page is not part of the error contract)
+Description: No error handler is registered, so Express's default one answers. Observed from the original with a malformed JSON body: status 400 with an HTML page containing the stack trace (parser module paths and internal frames). The mode is the default one (no production mode is set anywhere).
+Impact: Any caller learns library paths, versions and internals from one malformed request.
+Recommendation: Register the centralized error boundary of RP-09 and make the unsafe detail opt-in through configuration, keeping the status code. See RP-17.
+Contract: safe (the framework's default error output is not contract; the status code is kept)
 
 ### [HIGH] Mutable Global State   (AP-07)
 File: src/utils.js:9-15
-Description: A module-level globalCache object is mutated by logAndCache on every successful checkout (called at AppManager.js:59), grows without bound, is never read anywhere and is lost on restart; it is exported and shared by importers (unbounded accumulator, AP-13, is reported here).
-Impact: Memory grows with traffic until the process is restarted; the data is not a store of record and nothing consumes it.
-Recommendation: Remove the write-only cache (or bound it and inject it) and the module-level state; see RP-07.
+Description: `globalCache` is a module-level object mutated by `logAndCache` on every successful checkout (`src/AppManager.js:59`) and exported; nothing ever reads it, and it has no bound or eviction (also AP-13). `totalRevenue` (line 10) is a module-level `let` that is exported and never used.
+Impact: Behaviour depends on process history, the object grows with every distinct user, and the data is lost on restart.
+Recommendation: Drop the write-only cache (or give a real cache a bound and an owner); delete the unused counter. See RP-07.
 Contract: safe
 
-### [HIGH] Unsafe Handling of Credentials and Sensitive Data — weak password hash   (AP-08)
+### [HIGH] Unsafe Handling of Credentials and Sensitive Data — password derivation   (AP-08)
 File: src/utils.js:17-23
-Description: badCrypto builds the "hash" from the first two base64 characters of the password repeated and cut to 10 characters, after a 10000-iteration string loop; every password with the same first one or two characters yields the same value, no salt, no work factor, and the loop burns CPU for each new user. Kept at HIGH: the value is a lossy encoding of the prefix, not the full password, and no sign-in reads it.
-Impact: Stored passwords are trivially collided or guessed; the hashing cost is wasted CPU, not security.
-Recommendation: Use a purpose-built password KDF with a per-credential salt (the runtime's built-in scrypt); see RP-08.
-Contract: safe
+Description: `badCrypto` is not a hash: it repeats the first two Base64 characters of the password 10,000 times and keeps the first 10 characters, so the stored value is a function of the password's first one or two characters only, and the 10,000-iteration string concatenation burns CPU on every registration reachable by anonymous callers. It is stored in `users.pass` (`src/AppManager.js:68-69`); the seed stores `'123'` in plain text (line 18).
+Impact: The stored value carries almost no entropy and says nothing about the password; any two passwords with the same first characters collide.
+Recommendation: Use the runtime's built-in password KDF (per-credential random salt and a work factor, constant-time comparison) with no new dependency. See RP-08.
+Contract: safe (the column is never read back by any route; no client observes the stored value)
 
-### [MEDIUM] Known-Vulnerable Dependency — express runtime chain   (AP-19)
-File: package.json:10-10
-Description: npm audit (npm registry advisories, 2026-10-08, Tier B) reports advisories on the resolved runtime chain of express 4.22.1: body-parser < 1.20.6 (GHSA-v422-hmwv-36x6, invalid limit option), path-to-regexp < 0.1.13 (GHSA-37ch-88jc-xwx2, multiple route parameters), proxy-addr (GHSA-jqcg-44mw-7w3h, critical, trust-proxy subnet), qs (GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g). Reported at MEDIUM: the vulnerable features are not used (no body-parser limit option, routes carry a single parameter, no trust proxy setting); the qs advisories are moderate.
-Impact: Published, scannable advisories on the shipped versions.
-Recommendation: Update the lockfile within the same major (npm audit fix resolves it per the audit); see RP-18.
-Contract: safe (same major, lockfile only)
+### [MEDIUM] Known-Vulnerable Dependency — express and its runtime chain   (AP-19)
+File: package.json:9-12
+Description: Advisories for the resolved versions pulled in by `express` 4.22.1: `qs` 6.14.2 (GHSA-4mjr-xmp4-gh2g, GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx; all moderate, fixed in 6.16.0; OSV.dev and npm audit, 2026-10-12), `path-to-regexp` 0.1.12 (GHSA-37ch-88jc-xwx2, high, fixed in 0.1.13), `proxy-addr` 2.0.7 (GHSA-jqcg-44mw-7w3h, critical, fixed above 2.0.7) and `body-parser` 1.20.4 (GHSA-v422-hmwv-36x6, low, fixed in 1.20.6). De-escalated to MEDIUM after reading the code for reachability: the application never sets `trust proxy` and never reads `req.ip`, so the proxy-addr feature is unused; its only parameterized route has a single parameter (`/api/users/:id`), not the multi-parameter pattern the path-to-regexp advisory needs; `qs.stringify`, `plainObjects`, `allowPrototypes` and `comma: true` are not used (Express's default query parser runs `qs.parse` with default options); `express.json()` is used with the default limit.
+Impact: Public advisories exist for versions the lockfile pins; they are not reachable from the current code, but a code change that touches those features would make them live.
+Recommendation: Update the lockfile within express's declared ranges (`npm audit fix` equivalent); the fixed `qs` is 6.16.0, and if that is outside the range express declares, the update needs a newer express 4.x. See RP-18.
+Contract: safe (same major; a transitive override outside the parent's range would be treated like a major upgrade and proposed)
+
+### [MEDIUM] Missing Boundary Validation — wrong-typed values crash the process   (AP-11)
+File: src/AppManager.js:28-35
+Description: Checkout checks presence of `usr`, `eml`, `c_id` and `card` (35) but not their types. A non-string `card` makes `cc.startsWith` throw inside a driver callback (46), and a non-string `pwd` makes `Buffer.from(pwd)` throw (`src/utils.js:19`); neither is caught, the process exits (observed with a numeric `card`).
+Impact: One unauthenticated request stops the service.
+Recommendation: Reject, with the existing `400 Bad Request` text, a `card` that is not a string and a `pwd` that is present and not a string. See RP-11.
+Contract: safe (a value of the wrong type that no legitimate client sends and that currently crashes the process; §6, fourth row)
+
+### [MEDIUM] Missing Boundary Validation — remaining rules   (AP-11)
+File: src/AppManager.js:28-35
+Description: Beyond the wrong-typed subset above: no e-mail format check, no length bound on any field, `pwd` optional with a hard-coded fallback, no card-number format check (any string starting with "4" is paid, line 46), `c_id` never coerced or range-checked (a malformed id answers 404), and no request-body size decision beyond the framework default.
+Impact: Garbage is stored as accounts and e-mails; the payment decision accepts any string starting with "4".
+Recommendation: A boundary schema with format and length rules and a decision on whether `pwd` is mandatory. These need a product decision. See RP-11.
+Contract: contract-changing: requests accepted today (a bad e-mail, a missing password, a short card string) would be rejected with 400
 
 ### [MEDIUM] N+1 and Query-Inside-Loop Access   (AP-10)
 File: src/AppManager.js:83-127
-Description: The financial report reads every course, then per course the enrollments, then per enrollment a user query and a payment query, all inside nested loops (callbacks), and reads whole tables with SELECT * and no bound.
-Impact: Round trips grow with data volume (courses + enrollments x 2) and the report latency degrades in production.
-Recommendation: Replace with set-based joined queries, preserving the response shape; see RP-10.
-Contract: safe
+Description: The report reads every course, then per course its enrollments (92), then per enrollment the user (104) and the payment (106): three nested levels of per-row queries, and whole tables read without a bound. Default severity kept: the loop size is data-driven, not caller-controlled.
+Impact: Round trips grow with enrollments (1 + C + E + E); the report slows as data grows.
+Recommendation: One joined query ordered explicitly by course and enrollment, assembled into the same response shape. See RP-10.
+Contract: safe (response shape preserved; ordering made deterministic)
 
-### [LOW] Deprecated or End-of-Life API Usage — install-time dependency chain   (AP-14)
+### [LOW] Deprecated or End-of-Life API Usage — deprecated transitive packages of sqlite3   (AP-14)
 File: package.json:11-11
-Description: Installing the resolved tree prints registry deprecation notices (npm registry metadata, 2026-10-08, Tier B) for transitive packages pulled in by sqlite3 5.1.7: npmlog@6.0.2, are-we-there-yet@3.0.1, gauge@4.0.4 ("no longer supported"), rimraf@3.0.2, glob@7.2.3, inflight@1.0.6 (upstream names lru-cache), @npmcli/move-file@1.1.2 (upstream names @npmcli/fs), prebuild-install@7.1.3 ("no longer maintained"). The sqlite3 releases page (https://github.com/TryGhost/node-sqlite3/releases, 2026-10-08, Tier C) lists "Mark repository as unmaintained" and v6.0.0 "Bump all dependencies, SQLite, and modernise CI". No runtime deprecation warning was emitted by Node (--pending-deprecation --trace-deprecation, Tier A: none observed over boot and the exercised surface). For the packages without a named successor: no successor named upstream (npm registry, 2026-10-08).
-Impact: Unmaintained packages receive no fixes; they run at install time only.
-Recommendation: Move to the sqlite3 release that drops this chain (6.0.1, evaluated with AP-19 below), evaluating maintained alternatives if the repository stays unmaintained; see RP-14.
-Contract: safe (same API through the replay; applied only if the full replay passes)
+Description: `npm ci` printed registry deprecation notices (evidence tier B, 2026-10-12) for exact installed versions in the install chain of `sqlite3` 5.1.7: npmlog 6.0.2, gauge 4.0.4, are-we-there-yet 3.0.1 ("no longer supported"), rimraf 3.0.2 ("versions prior to v4 are no longer supported"), inflight 1.0.6 ("use lru-cache"), glob 7.2.3, @npmcli/move-file 1.1.2 ("moved to @npmcli/fs"), prebuild-install 7.1.3 ("no longer maintained") and tar 6.2.1 (also AP-19). They are install and build tooling, not loaded at run time; the direct dependencies themselves (express 4.22.1, sqlite3 5.1.7) are not flagged by `npm view ... deprecated`. No runtime deprecation warning was emitted (tier A: none).
+Impact: Unmaintained install tooling receives no fixes; the migration becomes urgent at the next toolchain upgrade.
+Recommendation: Upgrade the direct dependency `sqlite3` (latest line 6.0.1 on 2026-10-12); for the packages whose upstream names no successor (npmlog, gauge, are-we-there-yet, prebuild-install) no successor named upstream (npm registry, 2026-10-12); evaluate maintained alternatives. See RP-14.
+Contract: contract-changing: a native-driver major upgrade (sqlite3 5.x to 6.x) is applied only if the replay covers what changes (§6, dependency upgrades); otherwise it is proposed
 
-### [LOW] Known-Vulnerable Dependency — install-time chain of sqlite3   (AP-19)
+### [LOW] Known-Vulnerable Dependency — sqlite3 install chain   (AP-19)
 File: package.json:11-11
-Description: npm audit (2026-10-08, Tier B) reports advisories on tar <= 7.5.20 (critical, several GHSA ids such as GHSA-34x7-hfp2-rc4v), @tootallnate/once, http-proxy-agent, make-fetch-happen, cacache, node-gyp, brace-expansion, http-cache-semantics and ip-address, all reached through sqlite3 5.1.7's install and build tooling and never loaded at run time. Reported at LOW: install/build-time only. tar@6.2.1 is also deprecated (AP-14, reported there).
-Impact: Risk is confined to the machine that installs the package.
-Recommendation: The audit's fix is sqlite3 6.0.1, a major upgrade whose release notes (2026-10-08) announce no behaviour change; apply it only if the full replay passes, otherwise propose it; see RP-18.
-Contract: safe if the replay passes (major upgrade)
-
-### [LOW] Dead Code and Commented-Out Code   (AP-17)
-File: src/AppManager.js:2-2
-Description: totalRevenue is imported here and never used, and in utils.js:10 it is a let that is never assigned or read; dbUser, dbPass and smtpUser (utils.js:2-5) are never read; globalCache is exported and never read by any importer.
-Impact: Noise that suggests features (a revenue total, a mailer, a database login) that do not exist.
-Recommendation: Delete the unused names; see RP-16.
-Contract: safe
+Description: `npm audit` (2026-10-12) reports advisories on packages reached through `sqlite3` 5.1.7: tar 6.2.1 (critical, 12 advisories, fixed above 7.5.20), node-gyp 8.4.1, cacache 15.3.0, make-fetch-happen 9.1.0, http-proxy-agent 4.0.1, @tootallnate/once 1.1.2 (low), http-cache-semantics 4.2.0 (high), ip-address 10.1.0 (high) and brace-expansion 1.1.12 (high). They run when native bindings are fetched or built, not when the server serves requests; none is reachable from the application's surface. The audit's only offered fix is `sqlite3` 6.0.1, a major upgrade. LOW per the catalog (install and build time only; the advisories do not concern run time). `ip-address`, `http-cache-semantics` and `brace-expansion` were not individually traced to their parents; the audit lists them outside the express tree.
+Impact: A developer or CI machine installing the project runs the vulnerable archive extraction and fetch code.
+Recommendation: Upgrade `sqlite3` to its fixed major line after checking its changelog, and keep installs in clean containers meanwhile. See RP-18.
+Contract: contract-changing: a major upgrade of the datastore driver; applied only if the replay covers the changed behaviour (§6), otherwise proposed
 
 ### [LOW] Misleading Names and Inconsistent Structure   (AP-16)
 File: src/AppManager.js:29-33
-Description: Single-letter or cryptic locals (u, e, p, cid, cc) live across the 50-line checkout handler; badCrypto is neither crypto nor named for what it does; AppManager is a manager bin; logAndCache does two things; identifiers are English while responses are Portuguese. The request field names (usr, eml, pwd, c_id) are the public contract and stay.
-Impact: Readers must open the code to learn what each name means.
-Recommendation: Rename internals for intent; see RP-16.
-Contract: safe for internals only (request field names untouched)
+Description: The handler binds request fields to one-letter names (`u`, `e`, `p`, `cid`, `cc`) and `self` aliases `this`; request fields use abbreviations (`usr`, `eml`, `pwd`, `c_id`) with mixed casing; user-facing strings are Portuguese while code and logs mix both languages; `logAndCache` does two things; the module is called "utils". The request field names are part of the public contract and are not renamed.
+Impact: Readers must open the code to learn what a field means.
+Recommendation: Rename internal identifiers to what they hold; keep the request field names. See RP-16.
+Contract: safe (internal identifiers only)
 
 ### [LOW] Magic Values   (AP-15)
 File: src/AppManager.js:46-48
-Description: The payment decision is a bare test of the first card digit "4" with the status strings "PAID" and "DENIED" repeated as literals (46-48, 21), plus the hash length 10000/10/2 (utils.js:19-22), the default password "123456" (line 68), the cache key prefix and the port 3000.
-Impact: The meaning of the numbers and whether the strings agree across files is held in memory only.
-Recommendation: Named constants (a payment status enumeration, the card-approval prefix, hash parameters); see RP-15.
+Description: The payment outcome is decided by the literal prefix `"4"` and the strings `"PAID"` and `"DENIED"` repeated across lines 21, 46, 48 and 108; `src/utils.js:19-22` hold the unexplained 10000 and 10; line 68 holds the default password literal; the port 3000 is inline in the config object.
+Impact: Nobody can tell which are business rules and which are accidents; a typo in a status string silently creates a new state.
+Recommendation: Named constants for the payment statuses and the stub prefix rule; port from configuration with 3000 as the default. See RP-15.
+Contract: safe
+
+### [LOW] Dead Code and Commented-Out Code   (AP-17)
+File: src/utils.js:2-10
+Description: `dbUser`, `dbPass` and `smtpUser` (2, 3, 5) are never read; `totalRevenue` (10) is exported, imported at `src/AppManager.js:2` and never used; `globalCache` is write-only; `audit_logs` is written (line 57) and never read.
+Impact: Dead configuration keeps secrets alive and misleads readers about what the system uses.
+Recommendation: Delete the unused members and the unused import. See RP-16.
 Contract: safe
 
 ## Catalog Coverage
 
 | Entry | Signals checked | Result |
 |---|---|---|
-| AP-01 | secret-named identifiers with literals; seed/bootstrap credential data in INSERTs; URL with inline credentials; high-entropy / prefixed literals; session-signing key literal; committed credential files; default fallbacks that are working credentials | 2 findings: utils config (CRITICAL), seed and default passwords (HIGH) |
-| AP-02 | external input into driver calls by concatenation/interpolation (all queries use ? placeholders; the template string at AppManager.js:57 is passed as a bound parameter); ORM raw escapes (none); dynamic identifiers (none); shell/process execution (none); unsafe deserialization/templating (none); path traversal (none) | none |
-| AP-03 | >=3 responsibility categories in one module; size >300 with 2 categories; unit >50 lines or deep nesting; several unrelated domain concepts in one file; low-cohesion class; utils/manager bin; high afferent coupling | 1 finding: AppManager.js (utils.js is covered under AP-07/08 and AP-17) |
-| AP-04 | entries without auth/ownership checks; lookups filtered only by input id; check only on one door; role from the request; unverified tokens; unreachable guards; commented-out guards; privileged operations unguarded | 3 findings: report, delete (privileged), checkout password |
-| AP-05 | domain decisions in handlers; driver calls in handlers; handlers >30 lines; request objects deep in the stack; duplicated rule across handlers; pass-through service | none separately (module filed as AP-03 by the precedence rule) |
-| AP-06 | collaborators built inside units; import-time side effects; no single wiring place; no seam for doubles; domain importing concrete drivers; config read at point of use | 1 finding |
-| AP-07 | reassigned module state; request-scoped data stored globally; in-memory store of record; mutable defaults/shared attributes; cache without lifecycle; monkey-patching; process-memory counters | 1 finding |
-| AP-08 | reversible password storage; fast digest; shared/constant salt; non-constant-time comparison; sensitive values logged; whole record serialized; TLS verification off; token expiry | 2 findings: card/key logged, weak hash |
-| AP-09 | empty/log-and-continue catches; over-broad catches; repeated error mapping; no central handler (default handler observed); stack traces in bodies; inconsistent return conventions; partial multi-write without transaction; exceptions as control flow | 1 finding (stack-trace leak is AP-18) |
-| AP-10 | driver call in loop or in a function called from a loop; per-element related fetch; lazy relation in iteration; repeated reads set-based query would replace; remote call in loop; whole table read in memory; write loop | 1 finding |
-| AP-11 | input used without type/range check; optional input dereferenced; unconstrained pagination; numeric parse without failure path; validation on one door only; validation after side effect; unenforced invariants; no body size bound (default body limit applies); ad-hoc scattered validation | 1 finding |
-| AP-12 | structurally identical blocks >=10 lines; same rule in two places; repeated validation/serialization; hand-written mappings; copy-modify lineage; repeated constants; repeated guard | none (the two completion blocks of the report are under 10 lines) |
-| AP-13 | paired acquire/release; handles without release on failure; connection per call; calls without timeout (no outbound calls exist); retries; unbounded reads; unbounded accumulators (reported under AP-07); background tasks without shutdown; recursion | none separately |
-| AP-14 | forced detectors (--pending-deprecation --trace-deprecation) over boot, seed (run at boot) and every non-destructive surface entry: no warning emitted; deprecated dependencies in installed metadata; superseded constructs | 1 finding (install-time chain, LOW) |
-| AP-15 | unexplained numerics; unitless durations; repeated enumerated strings; repeated literals; numeric codes; positional indexes; inline environment-specific literals | 1 finding |
-| AP-16 | names contradicting behaviour; non-descriptive identifiers; several names for one concept; how-names; mixed casing; mixed human languages; stale comments; boolean parameters | 1 finding |
-| AP-17 | commented-out code; unreachable branches; unreferenced units; unused imports and declared dependencies; unused parameters/values; constant flags; unregistered endpoints; *_old/backup copies | 1 finding |
-| AP-18 | debug/reload literals (none); dev server as production (plain Node server, nothing declared); all-interface bind with debug (none); error output exposing internals (observed); permissive CORS (none configured); unrestricted diagnostic surfaces (admin report under AP-04); disabled protective defaults | 1 finding |
-| AP-19 | npm audit over the resolved tree, direct and transitive; lockfile pins vs ranges (lockfile present); lockless ranges (n/a) | 2 findings |
-| AP-20 | identity columns without unique constraint; reference columns without foreign key; parent delete with no child rule; money as binary floating point; nullable required columns / free-text closed sets | 1 finding |
+| AP-01 | name-pattern literals in code (utils.js, AppManager.js); credential values in seed data (INSERT at AppManager.js:18); inline-credential URLs (none); high-entropy / credential-prefix literals (`pk_live_`); framework signing key literal (none, no sessions); committed credential files (no .env/.pem/key file in the tree); default fallback that is a working secret (AppManager.js:68) | 1 finding: AP-01 |
+| AP-02 | external input reaching a driver call by concatenation/interpolation/format (all 11 driver calls at AppManager.js:37, 40, 50, 54, 57, 69, 83, 92, 104, 106, 133 use `?` with a separate parameter array); ORM escape hatches (no ORM); dynamic identifiers (none); shell/process execution (none); unsafe deserialization / template from input (none); input-derived filesystem paths (none) | none |
+| AP-03 | 3+ responsibility categories in one module; module over ~300 lines with 2+ categories (141 lines, 5 categories); unit over ~50 lines (`setupRoutes`, 113); several unrelated domain concepts in one file; low-cohesion class; themeless utilities module (utils.js); high afferent coupling | 1 finding: AP-03 |
+| AP-04 | handler fetching/mutating by input id with no principal scoping; authorization only on one door; role/identity taken from the request (none); token decoded without verification (no tokens exist); unreachable/commented-out guards (none); privileged operations without a guard (financial report, account delete); unverified account at checkout | 2 findings: AP-04 (privileged), AP-04 (checkout) |
+| AP-05 | domain decisions, persistence and long handlers in the delivery layer; request objects deep in the stack; duplicated rule across handlers; pass-through service layer — all present in AppManager.js, filed under AP-03 by the precedence rule | none (merged into AP-03) |
+| AP-06 | collaborators constructed inside the unit (AppManager.js:7); import-time side effects; no single wiring place; no test seam (clock/db); domain importing a driver; configuration read at the point of use (AppManager.js:45) | 1 finding: AP-06 |
+| AP-07 | module-level mutable reassigned from several places (globalCache, totalRevenue); request-scoped data held globally (none); in-memory collection as store of record (the only data store is an in-memory SQLite by design of the project, not a process variable; not filed); mutable defaults / shared class attributes (none); unbounded cache with no lifecycle (globalCache); monkey-patched built-ins (none); in-process id counters (none) | 1 finding: AP-07 |
+| AP-08 | reversible/plain password storage (seed `'123'`, weak derivation); fast digest for passwords; shared/constant/missing salt; non-constant-time credential comparison (no comparison exists); sensitive values in logs (AppManager.js:45); whole-record serialization (the report selects explicit fields; none); disabled certificate verification (none); no token expiry (no tokens) | 2 findings: AP-08 (log), AP-08 (derivation) |
+| AP-09 | empty/log-only catch or success on failure path (delete handler, audit insert); over-broad catches (none, no try/catch at all); repeated error-to-response mapping per handler; no centralized handler (observed default page); internals in responses (observed stack trace, see AP-18); inconsistent error signalling; multi-write without transaction (checkout); exceptions as control flow (none) | 1 finding: AP-09 |
+| AP-10 | driver call inside a loop or a function called from one (report, 92/104/106); per-element fetch by foreign key; lazy relation in iteration (no ORM); same read repeated; remote call in a loop (none); whole table read to filter in memory (report); write loop with one round trip per element (none) | 1 finding: AP-10 |
+| AP-11 | field used with no type/format/length check (checkout); optional input dereferenced (card, pwd); unconstrained limit parameter (no pagination exists); parse with silent default (none); validation on one entry point but not another; validation after side effect (user insert before payment); domain invariants unenforced; no bound on body size; scattered ad-hoc conditionals | 2 findings: AP-11 (safe subset), AP-11 (remaining) |
+| AP-12 | structurally identical blocks of 10+ lines (none; the two 4-line completion blocks at AppManager.js:96-99 and 119-122 are below the threshold); same rule in several places (none); repeated validation/error mapping/serialization (error text only, covered by AP-09); hand-written mappings with different field sets (none); copy-and-modify lineage (none) | none |
+| AP-13 | resource acquire/release with a path between them (the single connection lives for the process); connection opened per call (none); outbound call without timeout (none, no outbound calls); retry without bound (none); unbounded read (report reads whole tables, filed under AP-10); unbounded in-memory accumulator (globalCache, filed under AP-07); background task without shutdown (none); unbounded recursion (none) | none (cache growth reported in AP-07, whole-table reads in AP-10) |
+| AP-14 | Layer 1: node `--pending-deprecation --trace-deprecation --redirect-warnings` over the boot, the in-process schema and seed at boot, and 7 surface entries (checkout new user, denied card, existing user, missing fields, unknown course; financial report; delete of a nonexistent user) plus a malformed-body request and a wrong-typed request: no warning file was produced (tier A: none). Not exercised: the delete of an existing user (destructive; same handler). Manifest/lockfile deprecation flags; superseded constructs (callback-style driver API, noted under AP-09). Layer 2: `npm view <pkg>@<ver> deprecated` for express 4.22.1 and sqlite3 5.1.7 (empty), registry notices printed by `npm ci` | 1 finding: AP-14 |
+| AP-15 | unexplained numeric literals (10000, 10, card prefix "4", port 3000); units missing from names; repeated string statuses ("PAID", "DENIED"); repeated literals; numeric codes compared directly; unnamed index offsets (none); environment-specific literals inline (port) | 1 finding: AP-15 |
+| AP-16 | names contradicting behaviour (`logAndCache` does two things); non-descriptive identifiers (u, e, p, cc, cid, self); several names for one concept; how-not-what names; mixed conventions (`c_id` vs camelCase); mixed human languages; misplaced files; stale comments (none); boolean call-site opacity (none) | 1 finding: AP-16 |
+| AP-17 | commented-out code (none); unreachable branches (none); defined-never-referenced (dbUser, dbPass, smtpUser, totalRevenue, globalCache read side); unused imports (`totalRevenue` at AppManager.js:2); declared-never-imported dependency (none); unused parameters (`err` of the audit insert); parallel old copies (none) | 1 finding: AP-17 |
+| AP-18 | debug/reload flag set by literal (none); development server as production server (the framework listen call is the only server; no production declaration exists, noted); bind address with debug (none); internals exposed in error output (observed stack-trace page); permissive cross-origin policy (none configured); unrestricted diagnostic surfaces (none beyond AP-04); protective defaults off (none) | 1 finding: AP-18 |
+| AP-19 | advisories for direct dependencies at resolved versions (OSV.dev for qs; `npm audit` for the whole tree); transitive advisories mapped to the direct parent (express, sqlite3); manifest range vs lockfile pin (lockfile present and used by `npm ci`); no-lockfile case (not applicable) | 2 findings: AP-19 (express), AP-19 (sqlite3) |
+| AP-20 | identity column without uniqueness (users.email); reference column without foreign key (user_id, course_id, enrollment_id); parent delete without a child rule (user delete); money in binary floating point (price, amount, revenue sum); nullable always-present columns and free-text enumerations (status; noted, folded into the money/identity findings' DDL) | 2 findings: AP-20 (identity and money), AP-20 (orphans) |
 
 ## Dependency and Deprecated API Verification
 
 | Item | Version in use | Check | Evidence tier | Source | Looked up | Result |
 |---|---|---|---|---|---|---|
-| Node runtime APIs | node 24.12.0 | deprecation (forced detectors) | A | runtime warnings over boot, seed and 9 surface entries | n/a — local | no issue found |
-| express | 4.22.1 | deprecation | B | npm view express@4.22.1 deprecated (empty) | 2026-10-08 | no issue found |
-| sqlite3 | 5.1.7 | deprecation | B | npm view sqlite3@5.1.7 deprecated (empty) | 2026-10-08 | no issue found |
-| sqlite3 | 5.1.7 | maintenance status | C | https://github.com/TryGhost/node-sqlite3/releases | 2026-10-08 | AP-14 finding |
-| npmlog, are-we-there-yet, gauge, rimraf, glob, inflight, @npmcli/move-file, prebuild-install, tar | as resolved | deprecation | B | npm registry notices at install | 2026-10-08 | AP-14 finding |
-| express chain (body-parser, path-to-regexp, proxy-addr, qs) | as resolved | advisory | B | npm audit (GitHub advisory database) | 2026-10-08 | AP-19 finding (MEDIUM) |
-| sqlite3 install chain (tar, node-gyp, cacache, ...) | as resolved | advisory | B | npm audit | 2026-10-08 | AP-19 finding (LOW) |
-| express (after refactor) | 4.22.3 (lockfile) | advisory | B | npm audit on the refactored lockfile | 2026-10-08 | express chain clean; 7 advisories remain, all in the sqlite3 5.x install chain |
-| sqlite3 6.0.1 (attempted) | 6.0.1 | replay | n/a | refactored copy booted in node:24.12.0 | 2026-10-08 | does not boot: native binding needs GLIBC_2.38, the image has 2.36 — reverted, proposed |
+| express | 4.22.1 | deprecation | B | `npm view express@4.22.1 deprecated` (empty) | 2026-10-12 | no issue found |
+| sqlite3 | 5.1.7 | deprecation | B | `npm view sqlite3@5.1.7 deprecated` (empty); `npm view sqlite3 dist-tags`: latest 6.0.1 | 2026-10-12 | no issue found |
+| npmlog, gauge, are-we-there-yet, rimraf, inflight, glob, @npmcli/move-file, prebuild-install, tar | 6.0.2, 4.0.4, 3.0.1, 3.0.2, 1.0.6, 7.2.3, 1.1.2, 7.1.3, 6.2.1 | deprecation | B | registry notices printed by `npm ci` | 2026-10-12 | AP-14 (LOW) |
+| qs | 6.14.2 | advisory | B | OSV.dev `POST api.osv.dev/v1/query` (npm); GHSA-4mjr-xmp4-gh2g, GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx | 2026-10-12 | AP-19 express (MEDIUM; not reachable) |
+| path-to-regexp, proxy-addr, body-parser | 0.1.12, 2.0.7, 1.20.4 | advisory | B | `npm audit` (registry advisory API): GHSA-37ch-88jc-xwx2, GHSA-jqcg-44mw-7w3h, GHSA-v422-hmwv-36x6 | 2026-10-12 | AP-19 express (MEDIUM; not reachable) |
+| tar, node-gyp, cacache, make-fetch-happen, http-proxy-agent, @tootallnate/once, http-cache-semantics, ip-address, brace-expansion | 6.2.1, 8.4.1, 15.3.0, 9.1.0, 4.0.1, 1.1.2, 4.2.0, 10.1.0, 1.1.12 | advisory | B | `npm audit` (registry advisory API), 14 advisories groups: 3 low, 1 moderate, 8 high, 2 critical in total | 2026-10-12 | AP-19 sqlite3 (LOW; install/build time) |
+| runtime | node 24 | runtime deprecation warnings | A | `--pending-deprecation --trace-deprecation --redirect-warnings` over boot and 9 requests | 2026-10-12 (local) | none emitted |
 
 ## Execution Log
 
 | # | Phase | Action | Mode | Handle | Command | Result |
 |---|---|---|---|---|---|---|
-| 1 | 2 | start | container | ...-20261008-1501-1 | docker run -d ... sleep infinity (run-1); npm ci; exec -d node --pending-deprecation --trace-deprecation src/app.js | ready on port 3000 |
-| 2 | 2 | stop | container | ...-1 | docker rm -f ...-1 | removed |
-| 3 | 3a | start/stop | container | ...-2 | original baseline, non-destructive entries (run-2) | captured 9; removed by name |
-| 4 | 3a | start/stop | container | ...-3 | original baseline, delete-api-users-1 alone (run-3) | captured; removed by name |
-| 5 | 3a | start/stop | container | ...-4 | original baseline, sec-delete-api-users-1-anonymous alone (run-4) | captured; removed by name |
-| 6 | 3a | start/stop | container | ...-5 | original baseline, sec-post-api-checkout-card-wrong-type alone (run-5): the original crashed (transport error, recorded as baseline) | captured; removed by name |
-| 7 | 3b | start/stop | container | ...-6 | manifest tool only: npm install/update --package-lock-only against the target manifest, no application run, no node_modules created | lockfile regenerated; removed by name |
-| 8 | 3c | start/stop | container | ...-7, -8, -9, -10 | first replay with sqlite3 6.0.1 | application did not boot (GLIBC_2.38); removed by name |
-| 9 | 3b | start/stop | container | ...-11 | manifest tool only: lockfile regenerated after the sqlite3 revert | removed by name |
-| 10 | 3c | start/stop | container | ...-12 to -15 | replay 1 of the refactored application (refactored-5..8), 4 boots | compared; removed by name |
-| 11 | 3d | start/stop | container | ...-16 to -19 | replay 2 after the post-re-audit fixes (refactored-9..12), 4 boots | compared; removed by name |
-
-19 containers started (including the two manifest-tool ones and four that failed to boot), 19 removed by their exact name; `docker ps -a --filter label=refactor-arch.run=20261008-1501` returned nothing at the end. The snapshot directory was deleted after the second re-audit.
+| 1 | 2 | start | container | refactor-arch-ecommerce-api-legacy-clean-p2-1 | docker run -d ... node:24-bookworm-slim sleep infinity; exec npm ci; exec -d node --pending-deprecation --trace-deprecation src/app.js, in run-1 | ready on port 3000 (proc wait); no warnings readable (stdout of a detached exec is not captured), so restarted with warnings redirected to a file |
+| 2 | 2 | stop | container | refactor-arch-ecommerce-api-legacy-clean-p2-1 | docker rm -f refactor-arch-ecommerce-api-legacy-clean-p2-1 | removed |
+| 3 | 2 | start | container | refactor-arch-ecommerce-api-legacy-clean-p2-2 | docker run -d ... sleep infinity (same run-1 copy, dependencies already installed); exec -d node --pending-deprecation --trace-deprecation --redirect-warnings src/app.js | first `proc wait` raced the launch (exit 4 after 20 s), second call ready on 3000; 7-entry capture OK; wrong-typed card request crashed the application (observed); relaunched through the same container (exec -d), ready; malformed-body request observed |
+| 4 | 2 | stop | container | refactor-arch-ecommerce-api-legacy-clean-p2-2 | docker rm -f refactor-arch-ecommerce-api-legacy-clean-p2-2 | removed; `docker ps -a --filter label=refactor-arch.run=ecommerce-api-legacy-clean-p2` lists nothing |
+| 5 | 3a | start | container | ...-clean-p2-3 | run-2 copy of the snapshot, `npm ci`, `node src/app.js`; baseline capture of 10 non-destructive entries | ready on 3000; 10 observed |
+| 6 | 3a | stop | container | ...-clean-p2-3 | docker rm -f ...-3 | removed |
+| 7 | 3a | start/stop | container | ...-clean-p2-4 | fresh boot of the original (same run-2 copy; the database is in memory, nothing persists); capture `delete-api-users-1-operator` alone | observed; removed by name |
+| 8 | 3a | start/stop | container | ...-clean-p2-5 | fresh boot; capture `post-api-checkout-numeric-card` alone | transport error (the original crashed); removed by name |
+| 9 | 3a | start/stop | container | ...-clean-p2-6 | fresh boot; capture `post-api-checkout-numeric-password` alone | transport error (the original crashed); removed by name |
+| 10 | 3b | start/stop | container | ...-clean-p2-7 | refactored-1 copy, `npm ci`, `npm audit fix`, `npm update express` (lockfile work) | removed by name |
+| 11 | 3c | start | container | ...-clean-p2-8 | refactored-2 copy, `npm ci` from the refactored lockfile, boot with `OPERATOR_TOKEN` set through `-e`; full compare of 10 entries; malformed-body probe | ready; 8 PASS, 2 FIXED |
+| 12 | 3c | stop | container | ...-clean-p2-8 | docker rm -f ...-8 | removed |
+| 13 | 3c | start/stop | container | ...-clean-p2-9 | fresh boot with token; replay `delete-api-users-1-operator` alone | PASS; removed by name |
+| 14 | 3c | start/stop | container | ...-clean-p2-10 | fresh boot without token; replay `post-api-checkout-numeric-card` alone; check the guard is closed by default | FIXED (400); guard answered 403; removed by name |
+| 15 | 3c | start/stop | container | ...-clean-p2-11 | fresh boot without token; replay `post-api-checkout-numeric-password` alone | FIXED (400); removed by name |
+| 16 | 3d | start/stop | container | ...-clean-p2-12 | re-audit pass 1: boot with `--pending-deprecation --trace-deprecation --redirect-warnings`, 10 entries exercised, `npm audit --omit=dev` | no warning file produced; removed by name |
 
 ## Verification Coverage
 DEGRADED — the following checks did not run, and the findings above do not cover them:
-  - OSV.dev query: not used; the ecosystem's own audit tool (npm audit) was used instead (catalog AP-19 allows it) → advisories only as listed by that tool.
-  - Layer 1 over the destructive and crash entries (DELETE /api/users/1, anonymous DELETE, non-string card): not exercised with the detectors on → deprecation warnings on those paths unverified.
-  - Layer 2 language-level documentation lookups (Node 24 / Express 4 changelogs): not fetched → language-level deprecations without a runtime warning are unverified.
-  - Re-audit is full as to the catalog and the local checks, but the Layer 1 deprecation detectors were not re-run on the refactored application → the re-audit is PARTIAL for AP-14 runtime warnings.
-Manifest operations (npm install/update --package-lock-only) ran in a container with the target mounted, not in a run copy, because the output is the target's own lockfile. They create no application artifacts.
-The test operator token used by the replay (operator-secret-for-validation, in reports/surface.json) is a harness fixture that reaches only the validation run; it is not a deployment credential.
-Scratch root: the environment's scratch directory. Excluded from every copy: node_modules, .claude (tool config), VCS directories.
-No INCIDENT. No NON-LITERAL command. One non-conforming detail declared: audit-latest.md was written at the end of the run, not at the gate; the gate-time audit is audit-20261008-1501.md.
+  - Runtime deprecation evidence for the delete of an existing user (destructive entry): not exercised in Phase 2 → a deprecation warning only reachable on that path would not have been seen (the same handler was exercised with a nonexistent id).
+  - Individual tracing of `ip-address`, `http-cache-semantics` and `brace-expansion` to their parent packages: not performed → their LOW classification rests on `npm audit` placing them outside the express tree.
+  - Advisory fix notes beyond the OSV.dev entries for `qs`: not read for the other packages → "fixed above" versions for proxy-addr and tar come from `npm audit` ranges.
+Scratch root: the environment's scratch directory (option 1); the snapshot lives there and is deleted at the end of the run.
+NON-LITERAL — none. INCIDENT — none (no process action outside the Execution Log; no directory change or chained command).
 
 ================================
 Total: 21 findings
 ================================
 
-Confirmation: --yes (auto-approved, no human review)
+Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
+  y = apply all findings (contract-changing items will be proposed, not applied)
+  n = stop here; the report is saved and nothing else was touched
+  c = apply CRITICAL and HIGH only
+> y
 
----
+Confirmation: y (human-reviewed, answer relayed by the orchestrating session from the user's direct reply)
 
 ================================
 PHASE 3: REFACTORING COMPLETE
 ================================
 ## New Project Structure
+```
 ecommerce-api-legacy/
 ├── .env.example
 ├── .gitignore
+├── README.md
 ├── api.http
 ├── package.json
-├── package-lock.json
-├── README.md
-├── reports/                      (audit-*.md, audit-latest.md, surface.json, baseline.json, replay.json)
+├── package-lock.json            (updated within express's declared range; see below)
+├── reports/                     (audit-*.md, surface.json, baseline.json, replay-current.json)
 └── src/
-    ├── app.js                    composition root (createApp factory + start)
-    ├── errors.js                 domain error taxonomy
-    ├── config/
-    │   └── index.js              environment read once, frozen
+    ├── app.js                   composition root and entry point (npm start unchanged)
+    ├── errors.js                AppError + orFail
+    ├── config/index.js          reads the environment once, frozen
     ├── models/
-    │   ├── database.js           promise wrapper over the driver
-    │   ├── schema.js             DDL, constraints and seed
-    │   ├── passwordHasher.js     scrypt KDF
-    │   ├── paymentPolicy.js      pure payment rules
-    │   ├── userRepository.js
-    │   ├── courseRepository.js
-    │   ├── enrollmentRepository.js
-    │   └── reportRepository.js   one set-based query
+    │   ├── database.js          promise wrapper, serialized queue, transactions
+    │   ├── schema.js            schema + seed (generated, hashed seed password)
+    │   ├── repositories.js      user, course, enrollment, payment, audit log, financial report
+    │   ├── passwordHasher.js    scrypt with per-credential salt
+    │   ├── payment.js           payment statuses and the approval rule (pure)
+    │   └── money.js             integer cents to the decimal number clients receive
     ├── controllers/
     │   ├── checkoutController.js
     │   ├── reportController.js
     │   └── userController.js
-    ├── middlewares/
-    │   ├── asyncHandler.js
-    │   ├── requireOperator.js    operator guard, closed by default
-    │   └── errorBoundary.js      single error boundary
-    └── views/
-        ├── checkoutRoutes.js
-        └── adminRoutes.js        report and user deletion, behind the guard
+    ├── routes/index.js          route declarations + checkout boundary validation
+    └── middlewares/
+        ├── asyncHandler.js
+        ├── operatorGuard.js     X-Operator-Token, constant-time, closed by default
+        └── errorBoundary.js     the single error-to-response mapping
+```
+Removed: `src/AppManager.js`, `src/utils.js` (rewritten in place into the layers above; git history is the backup). Persistence is kept in the model layer (`models/repositories.js`), applied uniformly.
 
 ## Validation
   ✓ Application boots without errors
   ✓ Public surface replayed: 9 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
-    Security entries: 3 FIXED, 0 NOT FIXED
-  ○ Findings resolved: 17/21  (4 proposed, 0 unresolved)
-  ○ Anti-patterns remaining: 6 proposed-not-applied, 0 unresolved  (re-audit: 6 findings)
-    Re-audit passes: 2; fixed after re-audit: 4 (1 of them missed-in-phase-2)
-  ✓ Processes: 19 started, 19 stopped through their handles, 0 left running, 0 incidents
+    Security entries: 4 FIXED, 0 NOT FIXED
+  ○ Findings resolved: 16/21  (5 proposed, 0 unresolved)
+  ○ Anti-patterns remaining: 5 proposed-not-applied, 0 unresolved  (re-audit: 5 findings)
+    Re-audit passes: 1; fixed after re-audit: 0 (0 of them missed-in-phase-2)
+  ✓ Processes: 12 started, 12 stopped through their handles, 0 left running, 0 incidents
     Isolation: container
   ✓ Commands: 0 directory changes, 0 chained commands
 
+The 9 contract entries and 4 security entries are the 13 entries of `reports/surface.json`. Replay detail: new-user, denied-card, existing-user, no-password, missing-fields and unknown-course checkouts PASS; the report and the delete (a nonexistent id and, alone, id 1) PASS with the operator token. FIXED: the anonymous report and the anonymous delete answer 403 (baseline 200); a numeric `card` and a numeric `pwd` answer 400 (baseline: the original crashed, transport error). Verified by hand, not by the replay: the malformed-JSON body answers 400 with the body `Bad Request` and no stack trace (the baseline page carried one; not a surface entry because the framework default page is not contract and its masked text would read as a regression); with no `OPERATOR_TOKEN` configured, the report answers 403 (closed by default).
+
+Findings resolved (16): 1 AP-03, 2 AP-04 privileged, 3 AP-01, 4 AP-06, 5 AP-20 identity/money, 6 AP-08 log, 8 AP-09, 10 AP-18, 11 AP-07, 12 AP-08 derivation, 13 AP-19 express, 14 AP-11 safe subset, 16 AP-10, 19 AP-16, 20 AP-15, 21 AP-17. Notes: finding 21 listed `audit_logs` as written and never read; the re-audit withdraws that sub-item, since an audit trail is write-only by nature and its table is data, not code. It is kept. Finding 5: the unique index on `users.email` is in `src/models/schema.js` and the money columns are integer cents (`price_cents`, `amount_cents`), converted back to the decimal number in the response. Finding 8: besides the central boundary, the checkout writes now run in one transaction and the payment decision is made before any write, so a denied card no longer leaves an account behind (not observable through the API; the denied entry PASSes). Finding 13: `npm audit fix` and `npm update express` moved the lockfile only (express 4.22.1 to 4.22.3, qs 6.14.2 to 6.16.0, body-parser 1.20.4 to 1.20.8, path-to-regexp 0.1.12 to 0.1.13, proxy-addr 2.0.7 to 2.0.8); `package.json` is unchanged, and `npm audit --omit=dev` afterwards lists only the sqlite3 install chain (7 advisories groups). Secrets: the payment gateway key, database password and SMTP user that were in source are deleted; since they were committed, **rotate the real payment key and database password**: they remain in the repository history.
+
+Operator guard: set the environment variable `OPERATOR_TOKEN` and send it in the `X-Operator-Token` header to use `GET /api/admin/financial-report` and `DELETE /api/users/:id`. It is unset by default, which keeps both closed (403).
+
 ## Proposed, Not Applied
-### [HIGH] Missing or Bypassable Authorization — checkout ignores the password   (AP-04)
-File: src/AppManager.js:40-75 (original; now src/controllers/checkoutController.js)
-Reason not applied: verifying the password of an existing account rejects clients that today send a wrong or empty pwd for an existing email; there is no identity model, and the seeded user has no known password.
-Proposed change: decide the identity model (who signs in, where passwords are verified), then verify with the scrypt hashes already stored for new accounts.
+### [HIGH] Missing or Bypassable Authorization — checkout never verifies the account   (AP-04, finding 7)
+File: src/controllers/checkoutController.js:22-29 (originally src/AppManager.js:66-75)
+Reason not applied: introducing an identity model rejects anonymous checkouts for existing e-mails with a missing or wrong password, which clients send today (new 401/403). No identity model exists to build on.
+Proposed change: decide who the principals are; verify the password with the KDF at checkout (a `verifyPassword` next to `hashPassword`) or require a session; coordinate with clients that send any password for an existing e-mail.
 
-### [HIGH] Missing Schema-Level Integrity Constraints   (AP-20)
-File: src/AppManager.js:12-15 (original; now src/models/schema.js)
-Reason not applied: what a user delete does to enrollments and payments (refuse, cascade, detach) changes what the delete route does today (it succeeds and orphans). Applied from this finding: UNIQUE on users.email, money as integer cents with decimals at the boundary (replay PASS). Held back: foreign keys and the delete rule.
-Proposed change: pick the rule, add foreign keys and enable PRAGMA foreign_keys; first count the violating rows (enrollments or payments whose user no longer exists).
+### [HIGH] Missing Schema-Level Integrity Constraints — orphans on delete   (AP-20, finding 9)
+File: src/models/schema.js:20-21 (originally src/AppManager.js:131-137)
+Reason not applied: choosing what a user delete does to enrollments and payments (refuse, cascade, detach) changes what the delete route does and what the report shows.
+Proposed change: declare the foreign keys, enable `PRAGMA foreign_keys` on the connection, and pick the child rule; count the existing violations first (the in-memory seed has none).
 
-### [LOW] Deprecated or End-of-Life API Usage — install-time dependency chain   (AP-14)
+### [MEDIUM] Missing Boundary Validation — remaining rules   (AP-11, finding 15)
+File: src/routes/index.js:15-20 (originally src/AppManager.js:28-35)
+Reason not applied: e-mail format, length bounds, mandatory `pwd`, card format and `c_id` coercion reject requests accepted today (400).
+Proposed change: a boundary schema once the product owner decides the rules.
+
+### [LOW] Deprecated or End-of-Life API Usage — deprecated transitive packages of sqlite3   (AP-14, finding 17)
 File: package.json:11-11
-Reason not applied: the fix is sqlite3 6.0.1, which was applied and replayed: the application did not boot in the node:24.12.0 image (native binding needs GLIBC_2.38; the image has 2.36). Whoever deploys it would need a newer base image (or the musl build fixed in 6.0.1 on Alpine). Reverted per RP-18 step 4.
-Proposed change: upgrade to sqlite3 6.0.1 together with a base image with glibc >= 2.38 and re-run the replay; prebuild-install and the other deprecated build tools are removed with it (to be confirmed after the upgrade).
+Reason not applied: the only offered path is `sqlite3` 5.x to 6.0.1, a major upgrade. The 6.0.0 release notes (GitHub, 2026-10-12) say only "Mark repository as unmaintained" and "Bump all dependencies, SQLite, and modernise CI": a SQLite engine bump is a behaviour change, and the notes do not say which, so the replay cannot be shown to cover it (04 §6, dependency upgrades).
+Proposed change: evaluate the upgrade (or a maintained driver) in a branch; verify SQL behaviour for the three routes and the integer-cents columns; note the upstream repository is marked unmaintained.
 
-### [LOW] Known-Vulnerable Dependency — install-time chain of sqlite3   (AP-19)
+### [LOW] Known-Vulnerable Dependency — sqlite3 install chain   (AP-19, finding 18)
 File: package.json:11-11
-Reason not applied: same upgrade as above; the 7 remaining advisories (tar, node-gyp chain and others) are install/build time only.
-Proposed change: same as above.
-
-### [MEDIUM] Missing Boundary Validation — format and length of fields   (AP-11, missed-in-phase-2)
-File: src/controllers/checkoutController.js:15-22
-Reason not applied: email format and field length limits need a product decision and would reject requests clients may send today.
-Proposed change: define the allowed formats and maximum lengths and enforce them at the boundary.
-
-### [MEDIUM] Swallowed or Uncentralized Error Handling — failed course lookup reads as "not found"   (AP-09, missed-in-phase-2)
-File: src/controllers/checkoutController.js:25-30
-Reason not applied: the original answered 404 "Curso não encontrado" when the course query itself failed; answering 500 would change an intentional status. The failure is now logged.
-Proposed change: answer 500 "Erro DB" for a failed lookup, separately from "not found".
-
-## Findings detail after the re-audit
-
-First re-audit (10 findings): 6 proposed-not-applied (the four above that were already recorded, plus the two missed-in-phase-2 items) and 4 to fix:
-  - introduced: AP-09, the new dependency errors lost their cause (fixed: cause carried and logged at the boundary);
-  - introduced: AP-17, unused verifyPassword and close() I had written (removed);
-  - introduced: AP-06, the controller and the seed imported the hashing helper directly (injected from the composition root);
-  - missed-in-phase-2: AP-20, payments.status was a free-text closed set (CHECK constraint added; safe).
-Second re-audit (after the second full replay: 9 PASS, 0 REGRESSION, 3 FIXED): 6 findings, all proposed-not-applied; 0 unresolved. The Phase 2 total stays 21; the missed-in-phase-2 items are counted apart (2 found, 1 fixed after re-audit, 1 plus the AP-11 residual proposed).
+Reason not applied: same major upgrade as above. The advisories concern install and build time only (tar and node-gyp's fetch chain), not request handling.
+Proposed change: same as above; meanwhile install in clean containers.
 
 ## Verification Coverage
-Partial for AP-14 runtime warnings in the re-audit (the deprecation detectors were not re-run on the refactored application); everything else as in the Verification Coverage above. Operator path: the replay ran with OPERATOR_TOKEN set and the report and delete entries carrying the header matched the baseline (PASS); wrong token and anonymous answer 403 (verified by hand and by the security entries). Value-level equivalence of the report (cents conversion) was checked by hand: revenue 1994 and 994 for the replayed state; the shape comparison alone would not catch value drift.
+Full for the surface replay: the 13 entries of the inventory were captured against the original from a fresh run copy and replayed against the refactored application from a fresh `refactored-2` copy. The three destructive entries were captured and replayed alone, each on its own boot.
+Re-audit: pass 1 was complete for Layer 1 (boot plus the 10 non-destructive entries under `--pending-deprecation --trace-deprecation --redirect-warnings`: no warning file) and Layer 2 (`npm audit --omit=dev`, 2026-10-12); the destructive entries and the sqlite3 chain's runtime behaviour were not re-exercised under the detectors. The re-audit returned 5 findings, each matching an item above; none is `unresolved`, none `introduced`, none `missed-in-phase-2`. No second pass was needed.
+Scratch notes: the run-2, refactored-1 and refactored-2 copies were reused across several boots of the same copy (the database is in memory and the run wrote nothing else), instead of a new copy per boot; `node_modules` was installed once per copy. The snapshot directory was deleted after the re-audit, with no process or container of this run alive (`docker ps -a` by this run's label returned nothing). Scratch root: the environment's scratch directory.
+Container 1 was recreated as 2 (detached `exec` output is not captured) and the first `proc wait` of container 2 raced its launch: no effect on results.
+INCIDENT — none.
 ================================

@@ -1,13 +1,26 @@
-"""Users: domain constants and persistence."""
-import sqlite3
+"""User persistence and password handling."""
+import hmac
 
-from errors import ConflictError
+from werkzeug.security import check_password_hash, generate_password_hash
 
-TIPO_PADRAO = "cliente"
-# The credential keeps its field in the account responses, but its value is never read back.
-SENHA_MASCARADA = "********"
+from models.constants import VALOR_MASCARADO
 
-_COLUNAS = "id, nome, email, senha, tipo, criado_em"
+_PREFIXOS_HASH = ("scrypt:", "pbkdf2:")
+
+
+def hash_senha(senha):
+    return generate_password_hash(senha)
+
+
+def _eh_hash(armazenada):
+    return isinstance(armazenada, str) and armazenada.startswith(_PREFIXOS_HASH)
+
+
+def _confere(armazenada, senha):
+    if _eh_hash(armazenada):
+        return check_password_hash(armazenada, senha)
+    # Legacy row stored as plain text: constant-time comparison, upgraded on first sign-in.
+    return hmac.compare_digest((armazenada or "").encode("utf-8"), senha.encode("utf-8"))
 
 
 def _para_dict(row):
@@ -15,45 +28,41 @@ def _para_dict(row):
         "id": row["id"],
         "nome": row["nome"],
         "email": row["email"],
-        "senha": SENHA_MASCARADA,
+        "senha": VALOR_MASCARADO,
         "tipo": row["tipo"],
         "criado_em": row["criado_em"],
     }
 
 
 class UsuarioRepository:
-    def __init__(self, get_connection):
-        self._get_connection = get_connection
+    def __init__(self, db):
+        self._db = db
 
     def listar(self):
-        rows = self._get_connection().execute(
-            "SELECT " + _COLUNAS + " FROM usuarios ORDER BY id").fetchall()
-        return [_para_dict(row) for row in rows]
+        with self._db.session() as conn:
+            return [_para_dict(row) for row in conn.execute("SELECT * FROM usuarios").fetchall()]
 
     def buscar_por_id(self, usuario_id):
-        row = self._get_connection().execute(
-            "SELECT " + _COLUNAS + " FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
-        return _para_dict(row) if row else None
+        with self._db.session() as conn:
+            row = conn.execute("SELECT * FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+            return _para_dict(row) if row else None
 
-    def buscar_credenciais_por_email(self, email):
-        """Rows (id, nome, email, senha armazenada, tipo) that answer to this e-mail."""
-        return self._get_connection().execute(
-            "SELECT " + _COLUNAS + " FROM usuarios WHERE email = ? ORDER BY id", (email,)).fetchall()
-
-    def existe_email(self, email):
-        row = self._get_connection().execute(
-            "SELECT 1 FROM usuarios WHERE email = ?", (email,)).fetchone()
-        return row is not None
-
-    def criar(self, nome, email, senha_armazenada, tipo=TIPO_PADRAO):
-        try:
-            cursor = self._get_connection().execute(
+    def criar(self, nome, email, senha, tipo="cliente"):
+        with self._db.session() as conn:
+            cursor = conn.execute(
                 "INSERT INTO usuarios (nome, email, senha, tipo) VALUES (?, ?, ?, ?)",
-                (nome, email, senha_armazenada, tipo))
-        except sqlite3.IntegrityError:
-            raise ConflictError("Email já cadastrado")
-        return cursor.lastrowid
+                (nome, email, hash_senha(senha), tipo),
+            )
+            return cursor.lastrowid
 
-    def atualizar_senha(self, usuario_id, senha_armazenada):
-        self._get_connection().execute(
-            "UPDATE usuarios SET senha = ? WHERE id = ?", (senha_armazenada, usuario_id))
+    def autenticar(self, email, senha):
+        """Return the public user fields when the credentials match, else None."""
+        with self._db.session() as conn:
+            rows = conn.execute("SELECT * FROM usuarios WHERE email = ? ORDER BY id", (email,)).fetchall()
+            for row in rows:
+                if not _confere(row["senha"], senha):
+                    continue
+                if not _eh_hash(row["senha"]):
+                    conn.execute("UPDATE usuarios SET senha = ? WHERE id = ?", (hash_senha(senha), row["id"]))
+                return {"id": row["id"], "nome": row["nome"], "email": row["email"], "tipo": row["tipo"]}
+            return None

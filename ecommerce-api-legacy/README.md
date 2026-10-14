@@ -15,6 +15,11 @@ Exemplos de requisições estão em `api.http`.
 
 ## Configuração
 
-Veja `.env.example`. `PORT` (padrão 3000) e `OPERATOR_TOKEN`. As rotas privilegiadas
-(`GET /api/admin/financial-report` e `DELETE /api/users/:id`) respondem 403 enquanto
-`OPERATOR_TOKEN` não estiver definido; com ele definido, envie o valor no header `x-operator-token`.
+Veja `.env.example`. Variáveis lidas uma única vez em `src/config`:
+
+- `PORT` (padrão 3000).
+- `OPERATOR_TOKEN`: credencial das operações privilegiadas (`GET /api/admin/financial-report` e `DELETE /api/users/:id`), enviada no cabeçalho `X-Operator-Token`. Sem ela essas rotas respondem 403.
+
+## Estrutura
+
+`src/app.js` (raiz de composição) · `src/config` · `src/models` (domínio e persistência) · `src/controllers` (casos de uso) · `src/routes` (declaração de rotas) · `src/middlewares` (guarda de operador, fronteira de erros).

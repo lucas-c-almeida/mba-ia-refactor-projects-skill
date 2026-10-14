@@ -1,23 +1,28 @@
-"""Guard for operator-only operations: a credential from configuration, closed by default."""
-import functools
+"""Operator-only guard: a credential from configuration, compared in constant time, closed by default."""
 import hmac
+from functools import wraps
 
 from flask import request
 
-from errors import ForbiddenError
+from models.errors import ForbiddenError
 
-HEADER_OPERADOR = "X-Operator-Token"
+CABECALHO_OPERADOR = "x-operator-token"
 
 
 def exigir_operador(operator_token):
-    """Decorator factory. With no token configured, every call is refused (fail closed)."""
-    esperado = (operator_token or "").encode("utf-8")
+    """Wrap a view so it only runs with the configured operator token.
+
+    With no token configured the guard never opens (the route answers 403).
+    """
 
     def decorador(view):
-        @functools.wraps(view)
+        @wraps(view)
         def protegida(*args, **kwargs):
-            recebido = (request.headers.get(HEADER_OPERADOR) or "").encode("utf-8")
-            if not esperado or not hmac.compare_digest(recebido, esperado):
+            fornecido = request.headers.get(CABECALHO_OPERADOR, "")
+            autorizado = bool(operator_token) and hmac.compare_digest(
+                fornecido.encode("utf-8"), operator_token.encode("utf-8")
+            )
+            if not autorizado:
                 raise ForbiddenError("Acesso negado")
             return view(*args, **kwargs)
 

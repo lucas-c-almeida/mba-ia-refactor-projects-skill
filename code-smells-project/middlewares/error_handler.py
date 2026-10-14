@@ -1,23 +1,45 @@
-"""The error boundary: one mapping from the error taxonomy to responses.
+"""The single error boundary: maps the domain error taxonomy to protocol responses."""
+import logging
 
-Errors the application raises on purpose keep the status and body shape their handlers always
-used. Anything unexpected is logged in full by the framework and answered with a generic message:
-the exception text never reaches the client. The framework's own answers (unknown route, wrong
-method) are left to its default pages.
-"""
 from flask import jsonify
+from werkzeug.exceptions import HTTPException
 
-from errors import AppError
+from models.errors import (
+    AppError,
+    ForbiddenError,
+    NotFoundError,
+    ServicoIndisponivelError,
+    UnauthorizedError,
+    ValidationError,
+)
 
-MENSAGEM_ERRO_INTERNO = "Erro interno do servidor"
+logger = logging.getLogger(__name__)
+
+_STATUS = {
+    ValidationError: 400,
+    UnauthorizedError: 401,
+    ForbiddenError: 403,
+    NotFoundError: 404,
+}
 
 
-def register_error_handlers(app):
+def registrar_tratamento_de_erros(app):
     @app.errorhandler(AppError)
-    def tratar_erro_da_aplicacao(erro):
-        return jsonify(erro.body()), erro.status
+    def tratar_erro_de_dominio(erro):
+        corpo = {"erro": erro.mensagem}
+        if erro.sucesso_false:
+            corpo["sucesso"] = False
+        return jsonify(corpo), _STATUS.get(type(erro), 400)
 
-    @app.errorhandler(500)
-    def tratar_erro_inesperado(_erro):
-        # Flask has already logged the traceback of the original exception at this point.
-        return jsonify({"erro": MENSAGEM_ERRO_INTERNO}), 500
+    @app.errorhandler(ServicoIndisponivelError)
+    def tratar_servico_indisponivel(erro):
+        # The health body has its own failure shape.
+        return jsonify({"status": "erro", "detalhes": erro.mensagem}), 500
+
+    @app.errorhandler(Exception)
+    def tratar_erro_inesperado(erro):
+        if isinstance(erro, HTTPException):
+            # The framework's own answer (unknown route, wrong method, ...) is kept as is.
+            return erro
+        logger.exception("Erro inesperado")
+        return jsonify({"erro": "Erro interno do servidor"}), 500

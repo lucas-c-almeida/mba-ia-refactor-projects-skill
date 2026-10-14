@@ -1,38 +1,47 @@
 """Script para popular o banco com dados iniciais.
 
-A senha dos usuários de exemplo vem da variável de ambiente SEED_USER_PASSWORD (obrigatória,
-no mínimo 4 caracteres): nenhuma senha fica no código.
+A senha das contas de exemplo vem da variável de ambiente SEED_PASSWORD. Sem ela, uma senha
+aleatória é gerada e exibida uma única vez.
 """
 import os
-import sys
+import secrets
 from datetime import timedelta
+
+from sqlalchemy import delete, func, select
 
 from app import create_app
 from database import db
 from models.category import Category
 from models.clock import utc_now
-from models.constants import PASSWORD_MIN_LENGTH
 from models.task import Task
 from models.user import User
 
+SEED_USERS = (
+    ('João Silva', 'joao@email.com', 'admin'),
+    ('Maria Santos', 'maria@email.com', 'user'),
+    ('Pedro Oliveira', 'pedro@email.com', 'manager'),
+)
 
-def seed_data():
-    password = os.environ.get('SEED_USER_PASSWORD', '')
-    if len(password) < PASSWORD_MIN_LENGTH:
-        sys.exit(f'SEED_USER_PASSWORD must be set (at least {PASSWORD_MIN_LENGTH} characters)')
+SEED_CATEGORIES = (
+    ('Backend', 'Tarefas de backend', '#3498db'),
+    ('Frontend', 'Tarefas de frontend', '#2ecc71'),
+    ('DevOps', 'Tarefas de infraestrutura', '#e74c3c'),
+    ('Bug', 'Correção de bugs', '#e67e22'),
+)
 
-    app = create_app()
+
+def _count(model):
+    return db.session.scalar(select(func.count()).select_from(model))
+
+
+def seed_data(app, password):
     with app.app_context():
-
-        Task.query.delete()
-        User.query.delete()
-        Category.query.delete()
+        for model in (Task, User, Category):
+            db.session.execute(delete(model))
         db.session.commit()
 
         users = []
-        for name, email, role in (('João Silva', 'joao@email.com', 'admin'),
-                                  ('Maria Santos', 'maria@email.com', 'user'),
-                                  ('Pedro Oliveira', 'pedro@email.com', 'manager')):
+        for name, email, role in SEED_USERS:
             user = User()
             user.name = name
             user.email = email
@@ -40,25 +49,20 @@ def seed_data():
             user.role = role
             db.session.add(user)
             users.append(user)
-        u1, u2, u3 = users
-
         db.session.commit()
 
         categories = []
-        for name, description, color in (('Backend', 'Tarefas de backend', '#3498db'),
-                                         ('Frontend', 'Tarefas de frontend', '#2ecc71'),
-                                         ('DevOps', 'Tarefas de infraestrutura', '#e74c3c'),
-                                         ('Bug', 'Correção de bugs', '#e67e22')):
+        for name, description, color in SEED_CATEGORIES:
             category = Category()
             category.name = name
             category.description = description
             category.color = color
             db.session.add(category)
             categories.append(category)
-        c1, c2, c3, c4 = categories
-
         db.session.commit()
 
+        u1, u2, u3 = users
+        c1, c2, c3, c4 = categories
         now = utc_now()
         tasks_data = [
             {'title': 'Implementar autenticação JWT', 'description': 'Adicionar autenticação real com JWT', 'status': 'pending', 'priority': 1, 'user_id': u1.id, 'category_id': c1.id, 'due_date': now - timedelta(days=3)},
@@ -73,26 +77,22 @@ def seed_data():
             {'title': 'Melhorar validações de input', 'description': 'Usar marshmallow ou pydantic', 'status': 'pending', 'priority': 3, 'user_id': u1.id, 'category_id': c1.id, 'tags': 'improvement,validation'},
         ]
 
-        for td in tasks_data:
-            t = Task()
-            t.title = td['title']
-            t.description = td['description']
-            t.status = td['status']
-            t.priority = td['priority']
-            t.user_id = td['user_id']
-            t.category_id = td['category_id']
-            if 'due_date' in td:
-                t.due_date = td['due_date']
-            if 'tags' in td:
-                t.tags = td['tags']
-            db.session.add(t)
-
+        for entry in tasks_data:
+            task = Task()
+            for field, value in entry.items():
+                setattr(task, field, value)
+            db.session.add(task)
         db.session.commit()
+
         print("Seed concluído com sucesso!")
-        print(f"  {User.query.count()} usuários")
-        print(f"  {Category.query.count()} categorias")
-        print(f"  {Task.query.count()} tasks")
+        print(f"  {_count(User)} usuários")
+        print(f"  {_count(Category)} categorias")
+        print(f"  {_count(Task)} tasks")
 
 
 if __name__ == '__main__':
-    seed_data()
+    seed_password = os.environ.get('SEED_PASSWORD')
+    if not seed_password:
+        seed_password = secrets.token_urlsafe(12)
+        print(f"SEED_PASSWORD não definida: senha gerada para as contas de exemplo: {seed_password}")
+    seed_data(create_app(), seed_password)

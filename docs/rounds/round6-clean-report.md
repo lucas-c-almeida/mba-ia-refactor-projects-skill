@@ -167,6 +167,6 @@ junto de `surface.json`, `baseline.json` e o replay.
 | ecommerce-api-legacy | `round6/clean-p2` | `040c89d` |
 | task-manager-api | `round6/clean-p3` | `f209ec3` |
 
-**Estado da entrega.** Este relatório está na `main`; o código refatorado da rodada limpa **não** está
-na `main` nem na `feat/round6`. A `feat/round6` ainda guarda o código das execuções em `--yes`. A
-escolha de qual versão vai para o `release/delivery` (a limpa, que tem gate humano) é decisão do autor.
+**Estado da entrega.** O autor escolheu a versão limpa (a que tem gate humano) para a entrega: o
+código dos três projetos em `release/delivery-r6` é o dos commits acima. A `feat/round6` continua
+guardando o código das execuções em `--yes`, só como evidência.

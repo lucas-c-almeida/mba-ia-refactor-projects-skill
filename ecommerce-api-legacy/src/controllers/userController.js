@@ -1,15 +1,14 @@
-const { DependencyError } = require('../errors');
+'use strict';
 
+/** Account removal use case. Enrollments and payments are left as they were (see the audit report). */
 class UserController {
-    constructor({ users }) { this.users = users; }
+  constructor({ users }) {
+    this.users = users;
+  }
 
-    async remove(id) {
-        try {
-            await this.users.deleteById(id);
-        } catch (err) {
-            throw new DependencyError('Erro DB', err);
-        }
-    }
+  async deleteUser(id) {
+    await this.users.deleteById(id);
+  }
 }
 
 module.exports = { UserController };

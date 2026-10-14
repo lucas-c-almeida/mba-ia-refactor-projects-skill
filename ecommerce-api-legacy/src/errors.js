@@ -1,28 +1,26 @@
-// Small error taxonomy owned by the domain. The messages are the bodies the API has always sent.
+'use strict';
 
+/**
+ * An error the application raises on purpose. `message` is the body sent to
+ * the client and `status` the HTTP status; both are part of the public contract.
+ */
 class AppError extends Error {
-    constructor(message, status, cause) {
-        super(message, cause === undefined ? undefined : { cause });
-        this.name = this.constructor.name;
-        this.status = status;
-    }
+  constructor(message, status, options) {
+    super(message, options);
+    this.status = status;
+  }
 }
 
-class ValidationError extends AppError {
-    constructor(message = 'Bad Request') { super(message, 400); }
+/**
+ * Awaits a promise and, if it rejects, raises the intentional error the
+ * original API answered with. The underlying cause is kept for the log.
+ */
+async function orFail(promise, message, status = 500) {
+  try {
+    return await promise;
+  } catch (cause) {
+    throw new AppError(message, status, { cause });
+  }
 }
 
-class BusinessRuleError extends AppError {
-    constructor(message) { super(message, 400); }
-}
-
-class NotFoundError extends AppError {
-    constructor(message) { super(message, 404); }
-}
-
-// A failed dependency (the datastore). The original error travels as `cause` and is logged at the boundary.
-class DependencyError extends AppError {
-    constructor(message, cause) { super(message, 500, cause); }
-}
-
-module.exports = { AppError, ValidationError, BusinessRuleError, NotFoundError, DependencyError };
+module.exports = { AppError, orFail };

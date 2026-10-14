@@ -1,87 +1,108 @@
-"""Orders: domain rules and persistence."""
-from errors import ValidationError
-from models.money import from_centavos
+"""Order persistence and the order-placement rules."""
+import json
 
-STATUS_INICIAL = "pendente"
-STATUS_APROVADO = "aprovado"
-STATUS_CANCELADO = "cancelado"
-STATUS_VALIDOS = [STATUS_INICIAL, STATUS_APROVADO, "enviado", "entregue", STATUS_CANCELADO]
-PRODUTO_DESCONHECIDO = "Desconhecido"
+from models.constants import STATUS_PENDENTE
+from models.errors import ValidationError
 
-_LISTAGEM = (
-    "SELECT p.id AS id, p.usuario_id AS usuario_id, p.status AS status,"
-    " p.total_centavos AS total_centavos, p.criado_em AS criado_em,"
-    " i.produto_id AS produto_id, i.quantidade AS quantidade,"
-    " i.preco_unitario_centavos AS preco_unitario_centavos,"
-    " pr.id AS produto_existente, pr.nome AS produto_nome"
-    " FROM pedidos p"
-    " LEFT JOIN itens_pedido i ON i.pedido_id = p.id"
-    " LEFT JOIN produtos pr ON pr.id = i.produto_id"
-)
-_ORDEM = " ORDER BY p.id, i.id"
+_SELECT_PEDIDOS = """
+    SELECT p.id AS pedido_id, p.usuario_id, p.status, p.total, p.criado_em,
+           i.produto_id, i.quantidade, i.preco_unitario,
+           pr.id AS produto_existente, pr.nome AS produto_nome
+    FROM pedidos p
+    LEFT JOIN itens_pedido i ON i.pedido_id = p.id
+    LEFT JOIN produtos pr ON pr.id = i.produto_id
+"""
 
 
-def verificar_linha(produto, produto_id, quantidade):
-    """Rules for one order line: the product exists and its stock covers the quantity."""
-    if produto is None:
-        raise ValidationError("Produto " + str(produto_id) + " não encontrado", sucesso=False)
-    if produto["estoque"] < quantidade:
-        raise ValidationError("Estoque insuficiente para " + produto["nome"], sucesso=False)
-
-
-def _agrupar(rows):
+def _montar_pedidos(rows):
+    """Group the joined rows back into orders with their items (one query, no N+1)."""
     pedidos = {}
     for row in rows:
-        pedido = pedidos.get(row["id"])
+        pedido = pedidos.get(row["pedido_id"])
         if pedido is None:
             pedido = {
-                "id": row["id"],
+                "id": row["pedido_id"],
                 "usuario_id": row["usuario_id"],
                 "status": row["status"],
-                "total": from_centavos(row["total_centavos"]),
+                "total": row["total"],
                 "criado_em": row["criado_em"],
                 "itens": [],
             }
-            pedidos[row["id"]] = pedido
-        if row["produto_id"] is not None:
-            existe = row["produto_existente"] is not None
+            pedidos[row["pedido_id"]] = pedido
+        if row["produto_id"] is not None or row["quantidade"] is not None:
             pedido["itens"].append({
                 "produto_id": row["produto_id"],
-                "produto_nome": row["produto_nome"] if existe else PRODUTO_DESCONHECIDO,
+                "produto_nome": row["produto_nome"] if row["produto_existente"] is not None else "Desconhecido",
                 "quantidade": row["quantidade"],
-                "preco_unitario": from_centavos(row["preco_unitario_centavos"]),
+                "preco_unitario": row["preco_unitario"],
             })
     return list(pedidos.values())
 
 
 class PedidoRepository:
-    def __init__(self, get_connection):
-        self._get_connection = get_connection
+    def __init__(self, db):
+        self._db = db
 
-    def inserir(self, usuario_id, total_centavos, linhas):
-        """Insert an order and its lines; ``linhas`` are (produto_id, quantidade, centavos)."""
-        connection = self._get_connection()
-        cursor = connection.execute(
-            "INSERT INTO pedidos (usuario_id, status, total_centavos) VALUES (?, ?, ?)",
-            (usuario_id, STATUS_INICIAL, total_centavos))
-        pedido_id = cursor.lastrowid
-        connection.executemany(
-            "INSERT INTO itens_pedido (pedido_id, produto_id, quantidade,"
-            " preco_unitario_centavos) VALUES (?, ?, ?, ?)",
-            [(pedido_id, produto_id, quantidade, preco_unitario_centavos)
-             for produto_id, quantidade, preco_unitario_centavos in linhas])
-        return pedido_id
+    def criar(self, usuario_id, itens):
+        """Place an order atomically: validate stock, insert, decrement. Rolls back on any failure."""
+        with self._db.session() as conn:
+            # One set-based read for every product of the order (ids bound as a single JSON array).
+            ids = json.dumps(sorted({item["produto_id"] for item in itens}))
+            produtos = {
+                row["id"]: row
+                for row in conn.execute(
+                    "SELECT * FROM produtos WHERE id IN (SELECT value FROM json_each(?))", (ids,)
+                ).fetchall()
+            }
 
-    def listar_todos(self):
-        rows = self._get_connection().execute(_LISTAGEM + _ORDEM).fetchall()
-        return _agrupar(rows)
+            total = 0
+            linhas = []
+            demanda = {}
+            for item in itens:
+                produto = produtos.get(item["produto_id"])
+                if produto is None:
+                    raise ValidationError("Produto " + str(item["produto_id"]) + " não encontrado", sucesso_false=True)
+                if produto["estoque"] < item["quantidade"]:
+                    raise ValidationError("Estoque insuficiente para " + produto["nome"], sucesso_false=True)
+                total = total + (produto["preco"] * item["quantidade"])
+                linhas.append((item["produto_id"], item["quantidade"], produto["preco"]))
+                demanda[item["produto_id"]] = demanda.get(item["produto_id"], 0) + item["quantidade"]
+
+            for produto_id, quantidade in demanda.items():
+                if produtos[produto_id]["estoque"] < quantidade:
+                    raise ValidationError("Estoque insuficiente para " + produtos[produto_id]["nome"], sucesso_false=True)
+
+            cursor = conn.execute(
+                "INSERT INTO pedidos (usuario_id, status, total) VALUES (?, ?, ?)",
+                (usuario_id, STATUS_PENDENTE, total),
+            )
+            pedido_id = cursor.lastrowid
+
+            conn.executemany(
+                "INSERT INTO itens_pedido (pedido_id, produto_id, quantidade, preco_unitario) VALUES (?, ?, ?, ?)",
+                [(pedido_id, produto_id, quantidade, preco) for produto_id, quantidade, preco in linhas],
+            )
+            # The stock guard is in the statement itself, so two concurrent orders cannot oversell.
+            baixa = conn.executemany(
+                "UPDATE produtos SET estoque = estoque - ? WHERE id = ? AND estoque >= ?",
+                [(quantidade, produto_id, quantidade) for produto_id, quantidade in demanda.items()],
+            )
+            if baixa.rowcount != len(demanda):
+                raise ValidationError("Estoque insuficiente", sucesso_false=True)
+            return {"pedido_id": pedido_id, "total": total}
 
     def listar_por_usuario(self, usuario_id):
-        rows = self._get_connection().execute(
-            _LISTAGEM + " WHERE p.usuario_id = ?" + _ORDEM, (usuario_id,)).fetchall()
-        return _agrupar(rows)
+        with self._db.session() as conn:
+            rows = conn.execute(
+                _SELECT_PEDIDOS + " WHERE p.usuario_id = ? ORDER BY p.id, i.id", (usuario_id,)
+            ).fetchall()
+            return _montar_pedidos(rows)
+
+    def listar_todos(self):
+        with self._db.session() as conn:
+            rows = conn.execute(_SELECT_PEDIDOS + " ORDER BY p.id, i.id").fetchall()
+            return _montar_pedidos(rows)
 
     def atualizar_status(self, pedido_id, novo_status):
-        self._get_connection().execute(
-            "UPDATE pedidos SET status = ? WHERE id = ?", (novo_status, pedido_id))
-        return True
+        with self._db.session() as conn:
+            conn.execute("UPDATE pedidos SET status = ? WHERE id = ?", (novo_status, pedido_id))
