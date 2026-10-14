@@ -1,18 +1,13 @@
 'use strict';
 
-// Domain rules for payments. No I/O, no framework.
+const PAYMENT_STATUS = Object.freeze({ PAID: 'PAID', DENIED: 'DENIED' });
 
-const PaymentStatus = Object.freeze({
-    PAID: 'PAID',
-    DENIED: 'DENIED',
-});
-
-// Simulated gateway rule kept from the original behaviour: card numbers starting with this
-// prefix are approved, every other one is denied.
+// Stand-in for a real gateway: cards starting with this prefix are approved.
 const APPROVED_CARD_PREFIX = '4';
 
-function decidePaymentStatus(cardNumber) {
-    return cardNumber.startsWith(APPROVED_CARD_PREFIX) ? PaymentStatus.PAID : PaymentStatus.DENIED;
+/** Decides the payment outcome for a card number. Pure: no I/O. */
+function decidePaymentStatus(card) {
+  return card.startsWith(APPROVED_CARD_PREFIX) ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.DENIED;
 }
 
-module.exports = { PaymentStatus, APPROVED_CARD_PREFIX, decidePaymentStatus };
+module.exports = { PAYMENT_STATUS, decidePaymentStatus };

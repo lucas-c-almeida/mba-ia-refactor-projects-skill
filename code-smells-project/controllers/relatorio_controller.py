@@ -1,4 +1,4 @@
-from models.relatorio import montar_relatorio
+"""Sales report use case."""
 
 
 class RelatorioController:
@@ -6,4 +6,4 @@ class RelatorioController:
         self._relatorios = relatorios
 
     def vendas(self):
-        return montar_relatorio(*self._relatorios.totais_vendas())
+        return self._relatorios.vendas()

@@ -1,8 +1,8 @@
 {
   "baseUrl": "http://127.0.0.1:5000",
-  "capturedAt": "2026-10-01T22:03:02Z",
+  "capturedAt": "2026-10-13T03:54:54Z",
   "results": {
-    "delete-category-3": {
+    "delete-categories-4": {
       "contentType": "application/json",
       "destructive": true,
       "error": null,
@@ -11,11 +11,11 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "delete-category-3",
+      "id": "delete-categories-4",
       "kind": "contract",
       "like": null,
       "method": "DELETE",
-      "path": "/categories/3",
+      "path": "/categories/4",
       "shape": {
         "properties": {
           "message": "string"
@@ -25,7 +25,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "delete-category-missing": {
+    "delete-categories-9999": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -34,7 +34,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "delete-category-missing",
+      "id": "delete-categories-9999",
       "kind": "contract",
       "like": null,
       "method": "DELETE",
@@ -48,7 +48,7 @@
       "state": "OBSERVED",
       "status": 404
     },
-    "delete-task-3": {
+    "delete-tasks-10": {
       "contentType": "application/json",
       "destructive": true,
       "error": null,
@@ -57,11 +57,11 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "delete-task-3",
+      "id": "delete-tasks-10",
       "kind": "contract",
       "like": null,
       "method": "DELETE",
-      "path": "/tasks/3",
+      "path": "/tasks/10",
       "shape": {
         "properties": {
           "message": "string"
@@ -71,7 +71,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "delete-task-missing": {
+    "delete-tasks-9999": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -80,57 +80,11 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "delete-task-missing",
+      "id": "delete-tasks-9999",
       "kind": "contract",
       "like": null,
       "method": "DELETE",
       "path": "/tasks/9999",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 404
-    },
-    "delete-user-3": {
-      "contentType": "application/json",
-      "destructive": true,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "delete-user-3",
-      "kind": "contract",
-      "like": null,
-      "method": "DELETE",
-      "path": "/users/3",
-      "shape": {
-        "properties": {
-          "message": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "delete-user-missing": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "delete-user-missing",
-      "kind": "contract",
-      "like": null,
-      "method": "DELETE",
-      "path": "/users/9999",
       "shape": {
         "properties": {
           "error": "string"
@@ -195,160 +149,6 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-reports-summary": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "get-reports-summary",
-      "kind": "contract",
-      "like": null,
-      "method": "GET",
-      "path": "/reports/summary",
-      "shape": {
-        "properties": {
-          "generated_at": "string",
-          "overdue": {
-            "properties": {
-              "count": "number",
-              "tasks": {
-                "items": {
-                  "properties": {
-                    "days_overdue": "number",
-                    "due_date": "string",
-                    "id": "number",
-                    "title": "string"
-                  },
-                  "type": "object"
-                },
-                "type": "array"
-              }
-            },
-            "type": "object"
-          },
-          "overview": {
-            "properties": {
-              "total_categories": "number",
-              "total_tasks": "number",
-              "total_users": "number"
-            },
-            "type": "object"
-          },
-          "recent_activity": {
-            "properties": {
-              "tasks_completed_last_7_days": "number",
-              "tasks_created_last_7_days": "number"
-            },
-            "type": "object"
-          },
-          "tasks_by_priority": {
-            "properties": {
-              "critical": "number",
-              "high": "number",
-              "low": "number",
-              "medium": "number",
-              "minimal": "number"
-            },
-            "type": "object"
-          },
-          "tasks_by_status": {
-            "properties": {
-              "cancelled": "number",
-              "done": "number",
-              "in_progress": "number",
-              "pending": "number"
-            },
-            "type": "object"
-          },
-          "user_productivity": {
-            "items": {
-              "properties": {
-                "completed_tasks": "number",
-                "completion_rate": "number",
-                "total_tasks": "number",
-                "user_id": "number",
-                "user_name": "string"
-              },
-              "type": "object"
-            },
-            "type": "array"
-          }
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "get-reports-user-1": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "get-reports-user-1",
-      "kind": "contract",
-      "like": null,
-      "method": "GET",
-      "path": "/reports/user/1",
-      "shape": {
-        "properties": {
-          "statistics": {
-            "properties": {
-              "cancelled": "number",
-              "completion_rate": "number",
-              "done": "number",
-              "high_priority": "number",
-              "in_progress": "number",
-              "overdue": "number",
-              "pending": "number",
-              "total_tasks": "number"
-            },
-            "type": "object"
-          },
-          "user": {
-            "properties": {
-              "email": "string",
-              "id": "number",
-              "name": "string"
-            },
-            "type": "object"
-          }
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "get-reports-user-missing": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "get-reports-user-missing",
-      "kind": "contract",
-      "like": null,
-      "method": "GET",
-      "path": "/reports/user/9999",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 404
-    },
     "get-root": {
       "contentType": "application/json",
       "destructive": false,
@@ -372,66 +172,6 @@
       },
       "state": "OBSERVED",
       "status": 200
-    },
-    "get-task-1": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "get-task-1",
-      "kind": "contract",
-      "like": null,
-      "method": "GET",
-      "path": "/tasks/1",
-      "shape": {
-        "properties": {
-          "category_id": "number",
-          "created_at": "string",
-          "description": "string",
-          "due_date": "string",
-          "id": "number",
-          "overdue": "boolean",
-          "priority": "number",
-          "status": "string",
-          "tags": {
-            "items": "empty",
-            "type": "array"
-          },
-          "title": "string",
-          "updated_at": "string",
-          "user_id": "number"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "get-task-missing": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "get-task-missing",
-      "kind": "contract",
-      "like": null,
-      "method": "GET",
-      "path": "/tasks/9999",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 404
     },
     "get-tasks": {
       "contentType": "application/json",
@@ -523,97 +263,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-tasks-cors": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "http://client.example"
-      },
-      "id": "get-tasks-cors",
-      "kind": "contract",
-      "like": null,
-      "method": "GET",
-      "path": "/tasks",
-      "shape": {
-        "items": {
-          "oneOf": [
-            {
-              "properties": {
-                "category_id": "number",
-                "category_name": "string",
-                "created_at": "string",
-                "description": "string",
-                "due_date": "null",
-                "id": "number",
-                "overdue": "boolean",
-                "priority": "number",
-                "status": "string",
-                "tags": {
-                  "items": "empty",
-                  "type": "array"
-                },
-                "title": "string",
-                "updated_at": "string",
-                "user_id": "number",
-                "user_name": "string"
-              },
-              "type": "object"
-            },
-            {
-              "properties": {
-                "category_id": "number",
-                "category_name": "string",
-                "created_at": "string",
-                "description": "string",
-                "due_date": "null",
-                "id": "number",
-                "overdue": "boolean",
-                "priority": "number",
-                "status": "string",
-                "tags": {
-                  "items": "string",
-                  "type": "array"
-                },
-                "title": "string",
-                "updated_at": "string",
-                "user_id": "number",
-                "user_name": "string"
-              },
-              "type": "object"
-            },
-            {
-              "properties": {
-                "category_id": "number",
-                "category_name": "string",
-                "created_at": "string",
-                "description": "string",
-                "due_date": "string",
-                "id": "number",
-                "overdue": "boolean",
-                "priority": "number",
-                "status": "string",
-                "tags": {
-                  "items": "empty",
-                  "type": "array"
-                },
-                "title": "string",
-                "updated_at": "string",
-                "user_id": "number",
-                "user_name": "string"
-              },
-              "type": "object"
-            }
-          ]
-        },
-        "type": "array"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "get-tasks-search": {
+    "get-tasks-1": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -622,11 +272,108 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "get-tasks-search",
+      "id": "get-tasks-1",
       "kind": "contract",
       "like": null,
       "method": "GET",
-      "path": "/tasks/search?q=API&status=pending",
+      "path": "/tasks/1",
+      "shape": {
+        "properties": {
+          "category_id": "number",
+          "created_at": "string",
+          "description": "string",
+          "due_date": "string",
+          "id": "number",
+          "overdue": "boolean",
+          "priority": "number",
+          "status": "string",
+          "tags": {
+            "items": "empty",
+            "type": "array"
+          },
+          "title": "string",
+          "updated_at": "string",
+          "user_id": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-tasks-9999": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-tasks-9999",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/tasks/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-tasks-cors": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "http://example.test"
+      },
+      "id": "get-tasks-cors",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/tasks/1",
+      "shape": {
+        "properties": {
+          "category_id": "number",
+          "created_at": "string",
+          "description": "string",
+          "due_date": "string",
+          "id": "number",
+          "overdue": "boolean",
+          "priority": "number",
+          "status": "string",
+          "tags": {
+            "items": "empty",
+            "type": "array"
+          },
+          "title": "string",
+          "updated_at": "string",
+          "user_id": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-tasks-search-numeric": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-tasks-search-numeric",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/tasks/search?priority=1&user_id=1",
       "shape": {
         "items": {
           "properties": {
@@ -652,30 +399,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-tasks-search-priority-not-number": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "get-tasks-search-priority-not-number",
-      "kind": "security",
-      "like": null,
-      "method": "GET",
-      "path": "/tasks/search?priority=abc",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "get-tasks-search-priority-user": {
+    "get-tasks-search-text": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -684,11 +408,11 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "get-tasks-search-priority-user",
+      "id": "get-tasks-search-text",
       "kind": "contract",
       "like": null,
       "method": "GET",
-      "path": "/tasks/search?priority=1&user_id=1",
+      "path": "/tasks/search?q=bug&status=pending",
       "shape": {
         "items": {
           "properties": {
@@ -743,7 +467,34 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-user-1": {
+    "get-unknown-route": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-unknown-route",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/no-such-route",
+      "shape": {
+        "lines": [
+          "<!doctype html>",
+          "<h<n>>Not Found</h<n>>",
+          "<html lang=en>",
+          "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+          "<title><n> Not Found</title>"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "get-users": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -752,7 +503,39 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "get-user-1",
+      "id": "get-users",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/users",
+      "shape": {
+        "items": {
+          "properties": {
+            "active": "boolean",
+            "created_at": "string",
+            "email": "string",
+            "id": "number",
+            "name": "string",
+            "role": "string",
+            "task_count": "number"
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-users-1": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "get-users-1",
       "kind": "contract",
       "like": null,
       "method": "GET",
@@ -806,25 +589,6 @@
                     "user_id": "number"
                   },
                   "type": "object"
-                },
-                {
-                  "properties": {
-                    "category_id": "number",
-                    "created_at": "string",
-                    "description": "string",
-                    "due_date": "string",
-                    "id": "number",
-                    "priority": "number",
-                    "status": "string",
-                    "tags": {
-                      "items": "string",
-                      "type": "array"
-                    },
-                    "title": "string",
-                    "updated_at": "string",
-                    "user_id": "number"
-                  },
-                  "type": "object"
                 }
               ]
             },
@@ -836,7 +600,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-user-1-tasks": {
+    "get-users-1-tasks": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -845,7 +609,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "get-user-1-tasks",
+      "id": "get-users-1-tasks",
       "kind": "contract",
       "like": null,
       "method": "GET",
@@ -886,7 +650,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-user-missing": {
+    "get-users-9999": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -895,7 +659,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "get-user-missing",
+      "id": "get-users-9999",
       "kind": "contract",
       "like": null,
       "method": "GET",
@@ -909,7 +673,7 @@
       "state": "OBSERVED",
       "status": 404
     },
-    "get-user-missing-tasks": {
+    "get-users-9999-tasks": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -918,7 +682,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "get-user-missing-tasks",
+      "id": "get-users-9999-tasks",
       "kind": "contract",
       "like": null,
       "method": "GET",
@@ -932,104 +696,224 @@
       "state": "OBSERVED",
       "status": 404
     },
-    "get-users": {
+    "op-delete-users-3": {
       "contentType": "application/json",
-      "destructive": false,
+      "destructive": true,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "get-users",
+      "id": "op-delete-users-3",
       "kind": "contract",
       "like": null,
-      "method": "GET",
-      "path": "/users",
-      "shape": {
-        "items": {
-          "properties": {
-            "active": "boolean",
-            "created_at": "string",
-            "email": "string",
-            "id": "number",
-            "name": "string",
-            "role": "string",
-            "task_count": "number"
-          },
-          "type": "object"
-        },
-        "type": "array"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "options-tasks-preflight": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-headers": "content-type",
-        "access-control-allow-methods": "delete, get, head, options, patch, post, put",
-        "access-control-allow-origin": "http://client.example"
-      },
-      "id": "options-tasks-preflight",
-      "kind": "contract",
-      "like": null,
-      "method": "OPTIONS",
-      "path": "/tasks",
-      "shape": "empty",
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "options-tasks-preflight-private-network": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-methods": "delete, get, head, options, patch, post, put",
-        "access-control-allow-origin": "http://client.example",
-        "access-control-allow-private-network": "true"
-      },
-      "id": "options-tasks-preflight-private-network",
-      "kind": "contract",
-      "like": null,
-      "method": "OPTIONS",
-      "path": "/tasks",
-      "shape": "empty",
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "post-categories": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "post-categories",
-      "kind": "contract",
-      "like": null,
-      "method": "POST",
-      "path": "/categories",
+      "method": "DELETE",
+      "path": "/users/3",
       "shape": {
         "properties": {
-          "color": "string",
-          "created_at": "string",
-          "description": "string",
-          "id": "number",
-          "name": "string"
+          "message": "string"
         },
         "type": "object"
       },
       "state": "OBSERVED",
-      "status": 201
+      "status": 200
+    },
+    "op-delete-users-9999": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "op-delete-users-9999",
+      "kind": "contract",
+      "like": null,
+      "method": "DELETE",
+      "path": "/users/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "op-get-reports-summary": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "op-get-reports-summary",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/reports/summary",
+      "shape": {
+        "properties": {
+          "generated_at": "string",
+          "overdue": {
+            "properties": {
+              "count": "number",
+              "tasks": {
+                "items": {
+                  "properties": {
+                    "days_overdue": "number",
+                    "due_date": "string",
+                    "id": "number",
+                    "title": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "overview": {
+            "properties": {
+              "total_categories": "number",
+              "total_tasks": "number",
+              "total_users": "number"
+            },
+            "type": "object"
+          },
+          "recent_activity": {
+            "properties": {
+              "tasks_completed_last_7_days": "number",
+              "tasks_created_last_7_days": "number"
+            },
+            "type": "object"
+          },
+          "tasks_by_priority": {
+            "properties": {
+              "critical": "number",
+              "high": "number",
+              "low": "number",
+              "medium": "number",
+              "minimal": "number"
+            },
+            "type": "object"
+          },
+          "tasks_by_status": {
+            "properties": {
+              "cancelled": "number",
+              "done": "number",
+              "in_progress": "number",
+              "pending": "number"
+            },
+            "type": "object"
+          },
+          "user_productivity": {
+            "items": {
+              "properties": {
+                "completed_tasks": "number",
+                "completion_rate": "number",
+                "total_tasks": "number",
+                "user_id": "number",
+                "user_name": "string"
+              },
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "op-get-reports-user-1": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "op-get-reports-user-1",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/reports/user/1",
+      "shape": {
+        "properties": {
+          "statistics": {
+            "properties": {
+              "cancelled": "number",
+              "completion_rate": "number",
+              "done": "number",
+              "high_priority": "number",
+              "in_progress": "number",
+              "overdue": "number",
+              "pending": "number",
+              "total_tasks": "number"
+            },
+            "type": "object"
+          },
+          "user": {
+            "properties": {
+              "email": "string",
+              "id": "number",
+              "name": "string"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "op-get-reports-user-9999": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "op-get-reports-user-9999",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/reports/user/9999",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "options-tasks-cors": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-methods": "delete, get, head, options, patch, post, put",
+        "access-control-allow-origin": "http://example.test"
+      },
+      "id": "options-tasks-cors",
+      "kind": "contract",
+      "like": null,
+      "method": "OPTIONS",
+      "path": "/tasks",
+      "shape": "empty",
+      "state": "OBSERVED",
+      "status": 200
     },
     "post-categories-no-name": {
       "contentType": "application/json",
@@ -1054,7 +938,7 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "post-login": {
+    "post-categories-ok": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1063,7 +947,57 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "post-login",
+      "id": "post-categories-ok",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/categories",
+      "shape": {
+        "properties": {
+          "color": "string",
+          "created_at": "string",
+          "description": "string",
+          "id": "number",
+          "name": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "post-login-missing-fields": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-login-missing-fields",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/login",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-login-ok": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-login-ok",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -1090,29 +1024,6 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "post-login-missing-fields": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "post-login-missing-fields",
-      "kind": "contract",
-      "like": null,
-      "method": "POST",
-      "path": "/login",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
     "post-login-wrong-password": {
       "contentType": "application/json",
       "destructive": false,
@@ -1136,42 +1047,6 @@
       "state": "OBSERVED",
       "status": 401
     },
-    "post-tasks": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "post-tasks",
-      "kind": "contract",
-      "like": null,
-      "method": "POST",
-      "path": "/tasks",
-      "shape": {
-        "properties": {
-          "category_id": "number",
-          "created_at": "string",
-          "description": "string",
-          "due_date": "string",
-          "id": "number",
-          "priority": "number",
-          "status": "string",
-          "tags": {
-            "items": "string",
-            "type": "array"
-          },
-          "title": "string",
-          "updated_at": "string",
-          "user_id": "number"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 201
-    },
     "post-tasks-bad-date": {
       "contentType": "application/json",
       "destructive": false,
@@ -1182,29 +1057,6 @@
         "access-control-allow-origin": "*"
       },
       "id": "post-tasks-bad-date",
-      "kind": "contract",
-      "like": null,
-      "method": "POST",
-      "path": "/tasks",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "post-tasks-bad-priority": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "post-tasks-bad-priority",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -1241,8 +1093,8 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "post-tasks-minimal": {
-      "contentType": "application/json",
+    "post-tasks-malformed-json": {
+      "contentType": "text/html",
       "destructive": false,
       "error": null,
       "expect": null,
@@ -1250,78 +1102,23 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "post-tasks-minimal",
+      "id": "post-tasks-malformed-json",
       "kind": "contract",
       "like": null,
       "method": "POST",
       "path": "/tasks",
       "shape": {
-        "properties": {
-          "category_id": "null",
-          "created_at": "string",
-          "description": "string",
-          "due_date": "null",
-          "id": "number",
-          "priority": "number",
-          "status": "string",
-          "tags": {
-            "items": "empty",
-            "type": "array"
-          },
-          "title": "string",
-          "updated_at": "string",
-          "user_id": "null"
-        },
-        "type": "object"
+        "lines": [
+          "<!doctype html>",
+          "<h<n>>Bad Request</h<n>>",
+          "<html lang=en>",
+          "<p>Failed to decode JSON object: Expecting value: line <n> column <n> (char <n>)</p>",
+          "<title><n> Bad Request</title>"
+        ],
+        "type": "text"
       },
       "state": "OBSERVED",
-      "status": 201
-    },
-    "post-tasks-missing-category": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "post-tasks-missing-category",
-      "kind": "contract",
-      "like": null,
-      "method": "POST",
-      "path": "/tasks",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 404
-    },
-    "post-tasks-missing-user": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "post-tasks-missing-user",
-      "kind": "contract",
-      "like": null,
-      "method": "POST",
-      "path": "/tasks",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 404
+      "status": 400
     },
     "post-tasks-no-title": {
       "contentType": "application/json",
@@ -1346,17 +1143,53 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "post-tasks-priority-not-number": {
+    "post-tasks-ok": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
+      "expect": null,
+      "finding": null,
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "post-tasks-priority-not-number",
-      "kind": "security",
+      "id": "post-tasks-ok",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "category_id": "number",
+          "created_at": "string",
+          "description": "string",
+          "due_date": "string",
+          "id": "number",
+          "priority": "number",
+          "status": "string",
+          "tags": {
+            "items": "string",
+            "type": "array"
+          },
+          "title": "string",
+          "updated_at": "string",
+          "user_id": "number"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 201
+    },
+    "post-tasks-priority-out-of-range": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-tasks-priority-out-of-range",
+      "kind": "contract",
       "like": null,
       "method": "POST",
       "path": "/tasks",
@@ -1392,7 +1225,7 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "post-users": {
+    "post-tasks-unknown-category": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1401,25 +1234,42 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "post-users",
+      "id": "post-tasks-unknown-category",
       "kind": "contract",
       "like": null,
       "method": "POST",
-      "path": "/users",
+      "path": "/tasks",
       "shape": {
         "properties": {
-          "active": "boolean",
-          "created_at": "string",
-          "email": "string",
-          "id": "number",
-          "name": "string",
-          "password": "string",
-          "role": "string"
+          "error": "string"
         },
         "type": "object"
       },
       "state": "OBSERVED",
-      "status": 201
+      "status": 404
+    },
+    "post-tasks-unknown-user": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "post-tasks-unknown-user",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
     },
     "post-users-bad-email": {
       "contentType": "application/json",
@@ -1467,7 +1317,7 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "post-users-duplicate": {
+    "post-users-duplicate-email": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1476,7 +1326,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "post-users-duplicate",
+      "id": "post-users-duplicate-email",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -1490,28 +1340,34 @@
       "state": "OBSERVED",
       "status": 409
     },
-    "post-users-name-not-string": {
+    "post-users-ok": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
+      "expect": null,
+      "finding": null,
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "post-users-name-not-string",
-      "kind": "security",
+      "id": "post-users-ok",
+      "kind": "contract",
       "like": null,
       "method": "POST",
       "path": "/users",
       "shape": {
         "properties": {
-          "error": "string"
+          "active": "boolean",
+          "created_at": "string",
+          "email": "string",
+          "id": "number",
+          "name": "string",
+          "password": "string",
+          "role": "string"
         },
         "type": "object"
       },
       "state": "OBSERVED",
-      "status": 400
+      "status": 201
     },
     "post-users-short-password": {
       "contentType": "application/json",
@@ -1536,7 +1392,7 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "put-category-2": {
+    "put-categories-1-ok": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1545,11 +1401,11 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-category-2",
+      "id": "put-categories-1-ok",
       "kind": "contract",
       "like": null,
       "method": "PUT",
-      "path": "/categories/2",
+      "path": "/categories/1",
       "shape": {
         "properties": {
           "color": "string",
@@ -1563,30 +1419,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "put-category-description-object": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "put-category-description-object",
-      "kind": "security",
-      "like": null,
-      "method": "PUT",
-      "path": "/categories/2",
-      "shape": {
-        "properties": {
-          "error": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "put-category-missing": {
+    "put-categories-9999": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1595,7 +1428,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-category-missing",
+      "id": "put-categories-9999",
       "kind": "contract",
       "like": null,
       "method": "PUT",
@@ -1609,20 +1442,20 @@
       "state": "OBSERVED",
       "status": 404
     },
-    "put-category-null-body": {
+    "put-tasks-1-bad-status": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
+      "expect": null,
+      "finding": null,
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-category-null-body",
-      "kind": "security",
+      "id": "put-tasks-1-bad-status",
+      "kind": "contract",
       "like": null,
       "method": "PUT",
-      "path": "/categories/2",
+      "path": "/tasks/1",
       "shape": {
         "properties": {
           "error": "string"
@@ -1632,7 +1465,7 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "put-task-2": {
+    "put-tasks-1-ok": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1641,11 +1474,11 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-task-2",
+      "id": "put-tasks-1-ok",
       "kind": "contract",
       "like": null,
       "method": "PUT",
-      "path": "/tasks/2",
+      "path": "/tasks/1",
       "shape": {
         "properties": {
           "category_id": "number",
@@ -1668,7 +1501,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "put-task-2-clear-date": {
+    "put-tasks-1-short-title": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1677,47 +1510,11 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-task-2-clear-date",
+      "id": "put-tasks-1-short-title",
       "kind": "contract",
       "like": null,
       "method": "PUT",
-      "path": "/tasks/2",
-      "shape": {
-        "properties": {
-          "category_id": "number",
-          "created_at": "string",
-          "description": "string",
-          "due_date": "null",
-          "id": "number",
-          "priority": "number",
-          "status": "string",
-          "tags": {
-            "items": "string",
-            "type": "array"
-          },
-          "title": "string",
-          "updated_at": "string",
-          "user_id": "number"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "put-task-bad-status": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {
-        "access-control-allow-origin": "*"
-      },
-      "id": "put-task-bad-status",
-      "kind": "contract",
-      "like": null,
-      "method": "PUT",
-      "path": "/tasks/2",
+      "path": "/tasks/1",
       "shape": {
         "properties": {
           "error": "string"
@@ -1727,7 +1524,7 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "put-task-missing": {
+    "put-tasks-9999": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1736,7 +1533,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-task-missing",
+      "id": "put-tasks-9999",
       "kind": "contract",
       "like": null,
       "method": "PUT",
@@ -1750,20 +1547,20 @@
       "state": "OBSERVED",
       "status": 404
     },
-    "put-task-title-not-string": {
+    "put-users-2-bad-email": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
+      "expect": null,
+      "finding": null,
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-task-title-not-string",
-      "kind": "security",
+      "id": "put-users-2-bad-email",
+      "kind": "contract",
       "like": null,
       "method": "PUT",
-      "path": "/tasks/2",
+      "path": "/users/2",
       "shape": {
         "properties": {
           "error": "string"
@@ -1773,7 +1570,7 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "put-user-2": {
+    "put-users-2-ok": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1782,7 +1579,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-user-2",
+      "id": "put-users-2-ok",
       "kind": "contract",
       "like": null,
       "method": "PUT",
@@ -1802,7 +1599,7 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "put-user-missing": {
+    "put-users-9999": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
@@ -1811,7 +1608,7 @@
       "headers": {
         "access-control-allow-origin": "*"
       },
-      "id": "put-user-missing",
+      "id": "put-users-9999",
       "kind": "contract",
       "like": null,
       "method": "PUT",
@@ -1824,6 +1621,259 @@
       },
       "state": "OBSERVED",
       "status": 404
+    },
+    "sec-delete-users-3": {
+      "contentType": "application/json",
+      "destructive": true,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-delete-users-3",
+      "kind": "security",
+      "like": null,
+      "method": "DELETE",
+      "path": "/users/3",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "sec-get-reports-summary": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-get-reports-summary",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/reports/summary",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "sec-get-reports-user-1": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-get-reports-user-1",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/reports/user/1",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "sec-post-task-priority-text": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-task-priority-text",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-post-task-title-number": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-task-title-number",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-post-task-user-zero": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-20",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-task-user-zero",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/tasks",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "sec-post-user-email-number": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-post-user-email-number",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/users",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-put-category-null-body": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-put-category-null-body",
+      "kind": "security",
+      "like": null,
+      "method": "PUT",
+      "path": "/categories/1",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-put-user-password-number": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-put-user-password-number",
+      "kind": "security",
+      "like": null,
+      "method": "PUT",
+      "path": "/users/2",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-search-priority-text": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-search-priority-text",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/tasks/search?priority=abc",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-search-userid-text": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {
+        "access-control-allow-origin": "*"
+      },
+      "id": "sec-search-userid-text",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/tasks/search?user_id=abc",
+      "shape": {
+        "properties": {
+          "error": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 400
     }
   },
   "version": 3

@@ -1375,6 +1375,49 @@ dos scorecards*: inflaria o recall da rodada 5 por construção (contaminação,
 stack sem harness embarcado, a imagem pode não ter Python nem Node. Nesse caso, a prontidão volta a
 ser uma checagem por chamada, repetida (protocolo §7).
 
+### D27 — Operação privilegiada: o teste de uso legítimo não rejeita o operador (emenda à D15, rodada 6)
+
+**Contexto.** O avaliador devolveu a entrega: AP-04 é CRITICAL nos três relatórios, mas a Fase 3 só o
+propõe, e no projeto 1 as rotas de reset de dados e de execução de SQL arbitrário continuam abertas a
+qualquer anônimo. Lista congelada em [`round6-changes.md`](rounds/round6-changes.md).
+
+**Falha de raciocínio na D15.** A pergunta "quem recebe a nova rejeição?" foi respondida com "todo
+cliente atual" sempre que não há modelo de identidade. Isso vale para operações que clientes comuns
+existem para chamar. Não vale para uma operação cujo único chamador legítimo é um operador: ali, quem
+a chama anonimamente é, por definição, o atacante, e o bloqueio só muda o que o uso ilegítimo observa,
+o mesmo raciocínio que torna parametrizar uma query seguro.
+
+**Decisão.** (1) *Operação privilegiada*, definida por sinal observável: executa consulta ou código
+vindo da requisição; destrói ou reinicia dados em massa; é de manutenção ou diagnóstico; remove conta
+sem noção de dono; ou agrega dados de todos os principais. (2) Privilegiada é `safe`, com ou sem
+identidade: **remover** da superfície quando é insegura por construção, **proteger** com credencial de
+operador lida de configuração, fail-closed, comparação em tempo constante. A guarda não é um modelo
+de identidade e não inventa usuários nem papéis. (3) Operação de negócio sem identidade continua
+`contract-changing` e proposta; na dúvida, propõe. (4) No protocolo, a chamada anônima de uma operação
+privilegiada vira entrada `security` (`rejected`), não `REGRESSION`; o caminho do operador é verificado
+com a credencial, ou rotulado como verificado à mão.
+
+**Alternativas rejeitadas.** *Sempre remover*: perde relatórios e exclusões que operadores usam.
+*Sempre proteger*: deixa em pé um executor de SQL arbitrário atrás de um segredo único. *Aplicar
+autenticação completa*: inventa política de produto, exatamente o que a D7 proíbe.
+
+**Emenda 1 (2026-10-10).** A primeira execução mostrou que o texto permitia leituras divergentes
+(exclusão de conta, agregados). Escolhida a opção de esclarecer, não a de estreitar: exclusão de
+**conta** sem modelo de identidade e **agregado gerencial** são privilegiados; CRUD de registro de
+domínio, listagens (contas incluídas), login e checkout não são. Estreitar teria devolvido ao estado
+aberto exatamente as rotas que o avaliador criticou.
+
+**Emenda 2 (2026-10-10).** Repetir o projeto 3 divergiu da primeira execução: o app emite um token
+que nenhuma rota verifica, e a definição de "modelo de identidade" (login, sessão ou token) deixou a
+exclusão de conta de fora. Passou a valer **verificação, não emissão**: sem operação que verifique
+credencial apresentada, não há identidade para o primeiro cenário da tabela. E o agregado gerencial
+é definido por conteúdo (financeiro ou por principal), de modo que contagem por estado é leitura.
+
+**Custo aceito.** A fronteira privilegiada/negócio ainda é um julgamento, agora com critérios
+escritos; a regra manda propor quando ambíguo. Remover uma rota muda o contrato para o uso anônimo ilegítimo, e isso é o
+objetivo. A guarda desligada por padrão exige que o operador configure a variável para reabilitar a
+operação, e o relatório diz qual.
+
 ---
 
 ## 4. O princípio emergente: a skill nunca degrada em silêncio

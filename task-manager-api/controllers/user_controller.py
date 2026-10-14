@@ -1,147 +1,191 @@
-"""User and authentication use cases. Plain values in, domain objects out."""
 import logging
+import re
 
-from sqlalchemy.exc import SQLAlchemyError
-
-from controllers.common import MSG_DELETE_FAILED, MSG_UPDATE_FAILED, require_object, required_text
-from database import commit_or_fail, db
-from models.errors import AuthenticationError, ConflictError, ForbiddenError, ValidationError
-from models.task import Task
-from models.user import DEFAULT_ROLE, MIN_PASSWORD_LENGTH, USER_ROLES, User, is_valid_email
+from models.constants import DEFAULT_ROLE, EMAIL_PATTERN, MIN_PASSWORD_LENGTH, USER_ROLES
+from models.errors import (
+    AuthenticationError, ConflictError, ForbiddenError, NotFoundError, PersistenceError, ValidationError,
+)
+from models.user import User
 
 logger = logging.getLogger(__name__)
 
-MSG_NAME_REQUIRED = 'Nome é obrigatório'
-MSG_NAME_INVALID = 'Nome inválido'
-MSG_EMAIL_REQUIRED = 'Email é obrigatório'
-MSG_PASSWORD_REQUIRED = 'Senha é obrigatória'
-MSG_EMAIL_INVALID = 'Email inválido'
-MSG_PASSWORD_TOO_SHORT_CREATE = 'Senha deve ter no mínimo 4 caracteres'
-MSG_PASSWORD_TOO_SHORT_UPDATE = 'Senha muito curta'
-MSG_EMAIL_TAKEN = 'Email já cadastrado'
-MSG_ROLE_INVALID = 'Role inválido'
-MSG_ACTIVE_INVALID = 'Valor inválido para active'
-MSG_CREDENTIALS_REQUIRED = 'Email e senha são obrigatórios'
-MSG_BAD_CREDENTIALS = 'Credenciais inválidas'
-MSG_INACTIVE = 'Usuário inativo'
-MSG_CREATE_FAILED = 'Erro ao criar usuário'
 
-# The token format is part of today's contract. Replacing it with a signed, expiring token
-# is proposed (AP-04), not applied: it needs an identity model the application lacks.
-LEGACY_TOKEN_PREFIX = 'fake-jwt-token-'
-
-
-def _validate_password(password, too_short_message):
-    if not isinstance(password, str) or len(password) < MIN_PASSWORD_LENGTH:
-        raise ValidationError(too_short_message)
-    return password
+def is_valid_email(email):
+    return isinstance(email, str) and re.match(EMAIL_PATTERN, email) is not None
 
 
 class UserController:
+    def __init__(self, users, tasks, uow, clock):
+        self._users = users
+        self._tasks = tasks
+        self._uow = uow
+        self._clock = clock
+
+    def _require_user(self, user_id):
+        user = self._users.get(user_id)
+        if not user:
+            raise NotFoundError('Usuário não encontrado')
+        return user
+
     def list_users(self):
-        counts = Task.counts_per_user()
-        return [(user, counts.get(user.id, (0, 0))[0]) for user in User.list_all()]
+        task_counts = self._tasks.counts_by_user()
+        return [
+            {
+                'id': u.id,
+                'name': u.name,
+                'email': u.email,
+                'role': u.role,
+                'active': u.active,
+                'created_at': str(u.created_at),
+                'task_count': task_counts.get(u.id, 0),
+            }
+            for u in self._users.list_all()
+        ]
 
     def get_user(self, user_id):
-        user = User.get_or_fail(user_id)
-        return user, Task.list_for_user(user_id)
+        user = self._require_user(user_id)
+        data = user.to_dict()
+        data['tasks'] = [t.to_dict() for t in self._tasks.for_user(user_id)]
+        return data
 
-    def user_tasks(self, user_id):
-        User.get_or_fail(user_id)
-        return Task.list_for_user(user_id)
+    def create_user(self, data):
+        if not isinstance(data, dict) or not data:
+            raise ValidationError('Dados inválidos')
 
-    def create(self, data):
-        data = require_object(data)
         name = data.get('name')
         email = data.get('email')
         password = data.get('password')
         role = data.get('role', DEFAULT_ROLE)
 
-        required_text(name, MSG_NAME_REQUIRED, MSG_NAME_INVALID)
+        if not name:
+            raise ValidationError('Nome é obrigatório')
         if not email:
-            raise ValidationError(MSG_EMAIL_REQUIRED)
+            raise ValidationError('Email é obrigatório')
         if not password:
-            raise ValidationError(MSG_PASSWORD_REQUIRED)
+            raise ValidationError('Senha é obrigatória')
         if not is_valid_email(email):
-            raise ValidationError(MSG_EMAIL_INVALID)
-        _validate_password(password, MSG_PASSWORD_TOO_SHORT_CREATE)
-        if User.find_by_email(email):
-            raise ConflictError(MSG_EMAIL_TAKEN)
-        # The role is still taken from the request: restricting it needs an identity model
-        # (AP-04, proposed). Only the closed set is enforced here.
+            raise ValidationError('Email inválido')
+        if not isinstance(password, str):
+            raise ValidationError('Senha inválida')
+        if len(password) < MIN_PASSWORD_LENGTH:
+            raise ValidationError('Senha deve ter no mínimo 4 caracteres')
+        if self._users.get_by_email(email):
+            raise ConflictError('Email já cadastrado')
         if role not in USER_ROLES:
-            raise ValidationError(MSG_ROLE_INVALID)
+            raise ValidationError('Role inválido')
 
-        user = User(name=name, email=email, role=role)
+        user = User()
+        user.name = name
+        user.email = email
         user.set_password(password)
-        db.session.add(user)
-        commit_or_fail(MSG_CREATE_FAILED)
-        logger.info('Usuário criado: %s - %s', user.id, user.name)
-        return user
+        user.role = role
 
-    def update(self, user_id, data):
-        user = User.get_or_fail(user_id)
-        data = require_object(data)
-        changes = {}
+        try:
+            self._users.add(user)
+            self._uow.commit()
+            logger.info('Usuário criado: %s - %s', user.id, user.name)
+            return user.to_dict()
+        except Exception:
+            self._uow.rollback()
+            logger.exception('Erro ao criar usuário')
+            raise PersistenceError('Erro ao criar usuário')
+
+    def update_user(self, user_id, data):
+        user = self._require_user(user_id)
+        if not isinstance(data, dict) or not data:
+            raise ValidationError('Dados inválidos')
+
         if 'name' in data:
-            changes['name'] = required_text(data['name'], MSG_NAME_REQUIRED, MSG_NAME_INVALID)
+            user.name = data['name']
         if 'email' in data:
             if not is_valid_email(data['email']):
-                raise ValidationError(MSG_EMAIL_INVALID)
-            existing = User.find_by_email(data['email'])
+                raise ValidationError('Email inválido')
+            existing = self._users.get_by_email(data['email'])
             if existing and existing.id != user_id:
-                raise ConflictError(MSG_EMAIL_TAKEN)
-            changes['email'] = data['email']
-        new_password = None
+                raise ConflictError('Email já cadastrado')
+            user.email = data['email']
         if 'password' in data:
-            new_password = _validate_password(data['password'], MSG_PASSWORD_TOO_SHORT_UPDATE)
+            if not isinstance(data['password'], str):
+                raise ValidationError('Senha inválida')
+            if len(data['password']) < MIN_PASSWORD_LENGTH:
+                raise ValidationError('Senha muito curta')
+            user.set_password(data['password'])
         if 'role' in data:
             if data['role'] not in USER_ROLES:
-                raise ValidationError(MSG_ROLE_INVALID)
-            changes['role'] = data['role']
+                raise ValidationError('Role inválido')
+            user.role = data['role']
         if 'active' in data:
-            if data['active'] not in (True, False):        # also accepts 0 and 1, as before
-                raise ValidationError(MSG_ACTIVE_INVALID)
-            changes['active'] = data['active']
+            user.active = data['active']
 
-        for field, value in changes.items():
-            setattr(user, field, value)
-        if new_password is not None:
-            user.set_password(new_password)
-        commit_or_fail(MSG_UPDATE_FAILED)
-        return user
+        try:
+            self._uow.commit()
+            return user.to_dict()
+        except Exception:
+            self._uow.rollback()
+            logger.exception('Erro ao atualizar usuário %s', user_id)
+            raise PersistenceError('Erro ao atualizar')
 
-    def delete(self, user_id):
-        user = User.get_or_fail(user_id)
-        Task.delete_for_user(user_id)
-        db.session.delete(user)
-        commit_or_fail(MSG_DELETE_FAILED)
-        logger.info('Usuário deletado: %s', user_id)
+    def delete_user(self, user_id):
+        user = self._require_user(user_id)
+        for task in self._tasks.for_user(user_id):
+            self._tasks.delete(task)
+        try:
+            self._users.delete(user)
+            self._uow.commit()
+            logger.info('Usuário deletado: %s', user_id)
+            return {'message': 'Usuário deletado com sucesso'}
+        except Exception:
+            self._uow.rollback()
+            logger.exception('Erro ao deletar usuário %s', user_id)
+            raise PersistenceError('Erro ao deletar')
+
+    def list_user_tasks(self, user_id):
+        self._require_user(user_id)
+        now = self._clock()
+        return [
+            {
+                'id': t.id,
+                'title': t.title,
+                'description': t.description,
+                'status': t.status,
+                'priority': t.priority,
+                'created_at': str(t.created_at),
+                'due_date': str(t.due_date) if t.due_date else None,
+                'overdue': t.is_overdue(now),
+            }
+            for t in self._tasks.for_user(user_id)
+        ]
 
     def login(self, data):
-        data = require_object(data)
+        if not isinstance(data, dict) or not data:
+            raise ValidationError('Dados inválidos')
+
         email = data.get('email')
         password = data.get('password')
-        if not email or not password or not isinstance(email, str) or not isinstance(password, str):
-            raise ValidationError(MSG_CREDENTIALS_REQUIRED)
+        if not email or not password:
+            raise ValidationError('Email e senha são obrigatórios')
+        if not isinstance(email, str) or not isinstance(password, str):
+            raise ValidationError('Dados inválidos')
 
-        user = User.find_by_email(email)
-        if not user or not user.check_password(password):
-            raise AuthenticationError(MSG_BAD_CREDENTIALS)
+        user = self._users.get_by_email(email)
+        if not user:
+            raise AuthenticationError('Credenciais inválidas')
+        if not user.check_password(password):
+            raise AuthenticationError('Credenciais inválidas')
         if not user.active:
-            raise ForbiddenError(MSG_INACTIVE)
-        if user.has_legacy_password_hash():
-            self._upgrade_password_hash(user, password)
-        return user, LEGACY_TOKEN_PREFIX + str(user.id)
+            raise ForbiddenError('Usuário inativo')
 
-    @staticmethod
-    def _upgrade_password_hash(user, password):
-        """Best-effort re-hash of a legacy MD5 credential. Deliberately narrow: a failure here
-        must not fail a login that already succeeded; it is logged and retried on the next one."""
-        user.set_password(password)
-        try:
-            db.session.commit()
-        except SQLAlchemyError:
-            db.session.rollback()
-            logger.warning('password hash upgrade failed for user %s; will retry on next login',
-                           user.id, exc_info=True)
+        if user.needs_password_upgrade():
+            # Transparent upgrade: re-hash the legacy digest with the salted KDF.
+            try:
+                user.set_password(password)
+                self._uow.commit()
+            except Exception:
+                self._uow.rollback()
+                logger.warning('Não foi possível atualizar o hash da senha do usuário %s', user.id)
+
+        return {
+            'message': 'Login realizado com sucesso',
+            'user': user.to_dict(),
+            'token': 'fake-jwt-token-' + str(user.id),
+        }

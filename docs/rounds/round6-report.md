@@ -200,6 +200,10 @@ remoto**. O relatório de auditoria de cada projeto está em `reports/audit-proj
 `<projeto>/reports/audit-latest.md`, junto de `surface.json`, `baseline.json` e `replay*.json`/
 `current.json`.
 
+> **Atualização (2026-10-13):** os branches `round6/*` e `feat/round6` foram enviados ao remoto depois
+> da escrita deste relatório. O código entregue em `release/delivery-r6` **não** é o desta rodada: é o da rodada limpa
+(`round6-clean-report.md`); o código desta rodada fica em `feat/round6`, só como evidência.
+
 | Projeto | Execução usada na entrega | Commit |
 |---|---|---|
 | code-smells-project | `round6/p1-iter2` | `f19b8e5` |

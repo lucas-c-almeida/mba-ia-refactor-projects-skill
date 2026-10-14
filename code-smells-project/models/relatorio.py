@@ -1,14 +1,5 @@
-"""Sales report: the discount rule and the aggregate query (AP-10, AP-15)."""
-
-from models.pedido import StatusPedido
-
-# Discount tiers on gross revenue: (revenue strictly above, rate). Checked from the highest down.
-FAIXAS_DESCONTO = (
-    (10000, 0.1),
-    (5000, 0.05),
-    (1000, 0.02),
-)
-CASAS_DECIMAIS = 2
+"""Sales report: aggregates in the database, the discount rule in a pure function."""
+from models.constants import FAIXAS_DESCONTO, STATUS_APROVADO, STATUS_CANCELADO, STATUS_PENDENTE
 
 
 def calcular_desconto(faturamento):
@@ -19,40 +10,35 @@ def calcular_desconto(faturamento):
 
 
 def montar_relatorio(total_pedidos, faturamento, pendentes, aprovados, cancelados):
-    if faturamento is None:
-        faturamento = 0
     desconto = calcular_desconto(faturamento)
     return {
         "total_pedidos": total_pedidos,
-        "faturamento_bruto": round(faturamento, CASAS_DECIMAIS),
-        "desconto_aplicavel": round(desconto, CASAS_DECIMAIS),
-        "faturamento_liquido": round(faturamento - desconto, CASAS_DECIMAIS),
+        "faturamento_bruto": round(faturamento, 2),
+        "desconto_aplicavel": round(desconto, 2),
+        "faturamento_liquido": round(faturamento - desconto, 2),
         "pedidos_pendentes": pendentes,
         "pedidos_aprovados": aprovados,
         "pedidos_cancelados": cancelados,
-        "ticket_medio": round(faturamento / total_pedidos, CASAS_DECIMAIS) if total_pedidos > 0 else 0,
+        "ticket_medio": round(faturamento / total_pedidos, 2) if total_pedidos > 0 else 0,
     }
 
 
 class RelatorioRepository:
-    def __init__(self, conexao):
-        self._conexao = conexao
+    def __init__(self, db):
+        self._db = db
 
-    def totais_vendas(self):
-        """One aggregate query instead of five."""
-        linha = self._conexao().execute(
-            "SELECT COUNT(*) AS total_pedidos, "
-            "       SUM(total) AS faturamento, "
-            "       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS pendentes, "
-            "       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS aprovados, "
-            "       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS cancelados "
-            "  FROM pedidos",
-            (StatusPedido.PENDENTE, StatusPedido.APROVADO, StatusPedido.CANCELADO),
-        ).fetchone()
-        return (
-            linha["total_pedidos"],
-            linha["faturamento"],
-            linha["pendentes"],
-            linha["aprovados"],
-            linha["cancelados"],
-        )
+    def vendas(self):
+        with self._db.session() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS total,
+                       SUM(total) AS faturamento,
+                       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS pendentes,
+                       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS aprovados,
+                       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS cancelados
+                FROM pedidos
+                """,
+                (STATUS_PENDENTE, STATUS_APROVADO, STATUS_CANCELADO),
+            ).fetchone()
+        faturamento = row["faturamento"] if row["faturamento"] is not None else 0
+        return montar_relatorio(row["total"], faturamento, row["pendentes"], row["aprovados"], row["cancelados"])

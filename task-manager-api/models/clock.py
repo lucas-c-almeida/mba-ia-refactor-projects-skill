@@ -1,11 +1,7 @@
-"""The single source of the current time (AP-14, AP-06).
-
-Replaces the deprecated `datetime.utcnow()` with its successor named by the runtime warning,
-`datetime.now(timezone.utc)`, and drops the tzinfo so stored and serialized values keep the
-naive-UTC format the API has always returned.
-"""
+"""Time source for the domain (injectable in controllers)."""
 from datetime import datetime, timezone
 
 
-def utcnow():
+def utc_now():
+    """Naive UTC timestamp: the storage and comparison format used by every column."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
