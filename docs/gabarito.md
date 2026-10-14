@@ -141,3 +141,98 @@ diretório temporário da sessão; nenhum arquivo versionado foi alterado.
   exemplos genéricos um arquivo de configuração com chave hardcoded, uma God Class em
   `AppManager.js` e uma query N+1 em pedidos. Os três achados aparecem aqui (P1 #4, P2 #5, P1 #11),
   mas seriam encontrados de qualquer forma. Não li o catálogo da skill nem os relatórios de rodada.
+
+---
+
+# Parte 2 — Extensão pós-rodada 6 (2026-10-13)
+
+> **Leia antes de usar.** A Parte 1 acima é o gabarito **cego**: escrito antes de qualquer rodada, só
+> com a leitura do código. Ela continua sendo o denominador de **recall** (25 + 21 + 23 = 69 itens) e
+> **não foi alterada**. Esta Parte 2 acrescenta o que se aprendeu *depois*, com duas origens, e por isso
+> **está contaminada por construção** (D12): vários itens existem porque a skill os viu primeiro.
+>
+> - **Regra de uso.** Recall histórico (rodadas 1–6) = só Parte 1. Recall da rodada 7 em diante = Parte 1
+>   **e** Parte 1 + 2, reportados separados. Um item da Parte 2 achado pela skill **não** conta como
+>   "achado além do gabarito" (D8): ele já está no gabarito. A métrica ⭐ passa a medir o que não está
+>   em nenhuma das duas partes.
+> - **Fonte `S`** = achado pela skill (Fase 2 da rodada limpa da rodada 6, ou rodada anterior citada).
+>   **Fonte `V`** = achado por verificador independente executando a entrega (docs/verification/).
+> - **Estado** diz o que a skill fez com o item na entrega `release/delivery-r6`: `corrigido`,
+>   `proposto` (gate de contrato), `não visto` (a Fase 2 não reportou) ou `introduzido` (a
+>   refatoração criou o defeito).
+> - Linhas apontam o **código original** (`7ef5932`) salvo quando a coluna diz "entrega".
+
+## code-smells-project — extensão
+
+| # | Sev. | Problema | Arquivo:linhas | Fonte | Estado |
+|---|---|---|---|---|---|
+| X1.1 | MEDIUM | Dependências com advisory vivo (OSV.dev, 2026-10-12): `flask-cors` 5.0.1 e `flask` 3.1.1, mesma linha da dúvida "versões com CVE" da Parte 1 | `requirements.txt:1-2` | S | corrigido (upgrade dentro da major do flask; major do flask-cors coberta pelo replay de CORS) |
+| X1.2 | MEDIUM | Listagens (produtos, usuários, pedidos) devolvem a tabela inteira, sem paginação | `models.py:4-22` | S | proposto (muda o corpo recebido) |
+| X1.3 | MEDIUM | Conexão aberta por requisição e nunca fechada (ciclo de vida do handle), distinto da conexão global do item 9 | `database.py:10-11` | S | corrigido |
+| X1.4 | CRITICAL | Relatório de vendas (agregado financeiro de todos os clientes) aberto a qualquer anônimo | `controllers.py:257-262`, `models.py:239-254` | S | corrigido (guarda de operador, D27) |
+| X1.5 | CRITICAL | Contas de seed com senha conhecida (`admin`/`admin123`) criadas em todo banco vazio, inclusive em produção | `database.py:75-83` | S | proposto (mudaria quais contas existem). A Parte 1 decidiu *não* listar à parte; as skills reportam como CRITICAL. Divergência de severidade registrada |
+| X1.6 | MEDIUM | Sem limite de tamanho de corpo nem de linhas por pedido (o sinal estava na lista de "verificados" da Fase 2 e não foi reportado) | `controllers.py:188-220`, `app.py:24-31` | S | não visto na Fase 2; achado pela re-auditoria (`missed-in-phase-2`); proposto |
+| X1.7 | LOW | Colunas de conjunto fechado (`pedidos.status`, `usuarios.tipo`) como texto livre; `email` e `nome` anuláveis embora o código os desreferencie | `database.py:26-44` | S | não visto na Fase 2; proposto |
+| X1.8 | MEDIUM | Inteiro fora da faixa do SQLite vira 500 depois da parametrização: `GET /produtos/<9999…9>` (original: 404) e `POST /produtos` com `estoque` gigante (original: 201) | entrega: `controllers/produto_controller.py`, `models/produto.py`, `controllers/validation.py` | V | **introduzido** pela correção do AP-02; a validação de borda não limita a faixa |
+| X1.9 | LOW | Valor não finito aceito: `preco=1e999` (original: 500, agora 201 e `estoque` "inf") | entrega: `controllers/validation.py:12-16` (`eh_numero`) | V | **introduzido** (validação de tipo sem validação de faixa) |
+| X1.10 | LOW | `POST /pedidos` com `itens` numérico → 500 por `len(itens)` antes de validar que é lista (o original também dava 500) | entrega: `controllers/pedido_controller.py:39` | V | não corrigido embora seja o "subconjunto seguro" de AP-11 (entrada malformada → 4xx) |
+| X1.11 | LOW | JSON com milhares de níveis de aninhamento → 500 por recursão (original também) | entrega, todas as rotas de escrita | V | não visto |
+
+## ecommerce-api-legacy — extensão
+
+| # | Sev. | Problema | Arquivo:linhas | Fonte | Estado |
+|---|---|---|---|---|---|
+| X2.1 | MEDIUM | Advisories na cadeia de execução do Express (ex.: ReDoS em `path-to-regexp`, `qs`, `body-parser`) | `package.json:9-12` | S | corrigido (lockfile dentro da major) |
+| X2.2 | HIGH | Página de erro padrão do framework com stack trace; `NODE_ENV` nunca definido | `src/app.js:5-6` | S | corrigido (middleware de erro central) |
+| X2.3 | MEDIUM | Tipo errado derruba o **processo**: `card` ou `pwd` numérico → `cc.startsWith is not a function` / `ERR_INVALID_ARG_TYPE` (a Parte 1, item 11, cita só o `err` ignorado) | `src/AppManager.js:28-35`, `:45` | S | corrigido |
+| X2.4 | LOW | Advisories e pacote sem manutenção na cadeia de instalação do `sqlite3` (a Parte 1, item 15, cita só a deprecação) | `package.json:11-11` | S | proposto (a única saída é um upgrade major cujas notas não cobrem a mudança do motor) |
+| X2.5 | LOW | Ordem do relatório financeiro não determinística (curso e aluno) | `src/AppManager.js:83-127` | V | corrigido (ordem por id) |
+| X2.6 | MEDIUM | `usr` e `eml` aceitam objeto, array e inteiro (200); o que foi gravado não foi conferido. A Parte 1, item 14, cita senha, e-mail, cartão e `c_id`, mas não o tipo de `usr`/`eml` | entrega: `src/routes/index.js` (validação de borda do checkout) | V | não corrigido (original igual) |
+| X2.7 | MEDIUM | Placeholder fraco entregue: `OPERATOR_TOKEN=change-me` em `.env.example`; a guarda aceita esse valor se for o configurado | entrega: `.env.example` | V | **introduzido** |
+| X2.8 | LOW | `DELETE /api/users/<id>` com id inexistente ou não numérico responde 200 "sucesso" (Parte 1, item 11, já cita) | entrega: `src/controllers/userController.js` | V | **ainda presente** na entrega (proposto como contrato) |
+| X2.9 | LOW | O log de auditoria do checkout é só escrito e nunca lido. A skill reportou isso como AP-17 e retirou na re-auditoria ("trilha de auditoria é write-only por natureza") | `src/AppManager.js:57-58` | S | **falso positivo conhecido**; não é problema do alvo |
+
+## task-manager-api — extensão
+
+| # | Sev. | Problema | Arquivo:linhas | Fonte | Estado |
+|---|---|---|---|---|---|
+| X3.1 | HIGH | `flask-cors` 4.0.0 com 5 advisories (a Parte 1 declarou a dúvida e não listou por falta de evidência viva) | `requirements.txt:3-3` | S | parcial: 4.0.2 aplicado (fecha 2); os outros 3 só na 6.0.0, major cujo comportamento de path-matching o replay não exercita → proposto |
+| X3.2 | LOW | `flask` 3.0.0 com advisory (cabeçalho `Vary` de sessão), reportado só na tabela de cobertura | `requirements.txt:1-1` | S | não visto como finding na Fase 2; achado pela re-auditoria; corrigido (3.1.3) |
+| X3.3 | MEDIUM | O módulo de relatórios hospeda a API de categorias (nome e responsabilidade desencontrados) | `routes/report_routes.py:159-223` | S | corrigido |
+| X3.4 | HIGH | Relatório geral e relatório por usuário (rollup de todos os principais) abertos a anônimos; a exclusão de conta também | `routes/report_routes.py:12-101`, `routes/user_routes.py:134-151` | S | corrigido (guarda de operador, D27). `GET /reports/user/<id>` é ambíguo (uma execução guardou, outra propôs) |
+| X3.5 | MEDIUM | `tags` como objeto → 500 | entrega: `controllers/task_controller.py:25-30` (`normalize_tags` só trata lista) | V | não corrigido (original igual) |
+| X3.6 | MEDIUM | `active` com valor não booleano (`"maybe"`) → 500 | entrega: `controllers/user_controller.py:117-118` | V | não corrigido (original igual); a Parte 1, item 9, cita `active` sem validação |
+| X3.7 | MEDIUM | Nome de categoria como lista → 500 | entrega: `controllers/category_controller.py:57-58` | V | não corrigido (original igual) |
+| X3.8 | MEDIUM | Id inteiro gigante em rota → 500 (`GET /tasks/<99…9>`) | rotas com `<int:id>` | V | não corrigido (original igual) |
+| X3.9 | LOW | Contas legadas (MD5) só migram no próximo login bem-sucedido; quem nunca loga mantém o digest fraco no banco | `models/user.py` (entrega) | S, V | `unresolved` na execução `--yes`; residual declarado |
+| X3.10 | LOW | `python app.py` com outro diretório corrente cria `instance/` e o banco relativos ao CWD; o README não avisa | entrega: `app.py`, `README.md` | V | introduzido (documentação) |
+| X3.11 | MEDIUM | `PUT /users/<id>` (pode setar `active` e `role`) e cadastro com `role` no corpo seguem abertos | `routes/user_routes.py:52`, `119-122` | S, V | proposto; é a parte de **negócio** do item 2 da Parte 1 |
+
+## Itens transversais — defeitos da própria skill (não do alvo)
+
+Não entram no recall (não são problemas dos alvos), mas são **erros achados pelas execuções** e
+precisam de tratamento na skill. Detalhe e proposta de mudança em
+[`docs/rounds/round6-skill-results.md`](rounds/round6-skill-results.md).
+
+| # | Problema | Origem |
+|---|---|---|
+| T1 | Artefatos da skill (`surface.json`, `baseline.json`) gravam senhas do seed e tokens de fixture do alvo | V |
+| T2 | A skill não gera nem preserva `.gitignore` do alvo; a rodada limpa removeu o dos projetos 1 e 3 | orquestrador |
+| T3 | `proc start` falha em imagem slim (sem hora de início do processo) | S (3 projetos) |
+| T4 | Rótulo de container e scratch com identificador só de timestamp colidem em execuções simultâneas | S |
+| T5 | AP-17 reporta tabela de auditoria "só escrita" | S |
+| T6 | A Fase 2 lista um sinal como verificado e não reporta (corpo/array sem limite; advisory só na tabela de cobertura) | S |
+| T7 | A classificação privilegiada/negócio diverge entre execuções (um relatório por usuário) | S |
+| T8 | O replay compara forma, não valor: a busca com aspa passou a achar o produto; faixa de inteiro e `1e999` passam | S, V |
+| T9 | AP-11 "subconjunto seguro" aplicado de forma incompleta: tipos errados ainda dão 500 em campos que a refatoração tocou | V |
+
+## Cobertura da Parte 2
+
+| Projeto | Itens | CRITICAL | HIGH | MEDIUM | LOW | Fonte S | Fonte V |
+|---|---|---|---|---|---|---|---|
+| code-smells-project | 11 | 2 | 0 | 5 | 4 | 7 | 4 |
+| ecommerce-api-legacy | 9 | 0 | 1 | 4 | 4 | 5 | 4 |
+| task-manager-api | 11 | 0 | 2 | 6 | 3 | 6 | 7 |
+| **Total** | **31** | 2 | 3 | 15 | 11 | 18 | 15 |
+
+(Itens com fonte "S, V" contam nas duas colunas; `T1..T9` não entram na contagem.)

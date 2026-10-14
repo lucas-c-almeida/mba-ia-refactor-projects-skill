@@ -236,6 +236,19 @@ repositório; nenhum arquivo versionado foi alterado.
 - **LIKE sem escapar `%`/`_`** na busca do projeto 3 (`routes/task_routes.py:252-253`). Não é injeção (o
   ORM parametriza), só busca imprecisa. Não listei.
 
+### A.6 — Extensão pós-rodada 6 (Parte 2 do gabarito)
+
+As seções A.1 a A.5 são o gabarito **cego** e continuam sendo o denominador do recall (25 + 21 + 23
+itens). Depois da rodada 6, `docs/gabarito.md` ganhou uma **Parte 2** com 31 itens que apareceram depois:
+18 achados pela skill na rodada limpa (advisories vivos, listagens sem limite, agregados financeiros
+abertos, corpo sem limite, entre outros) e 15 por três verificadores independentes que executaram a
+entrega (500 em tipo errado, inteiro fora da faixa e valor não finito, placeholder de token fraco,
+entre outros); dois itens contam nas duas origens. Há ainda 9 defeitos da própria skill, fora do
+recall. A Parte 2 está **contaminada por
+construção** (D12): vários itens existem porque a skill os viu primeiro. Por isso o recall histórico usa
+só a Parte 1, e os resultados da skill sobre a Parte 2 estão em
+[`docs/rounds/round6-skill-results.md`](docs/rounds/round6-skill-results.md).
+
 ---
 
 ## B) Construção da Skill
