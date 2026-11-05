@@ -33,6 +33,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from proc_check import check_proc  # noqa: E402
+from container_check import check_containers  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCRIPTS = os.path.join(ROOT, ".claude", "skills", "refactor-arch", "scripts")
@@ -119,15 +120,115 @@ FIXTURES = {
         "after": (200, J, [{"id": 1, "name": "a"}]),
     },
     ("POST", "/raw"): {       # malformed body, sent verbatim (R2-5); the server checks the bytes
-        "before": lambda body: (500, J, {"error": "crash"}) if body == RAW else (200, J, {}),
-        "after": lambda body: (400, J, {"error": "bad json"}) if body == RAW else (200, J, {}),
+        "before": lambda req: (500, J, {"error": "crash"}) if req["body"] == RAW else (200, J, {}),
+        "after": lambda req: (400, J, {"error": "bad json"}) if req["body"] == RAW else (200, J, {}),
     },
     ("DELETE", "/purge"): {   # destructive: runs alone, merged in (R2-5)
         "before": (204, {}, ""),
         "after": (204, {}, ""),
     },
+    # --- round 7: robustness matrix (R2/R3), value assertions (R5), secrets by reference (R8)
+    ("POST", "/orders"): {"before": lambda req: orders_before(req),
+                          "after": lambda req: orders_after(req)},
+    ("GET", "/list"): {"before": lambda req: list_handler(req, False),
+                       "after": lambda req: list_handler(req, True)},
+    ("GET", "/things/*"): {"before": lambda req: things_handler(req, False),
+                           "after": lambda req: things_handler(req, True)},
+    ("GET", "/hdr"): {"before": lambda req: hdr_handler(req, False),
+                      "after": lambda req: hdr_handler(req, True)},
+    ("GET", "/report"): {     # integral float before, integer after: same value (normalization)
+        "before": (200, J, {"total": 10.0, "currency": "BRL", "password": "hunter2",
+                            "items": [{"name": "a", "price": 100}, {"name": "b", "price": 250}]}),
+        "after": (200, J, {"total": 10, "currency": "BRL",
+                           "items": [{"name": "a", "price": 100}, {"name": "b", "price": 250}]}),
+    },
+    ("GET", "/report-bad"): {
+        "before": (200, J, {"total": 10}),
+        "after": (200, J, {"total": 12}),
+    },
+    ("GET", "/guarded"): {    # the replay only passes if {{env:...}} was substituted
+        "before": (200, J, {"ok": True}),
+        "after": lambda req: (200, J, {"ok": True}) if req["headers"].get("X-Operator") == SECRET
+        else (403, J, {"error": "forbidden"}),
+    },
 }
 RAW = '{"a": '
+SECRET = "s3cret-fixture"
+LOGGED = ("/orders", "/list", "/things/", "/hdr", "/guarded")
+REQUEST_LOG = []
+
+
+def _json(text):
+    try:
+        return True, json.loads(text)
+    except ValueError:
+        return False, None
+
+
+def _is_int(value):
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def orders_before(req):
+    """Lenient original: crashes on anything it cannot store."""
+    ok, body = _json(req["body"])
+    if not ok or not isinstance(body, dict):
+        return (500, J, {"error": "crash"})
+    qty = body.get("qty", 1)
+    if isinstance(qty, str) or (_is_int(qty) and abs(qty) < 2 ** 63):
+        return (201, J, {"id": 1})
+    return (500, J, {"error": "crash"})
+
+
+def orders_after(req):
+    """Validated, with one introduced failure (omitted) and one left (nested)."""
+    ok, body = _json(req["body"])
+    if not ok or not isinstance(body, dict):
+        return (400, J, {"error": "bad body"})
+    if "qty" not in body:
+        return (500, J, {"error": "KeyError"})
+    qty = body["qty"]
+    if isinstance(qty, dict) and "a" in qty:
+        return (500, J, {"error": "RecursionError"})
+    if _is_int(qty) and 0 < qty <= 1000:
+        return (201, J, {"id": 1})
+    return (400, J, {"error": "qty"})
+
+
+def _parse_int(text, bounded):
+    try:
+        value = int(text)
+    except (TypeError, ValueError):
+        return None
+    if bounded and not 1 <= value <= 1000:
+        return None
+    return value
+
+
+def list_handler(req, fixed):
+    from urllib.parse import parse_qs, urlsplit
+    query = parse_qs(urlsplit(req["path"]).query, keep_blank_values=True)
+    if "limit" not in query:
+        return (200, J, [])
+    if _parse_int(query["limit"][0], fixed) is None:
+        return (400, J, {"error": "limit"}) if fixed else (500, J, {"error": "crash"})
+    return (200, J, [])
+
+
+def things_handler(req, fixed):
+    segment = req["path"].split("?")[0].rsplit("/", 1)[-1]
+    if _parse_int(segment, fixed) is None:
+        return (400, J, {"error": "id"}) if fixed else (500, J, {"error": "crash"})
+    return (404, J, {"error": "not found"})
+
+
+def hdr_handler(req, fixed):
+    value = req["headers"].get("X-Count")
+    if value is None:
+        return (200, J, {})
+    if _parse_int(value, fixed) is None:
+        return (400, J, {"error": "count"}) if fixed else (500, J, {"error": "crash"})
+    return (200, J, {})
 
 SURFACE = {
     "version": 2,
@@ -162,8 +263,44 @@ SURFACE = {
         {"id": "raw-hostile", "method": "POST", "path": "/raw", "rawBody": '{"a": ',
          "kind": "security", "finding": "AP-11", "expect": "rejected"},
         {"id": "purge", "method": "DELETE", "path": "/purge", "destructive": True},
+        {"id": "rb-order", "method": "POST", "path": "/orders", "body": {"qty": 2, "note": "é"},
+         "kind": "robustness", "finding": "AP-11",
+         "fields": [{"in": "body", "name": "qty", "type": "integer"}]},
+        {"id": "rb-list", "method": "GET", "path": "/list?limit=5&sort=asc", "kind": "robustness",
+         "fields": [{"in": "query", "name": "limit", "type": "integer"}]},
+        {"id": "rb-thing", "method": "GET", "path": "/things/{id}", "kind": "robustness",
+         "fields": [{"in": "path", "name": "id", "type": "integer", "value": 7}]},
+        {"id": "rb-hdr", "method": "GET", "path": "/hdr", "headers": {"X-Count": "3"},
+         "kind": "robustness", "fields": [{"in": "header", "name": "X-Count", "type": "integer"}]},
+        {"id": "v-report", "method": "GET", "path": "/report", "kind": "value", "assert": [
+            {"path": "$.total", "sameAsBaseline": True},
+            {"path": "$.items[*].price", "sameAsBaseline": True},
+            {"path": "$.password", "absent": True},
+            {"path": "$.items[0].name", "matches": "^[a-z]$"},
+            {"path": "$.currency", "equals": "BRL"}]},
+        {"id": "v-report-bad", "method": "GET", "path": "/report-bad", "kind": "value",
+         "assert": [{"path": "$.total", "sameAsBaseline": True}]},
+        {"id": "get-guarded", "method": "GET", "path": "/guarded",
+         "headers": {"X-Operator": "{{env:PROBE_FIXTURE_TOKEN}}"}},
     ],
 }
+
+# Protocol section 2.3: the body variants of an integer field, in this order. Written out
+# here on purpose -- the test states the spec, it does not re-derive it from the code.
+ORDER_VARIANTS = ["omitted", "null", "string", "boolean", "list", "empty-object",
+                  "nested-object", "zero", "negative", "int64-max", "int64-overflow",
+                  "non-finite", "fraction"]
+LIST_VARIANTS = ["omitted", "empty", "string", "zero", "negative", "int64-max", "int64-overflow",
+                 "non-finite", "nan", "fraction", "repeated"]
+THING_VARIANTS = ["string", "zero", "negative", "int64-max", "int64-overflow", "non-finite",
+                  "nan", "fraction"]
+HDR_VARIANTS = ["omitted", "empty", "string", "zero", "negative", "int64-max", "int64-overflow",
+                "non-finite", "nan", "fraction"]
+MATRIX = (["rb-order#qty=" + v for v in ORDER_VARIANTS]
+          + ["rb-list#limit=" + v for v in LIST_VARIANTS]
+          + ["rb-thing#id=" + v for v in THING_VARIANTS]
+          + ["rb-hdr#X-Count=" + v for v in HDR_VARIANTS])
+ENV_ARGS = ["--env", "PROBE_FIXTURE_TOKEN=" + SECRET]
 
 EXPECTED = {
     "get-items": "PASS",
@@ -187,7 +324,14 @@ EXPECTED = {
     "search-already": "UNVERIFIED",
     "raw-hostile": "FIXED",
     "purge": "PASS",
+    "v-report": "HOLDS",
+    "v-report-bad": "VIOLATED",
+    "get-guarded": "PASS",
 }
+for _id in MATRIX:
+    EXPECTED[_id] = "ROBUST"
+EXPECTED["rb-order#qty=omitted"] = "REGRESSION"        # the fix introduced a 500
+EXPECTED["rb-order#qty=nested-object"] = "NOT ROBUST"  # failed before, still fails
 
 
 def make_handler(mode):
@@ -200,7 +344,14 @@ def make_handler(mode):
         def _serve(self):
             length = int(self.headers.get("Content-Length") or 0)
             received = self.rfile.read(length).decode("utf-8", "replace") if length else ""
-            spec = FIXTURES.get((self.command, self.path.split("?")[0]))
+            route = self.path.split("?")[0]
+            if route.startswith("/things/"):
+                route = "/things/*"
+            if self.path.startswith(LOGGED):
+                REQUEST_LOG.append((self.command, self.path, received,
+                                    self.headers.get("X-Count"), self.headers.get("X-Operator"),
+                                    self.headers.get("Content-Type")))
+            spec = FIXTURES.get((self.command, route))
             if spec is None:
                 self.send_response(404)
                 self.send_header("Content-Length", "0")
@@ -208,7 +359,8 @@ def make_handler(mode):
                 return
             response = spec[mode]
             if callable(response):
-                response = response(received)
+                response = response({"body": received, "path": self.path,
+                                     "headers": self.headers})
             if response == "crash":
                 self.close_connection = True
                 self.connection.shutdown(socket.SHUT_RDWR)
@@ -237,8 +389,9 @@ def start(mode):
     return server, "http://127.0.0.1:{0}".format(server.server_address[1])
 
 
-def run(impl, *args):
-    proc = subprocess.run(PROBES[impl] + list(args), capture_output=True)
+def run(impl, *args, env_args=True):
+    extra = ENV_ARGS if env_args and args and args[0] in ("capture", "compare") else []
+    proc = subprocess.run(PROBES[impl] + list(args) + extra, capture_output=True)
     return proc.returncode, proc.stdout.decode("utf-8").replace("\r\n", "\n"), \
         proc.stderr.decode("utf-8", "replace")
 
@@ -282,8 +435,28 @@ def main():
 
     outputs = {}
     merge_lines = {}
+    logs = {}
+    refusals = os.path.join(work, "refusal.json")
+    with open(refusals, "w", encoding="utf-8") as handle:
+        json.dump({"version": 3, "entries": [
+            {"id": "leaky", "method": "GET", "path": "/report", "kind": "value",
+             "assert": [{"path": "$.password", "sameAsBaseline": True}]}]}, handle)
     try:
         for impl in PROBES:
+            # Secrets by reference (protocol 2.5): a missing variable stops the run before any
+            # call, and sameAsBaseline on a secret-named field is refused.
+            code, _, _ = run(impl, "capture", "--surface", surface, "--base-url", before_url,
+                             "--out", os.path.join(work, "noenv.json"), "--only", "get-guarded",
+                             env_args=False)
+            if code != 2:
+                failures.append("{0}: missing {{{{env:...}}}} variable: expected exit 2, got {1}"
+                                .format(impl, code))
+            code, _, _ = run(impl, "capture", "--surface", refusals, "--base-url", before_url,
+                             "--out", os.path.join(work, "leaky.json"))
+            if code != 2:
+                failures.append("{0}: sameAsBaseline on a secret-named field: expected exit 2, "
+                                "got {1}".format(impl, code))
+            del REQUEST_LOG[:]
             base = os.path.join(work, "base-{0}.json".format(impl))
             cur = os.path.join(work, "cur-{0}.json".format(impl))
             code, _, err = run(impl, "capture", "--surface", surface, "--base-url", before_url,
@@ -329,6 +502,7 @@ def main():
                 continue
             code, out, err = run(impl, "compare", "--baseline", base, "--current", cur)
             outputs[impl] = {"base": base, "cur": cur, "code": code, "out": out, "err": err}
+            logs[impl] = list(REQUEST_LOG)
     finally:
         before.shutdown()
         after.shutdown()
@@ -364,10 +538,39 @@ def main():
             if got.get(entry_id) != expected:
                 failures.append("{0}: expected {1}, got {2}".format(
                     entry_id, expected, got.get(entry_id)))
+        generated = sorted(i for i in got if i.startswith("rb-"))
+        if generated != sorted(MATRIX):
+            failures.append("robustness matrix differs from protocol 2.3: extra {0}, missing {1}"
+                            .format(sorted(set(generated) - set(MATRIX)),
+                                    sorted(set(MATRIX) - set(generated))))
+
+        # Both implementations must send byte-identical requests: same variants, same order,
+        # same literals (int64 overflow and non-finite numbers are where JSON serializers drift).
+        if logs.get("py") != logs.get("node"):
+            pairs = zip(logs.get("py") or [], logs.get("node") or [])
+            first = next((pair for pair in pairs if pair[0] != pair[1]), None)
+            failures.append("requests differ between implementations ({0} vs {1}); first "
+                            "difference: {2}".format(len(logs.get("py") or []),
+                                                     len(logs.get("node") or []), first))
+        overflow = [r for r in logs.get("py") or []
+                    if r[1] == "/orders" and '"qty":9223372036854775808' in r[2]]
+        if not overflow:
+            failures.append("int64-overflow variant was not sent as the exact literal")
+
+        # Secrets by reference never reach the captures.
+        for label in ("base", "cur"):
+            for impl in PROBES:
+                if SECRET in normalized(outputs[impl][label]):
+                    failures.append("{0} {1} capture contains the {{{{env:...}}}} secret".format(
+                        impl, label))
 
         print(py["out"])
 
     failures.extend(check_proc())
+    if "--container" in sys.argv[1:]:
+        failures.extend(check_containers())
+    else:
+        print("note: slim-image lifecycle check not run (pass --container; needs Docker)")
 
     if failures:
         print("CONFORMANCE FAILED ({0}):".format(len(failures)))
