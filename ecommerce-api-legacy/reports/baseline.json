@@ -1,0 +1,1767 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "capturedAt": "2026-11-05T01:50:40Z",
+  "results": {
+    "delete-user-existing": {
+      "contentType": "text/html",
+      "destructive": true,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "delete-user-existing",
+      "kind": "contract",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "delete-user-missing-id": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "delete-user-missing-id",
+      "kind": "contract",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-admin-financial-report": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "get-admin-financial-report",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-admin-financial-report-values": {
+      "assertions": [
+        {
+          "found": true,
+          "op": "sameAsBaseline",
+          "path": "$[*].course",
+          "value": [
+            "Clean Architecture",
+            "Docker"
+          ]
+        },
+        {
+          "found": true,
+          "op": "sameAsBaseline",
+          "path": "$[*].revenue",
+          "value": [
+            3988,
+            994
+          ]
+        },
+        {
+          "found": true,
+          "op": "sameAsBaseline",
+          "path": "$[*].students[*].student",
+          "value": [
+            "Leonan",
+            "Sem Senha",
+            "Texto",
+            "Valor",
+            "Guilherme",
+            "Leonan"
+          ]
+        },
+        {
+          "found": true,
+          "op": "sameAsBaseline",
+          "path": "$[*].students[*].paid",
+          "value": [
+            997,
+            997,
+            997,
+            997,
+            497,
+            497
+          ]
+        }
+      ],
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "get-admin-financial-report-values",
+      "kind": "value",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-unknown-route": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "get-unknown-route",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/api/nope",
+      "shape": {
+        "lines": [
+          "<!DOCTYPE html>",
+          "</body>",
+          "</head>",
+          "</html>",
+          "<body>",
+          "<head>",
+          "<html lang=\"en\">",
+          "<meta charset=\"utf-<n>\">",
+          "<pre>Cannot GET /api/nope</pre>",
+          "<title>Error</title>"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "post-checkout-denied": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-denied",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Pagamento recusado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-existing-user-paid": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-existing-user-paid",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-missing-fields": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-missing-fields",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-new-user-paid": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-new-user-paid",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-no-password": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-no-password",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-string-course-id": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-string-course-id",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-unknown-course": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-unknown-course",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "post-checkout-value": {
+      "assertions": [
+        {
+          "holds": true,
+          "op": "equals",
+          "path": "$.msg"
+        },
+        {
+          "found": true,
+          "op": "sameAsBaseline",
+          "path": "$.enrollment_id",
+          "value": 6
+        }
+      ],
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-value",
+      "kind": "value",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#X-Operator-Token=empty": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#X-Operator-Token=empty",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#X-Operator-Token=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#X-Operator-Token=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#id=fraction": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#id=fraction",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1.5",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#id=int64-max": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#id=int64-max",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/9223372036854775807",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#id=int64-overflow": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#id=int64-overflow",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/9223372036854775808",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#id=nan": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#id=nan",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/NaN",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#id=negative": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#id=negative",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/-1",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#id=non-finite": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#id=non-finite",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1e999",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#id=string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#id=string",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/x",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-delete-user#id=zero": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-delete-user#id=zero",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/0",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-get-admin-financial-report#X-Operator-Token=empty": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-get-admin-financial-report#X-Operator-Token=empty",
+      "kind": "robustness",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "oneOf": [
+            {
+              "properties": {
+                "course": "string",
+                "revenue": "number",
+                "students": {
+                  "items": "empty",
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "course": "string",
+                "revenue": "number",
+                "students": {
+                  "items": {
+                    "properties": {
+                      "paid": "number",
+                      "student": "string"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-get-admin-financial-report#X-Operator-Token=omitted": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-get-admin-financial-report#X-Operator-Token=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "oneOf": [
+            {
+              "properties": {
+                "course": "string",
+                "revenue": "number",
+                "students": {
+                  "items": "empty",
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "course": "string",
+                "revenue": "number",
+                "students": {
+                  "items": {
+                    "properties": {
+                      "paid": "number",
+                      "student": "string"
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            }
+          ]
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#Content-Type=empty": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#Content-Type=empty",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#Content-Type=omitted": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#Content-Type=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#c_id=boolean": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#c_id=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=fraction": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=fraction",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=int64-max": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=int64-max",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=int64-overflow": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=int64-overflow",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=negative": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=negative",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=non-finite": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=non-finite",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#c_id=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#c_id=string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "rob-post-checkout#c_id=zero": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#c_id=zero",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#card=boolean": {
+      "contentType": null,
+      "destructive": false,
+      "error": "TypeError: UND_ERR_SOCKET",
+      "expect": null,
+      "finding": "AP-11",
+      "headers": null,
+      "id": "rob-post-checkout#card=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": null,
+      "state": "ERROR",
+      "status": null
+    },
+    "rob-post-checkout#card=empty-object": {
+      "contentType": null,
+      "destructive": false,
+      "error": "TypeError: UND_ERR_SOCKET",
+      "expect": null,
+      "finding": "AP-11",
+      "headers": null,
+      "id": "rob-post-checkout#card=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": null,
+      "state": "ERROR",
+      "status": null
+    },
+    "rob-post-checkout#card=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#card=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#card=list": {
+      "contentType": null,
+      "destructive": false,
+      "error": "TypeError: UND_ERR_SOCKET",
+      "expect": null,
+      "finding": "AP-11",
+      "headers": null,
+      "id": "rob-post-checkout#card=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": null,
+      "state": "ERROR",
+      "status": null
+    },
+    "rob-post-checkout#card=nested-object": {
+      "contentType": null,
+      "destructive": false,
+      "error": "TypeError: UND_ERR_SOCKET",
+      "expect": null,
+      "finding": "AP-11",
+      "headers": null,
+      "id": "rob-post-checkout#card=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": null,
+      "state": "ERROR",
+      "status": null
+    },
+    "rob-post-checkout#card=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#card=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#card=number": {
+      "contentType": null,
+      "destructive": false,
+      "error": "TypeError: UND_ERR_SOCKET",
+      "expect": null,
+      "finding": "AP-11",
+      "headers": null,
+      "id": "rob-post-checkout#card=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": null,
+      "state": "ERROR",
+      "status": null
+    },
+    "rob-post-checkout#card=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#card=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#eml=boolean": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#eml=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#eml=empty-object": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#eml=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#eml=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#eml=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#eml=list": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#eml=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#eml=nested-object": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#eml=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#eml=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#eml=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#eml=number": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#eml=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#eml=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#eml=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#pwd=boolean": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#pwd=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#pwd=empty-object": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#pwd=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#pwd=empty-string": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#pwd=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#pwd=list": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#pwd=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#pwd=nested-object": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#pwd=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#pwd=null": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#pwd=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#pwd=number": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#pwd=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#pwd=omitted": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#pwd=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#usr=boolean": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#usr=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#usr=empty-object": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#usr=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#usr=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#usr=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#usr=list": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#usr=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#usr=nested-object": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#usr=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#usr=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#usr=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "rob-post-checkout#usr=number": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#usr=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "rob-post-checkout#usr=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "rob-post-checkout#usr=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "sec-delete-user-anonymous": {
+      "contentType": "text/html",
+      "destructive": true,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "sec-delete-user-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "sec-get-admin-financial-report-anonymous": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "sec-get-admin-financial-report-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "sec-post-checkout-boolean-course": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": {},
+      "id": "sec-post-checkout-boolean-course",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "sec-post-checkout-numeric-card": {
+      "contentType": null,
+      "destructive": false,
+      "error": "TypeError: UND_ERR_SOCKET",
+      "expect": "rejected",
+      "finding": "AP-11",
+      "headers": null,
+      "id": "sec-post-checkout-numeric-card",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": null,
+      "state": "ERROR",
+      "status": null
+    }
+  },
+  "version": 3
+}

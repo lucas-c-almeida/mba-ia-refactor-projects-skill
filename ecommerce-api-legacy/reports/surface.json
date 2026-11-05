@@ -1,0 +1,90 @@
+{
+  "version": 3,
+  "appType": "http",
+  "baseUrl": "http://127.0.0.1:3000",
+  "entries": [
+    { "id": "post-checkout-new-user-paid", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Guilherme", "eml": "gui@fullcycle.com.br", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": 2, "card": "4111222233334444" } },
+    { "id": "post-checkout-existing-user-paid", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Leonan", "eml": "leonan@fullcycle.com.br", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": 2, "card": "4000000000000002" } },
+    { "id": "post-checkout-no-password", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Sem Senha", "eml": "semsenha@teste.com", "c_id": 1, "card": "4999888877776666" } },
+    { "id": "post-checkout-string-course-id", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Texto", "eml": "texto@teste.com", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": "1", "card": "4123123412341234" } },
+    { "id": "post-checkout-denied", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Joao", "eml": "joao@teste.com", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": 1, "card": "5111222233334444" } },
+    { "id": "post-checkout-missing-fields", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" }, "body": { "usr": "x" } },
+    { "id": "post-checkout-unknown-course", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "A", "eml": "a@b.c", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": 999, "card": "4111" } },
+    { "id": "post-checkout-value", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Valor", "eml": "valor@teste.com", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": 1, "card": "4555666677778888" },
+      "kind": "value",
+      "assert": [
+        { "path": "$.msg", "equals": "Sucesso" },
+        { "path": "$.enrollment_id", "sameAsBaseline": true }
+      ] },
+    { "id": "get-admin-financial-report", "method": "GET", "path": "/api/admin/financial-report",
+      "headers": { "X-Operator-Token": "{{env:OPERATOR_TOKEN}}" } },
+    { "id": "get-admin-financial-report-values", "method": "GET", "path": "/api/admin/financial-report",
+      "headers": { "X-Operator-Token": "{{env:OPERATOR_TOKEN}}" },
+      "kind": "value",
+      "assert": [
+        { "path": "$[*].course", "sameAsBaseline": true },
+        { "path": "$[*].revenue", "sameAsBaseline": true },
+        { "path": "$[*].students[*].student", "sameAsBaseline": true },
+        { "path": "$[*].students[*].paid", "sameAsBaseline": true }
+      ] },
+    { "id": "delete-user-missing-id", "method": "DELETE", "path": "/api/users/999",
+      "headers": { "X-Operator-Token": "{{env:OPERATOR_TOKEN}}" } },
+    { "id": "get-unknown-route", "method": "GET", "path": "/api/nope" },
+    { "id": "delete-user-existing", "method": "DELETE", "path": "/api/users/1",
+      "headers": { "X-Operator-Token": "{{env:OPERATOR_TOKEN}}" }, "destructive": true },
+
+    { "id": "sec-get-admin-financial-report-anonymous", "method": "GET", "path": "/api/admin/financial-report",
+      "kind": "security", "finding": "AP-04", "expect": "rejected" },
+    { "id": "sec-delete-user-anonymous", "method": "DELETE", "path": "/api/users/1",
+      "kind": "security", "finding": "AP-04", "expect": "rejected", "destructive": true },
+    { "id": "sec-post-checkout-numeric-card", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "A", "eml": "num@b.c", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": 1, "card": 4111 },
+      "kind": "security", "finding": "AP-11", "expect": "rejected" },
+    { "id": "sec-post-checkout-boolean-course", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "A", "eml": "bool@b.c", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": true, "card": "4111" },
+      "kind": "security", "finding": "AP-11", "expect": "rejected" },
+
+    { "id": "rob-post-checkout", "method": "POST", "path": "/api/checkout",
+      "headers": { "Content-Type": "application/json" },
+      "body": { "usr": "Robusto", "eml": "robusto@teste.com", "pwd": "{{env:CHECKOUT_PASSWORD}}", "c_id": 1, "card": "4111222233334444" },
+      "kind": "robustness", "finding": "AP-11",
+      "fields": [
+        { "in": "body", "name": "usr", "type": "string" },
+        { "in": "body", "name": "eml", "type": "string" },
+        { "in": "body", "name": "pwd", "type": "string" },
+        { "in": "body", "name": "c_id", "type": "integer" },
+        { "in": "body", "name": "card", "type": "string" },
+        { "in": "header", "name": "Content-Type", "type": "string" }
+      ] },
+    { "id": "rob-get-admin-financial-report", "method": "GET", "path": "/api/admin/financial-report",
+      "headers": { "X-Operator-Token": "{{env:OPERATOR_TOKEN}}" },
+      "kind": "robustness", "finding": "AP-11",
+      "fields": [
+        { "in": "header", "name": "X-Operator-Token", "type": "string" }
+      ] },
+    { "id": "rob-delete-user", "method": "DELETE", "path": "/api/users/{id}",
+      "headers": { "X-Operator-Token": "{{env:OPERATOR_TOKEN}}" },
+      "kind": "robustness", "finding": "AP-11",
+      "fields": [
+        { "in": "path", "name": "id", "type": "integer", "value": 999 },
+        { "in": "header", "name": "X-Operator-Token", "type": "string" }
+      ] }
+  ]
+}
