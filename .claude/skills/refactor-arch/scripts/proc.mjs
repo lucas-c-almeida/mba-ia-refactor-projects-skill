@@ -42,6 +42,7 @@
  *   node proc.mjs status --state <file>
  *   node proc.mjs wait   --port 8081 [--timeout 60]
  *   node proc.mjs copy   --from <dir> --to <new dir> [--exclude <name> ...]
+ *   node proc.mjs id
  *
  * Every command prints one JSON line (keys sorted) and exits with:
  *   0 ok (status: running; wait: ready)                        2 usage or I/O error
@@ -53,6 +54,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import {
   closeSync, cpSync, existsSync, lstatSync, openSync, readFileSync, statSync, writeFileSync,
 } from 'node:fs';
@@ -139,12 +141,31 @@ function windowsSnapshot() {
   return table;
 }
 
+/**
+ * Linux: the start time in clock ticks, field 22 of /proc/<pid>/stat. Read from the kernel,
+ * so it works in a slim image that ships no `ps` (round 6, G9). The command name (field 2)
+ * may contain spaces and parentheses, so fields are counted from the last ')'.
+ */
+function linuxStartToken(pid) {
+  let data;
+  try {
+    data = readFileSync(`/proc/${pid}/stat`, 'latin1');
+  } catch {
+    return null;
+  }
+  const fields = data.slice(data.lastIndexOf(')') + 2).split(/\s+/);
+  return fields.length > 19 && fields[19] ? `proc:${fields[19]}` : null;
+}
+
+const HAS_PROCFS = !IS_WINDOWS && existsSync('/proc/self/stat');
+
 /** The OS start time of a live process, or null if it is not running. */
 function startToken(pid) {
   if (IS_WINDOWS) {
     const entry = (windowsSnapshot() ?? new Map()).get(pid);
     return entry ? entry[1] : null;
   }
+  if (HAS_PROCFS) return linuxStartToken(pid);
   const token = (run(['ps', '-o', 'lstart=', '-p', String(pid)]) ?? '').trim();
   return token || null;
 }
@@ -523,7 +544,8 @@ const USAGE = `Start and stop exactly the process tree this tool started
   node proc.mjs stop   --state <file> [--timeout <s>]
   node proc.mjs status --state <file>
   node proc.mjs wait   --port <n> [--timeout <s>]
-  node proc.mjs copy   --from <dir> --to <new dir> [--exclude <name> ...]`;
+  node proc.mjs copy   --from <dir> --to <new dir> [--exclude <name> ...]
+  node proc.mjs id`;
 
 function parseArgs(tokens) {
   const opts = { env: [], exclude: [] };
@@ -548,6 +570,12 @@ async function main() {
   const [mode, ...rest] = head;
   const opts = parseArgs(rest);
 
+  if (mode === 'id') {
+    // A timestamp alone collided when two runs started in the same minute (round 6, G9);
+    // an agent cannot produce randomness by itself, so the tool does.
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
+    return emit({ runId: `${stamp}-${randomBytes(4).toString('hex')}` }, EXIT.OK);
+  }
   let usable;
   if (mode === 'copy') usable = typeof opts.from === 'string' && typeof opts.to === 'string';
   else if (mode === 'wait') {

@@ -75,19 +75,26 @@ Contract: <safe | contract-changing: what a client would observe differently>
 ### [LOW] <...>
 ...
 
-## Catalog Coverage
-<One row per catalog entry, every entry, including those with no hit. This is how a reader tells
-"looked and found nothing" from "never looked".>
+## Signal Ledger
+<One row per detection SIGNAL of every catalog entry — not one row per entry. This is how a reader
+tells "looked and found nothing" from "never looked", and where a hit that never became a finding
+shows up.>
 
-| Entry | Signals checked | Result |
-|---|---|---|
-| AP-01 | <every detection signal of the entry, by a few words each> | <n finding(s): ids of the findings above> |
-| AP-02 | <...> | <none> |
-| ... | ... | ... |
-| AP-20 | <...> | <n finding(s), or none, or UNVERIFIED — reason> |
+| Entry | Signal | Examined | Occurrences | Outcome |
+|---|---|---|---|---|
+| AP-01 | <the signal, in a few words> | <files or file groups read for it, or "all source files"> | <n, with the first sites: path:line> | <finding: the heading above / discarded: reason / none> |
+| AP-01 | <next signal of the same entry> | <...> | <0> | <none> |
+| ... | ... | ... | ... | ... |
+| AP-20 | <...> | <...> | <...> | <... or UNVERIFIED — reason> |
 
-"Signals checked" lists **each** detection signal of the entry, not a summary of the entry. A
-signal left off this column was not looked for, and a reader must be able to see that.
+## Classification Decisions
+<Only when an operation's classification is ambiguous (04-architecture-guidelines.md §6) — otherwise
+"none". One entry per operation:>
+D<n>. <method + route, or command> — <what it does, in one line>
+  Privileged because: <the signals that point that way>
+  Business because:   <the signals that point the other way>
+  If privileged: <remove / guard with operator credential — finding becomes resolved>
+  If business:   <proposed under PROPOSED, NOT APPLIED>
 
 ## Dependency and Deprecated API Verification
 <One line per checked item, for AP-14 (deprecation) and AP-19 (advisories). Every entry cites
@@ -132,6 +139,9 @@ Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
   y = apply all findings (contract-changing items will be proposed, not applied)
   n = stop here; the report is saved and nothing else was touched
   c = apply CRITICAL and HIGH only
+<When Classification Decisions lists any entry, also:>
+  For each classification decision, answer privileged or business (e.g. "y D1=privileged D2=business").
+  An unanswered decision is treated as business (proposed).
 >
 <With --yes, instead of the prompt:>
 Confirmation: --yes (auto-approved, not human-reviewed)
@@ -170,11 +180,35 @@ specific modern equivalent.
 
 **`Contract:`** — `safe` or `contract-changing`. This is the input to the Phase 3 gate
 (`04-architecture-guidelines.md` §6). If contract-changing, state exactly what an existing client
-would observe differently.
+would observe differently. A privileged operation left open (AP-04) is `safe`: its fix rejects only
+non-operators. Never write `contract-changing` for it because the application has no identity model.
+Such a finding cannot end under `PROPOSED, NOT APPLIED` for that reason; it is `resolved`, or
+`unresolved` if the transformation failed.
 
 **Severity deviation.** When the reported severity differs from the catalog default, the deviation
 must appear in `Description:` with its reason. A severity that moves without a stated reason looks
 like an error even when it is correct.
+
+**The signal ledger is the audit's working, and it must agree with the findings.** Every catalog
+signal has a row. `Examined` says where you looked — a signal checked in one file of twenty is
+recorded as such, so the gap is visible. Coherence rules, checked before writing the file:
+
+- a row with occurrences ends in a finding or in `discarded: <reason>` — the reason names what
+  makes the occurrence harmless here (unreachable, test-only, already guarded at line n). A hit
+  with neither is an audit defect;
+- nothing that appears elsewhere in the report as a problem stays out of the findings: an advisory
+  in the dependency table, a deprecation warning, an occurrence a coverage note mentions. Either it
+  is a finding, or its ledger row says why not;
+- a signal that could not be checked is `UNVERIFIED — <reason>`, never `none`.
+
+A `missed-in-phase-2` item that Phase 3's re-audit finds through a signal already in the catalog
+points at a ledger row that said `none` or examined too little. Name that row next to the item.
+
+**Classification decisions.** List an operation only when `04-architecture-guidelines.md` §6 calls
+it ambiguous; never to defer a decision the guidelines already make. Each entry states both
+readings with the code signals behind them, and exactly what Phase 3 does under each answer. Phase
+3 copies the answer into the finding's entry in the final report (`Decided at the gate: D<n> =
+privileged`).
 
 **Counts.** The `## Summary` counts must equal the number of findings actually listed, and `Total:`
 must equal their sum. Inconsistent counts are the fastest way to lose a reader's trust in the whole
@@ -208,7 +242,9 @@ Situations that require it:
 | No container runtime, or its image could not be obtained | Host mode: executions ran on the host through `proc`, isolated by process ownership only — not by filesystem or network |
 | `proc` was generated for an unshipped runtime | Process ownership ran on code that has not passed the shipped tools' conformance test |
 | A port override changed more than the port | Evidence depending on that setting (debug surface, error pages) was gathered from a native-configuration run — or, if none was possible, is unverified |
-| A security finding's fix is visible only in values | Its security entry comes back `UNVERIFIED`; name the other way it was verified, or that it was not |
+| A security finding's fix is visible only in values | Its security entry comes back `UNVERIFIED`; name the value entry that verifies it (protocol §2.4), or that it was not verified |
+| An operation that reads request input has no robustness entry | Its malformed-input behaviour is unverified; name the operation and why it was left out |
+| A transformation's effect on a value has no value entry | Name the transformation; it is `UNVERIFIED`, never "verified by hand" |
 
 Each line names **the check**, **why it did not run**, and **what is therefore unverified**.
 A labelled gap is honest. An unlabelled one is indistinguishable from success.
@@ -235,10 +271,14 @@ After printing the report, stop and wait. Do not call a write tool until the ans
 - `y` → Phase 3 over all findings, with the contract gate applied.
 - `n` → stop. State the saved report path. Change nothing else.
 - `c` → Phase 3 over CRITICAL and HIGH only; list the deferred items in the final report.
+- Classification answers (`D1=privileged`, `D2=business`) may accompany `y` or `c`. Record them in
+  the header's confirmation line (`human-confirmed: y; D1=privileged, D2=business`). A decision left
+  unanswered is business: proposed. Never re-ask in Phase 3, and never re-decide.
 
 With `--yes`, do not print the prompt — nobody is there to answer it. Print
 `Confirmation: --yes (auto-approved, not human-reviewed)` in its place, proceed as `y`, and record
-the same line in the header.
+the same line in the header. Every classification decision then takes the default (business:
+proposed), and the final report says so.
 
 ---
 
@@ -259,6 +299,8 @@ PHASE 3: REFACTORING COMPLETE
   ✓ Application boots without errors
   ✓ Public surface replayed: <P> PASS, <R> REGRESSION, <F> PRE-EXISTING FAILURE, <U> UNVERIFIED
     Security entries: <X> FIXED, <Y> NOT FIXED
+  ✓ Malformed input: <n> ROBUST, <k> NOT ROBUST, <g> REGRESSION over <o> operations
+  ✓ Values: <h> HOLDS, <v> VIOLATED, <w> UNVERIFIED
   ✓ Findings resolved: <r>/<total>  (<p> proposed, <u> unresolved)
   <re-audit line>
     Re-audit passes: <1|2>; fixed after re-audit: <f> (<m> of them missed-in-phase-2)
@@ -275,8 +317,19 @@ Proposed change: <what to do, and what coordination it needs>
 
 ## Verification Coverage
 <full, or the degraded block, and any INCIDENT line>
+Fixtures by reference: <the {{env:NAME}} names the replay needed, never their values — or "none">
 ================================
 ```
+
+**The malformed-input line** is `✓` only when every robustness variant is `ROBUST`. A `NOT ROBUST`
+variant is a pre-existing crash the boundary validation did not close; a `REGRESSION` is one the
+refactoring created. Either makes the line `✗`, and each affected field becomes an `unresolved`
+AP-11 finding (origin `failed` or `introduced`). The line is omitted only when no operation reads
+request input — and then the report says so.
+
+**The values line** is `✓` only when every value entry `HOLDS`. A `VIOLATED` entry moves the finding
+whose transformation it checks to `unresolved`. Any check described anywhere in the report as
+"verified by hand" must be a value entry counted here, or an `UNVERIFIED` one with its reason.
 
 `## Proposed, Not Applied` appears **once**, inside this block. The Phase 2 report does not have
 the section: at the gate, the `Contract:` field of each finding already says what would be
@@ -289,7 +342,10 @@ that is not a success. A surface entry that failed before and after the refactor
 **The findings line has exactly three buckets, and they add up.** Every Phase 2 finding is in one:
 
 - `resolved` — all of it is gone, and the re-audit agrees;
-- `proposed` — it sits under `PROPOSED, NOT APPLIED`, declined by the contract gate;
+- `proposed` — it sits under `PROPOSED, NOT APPLIED`: declined by the contract gate, or a residue
+  that **only an operator action** can clear once the code has done its part (a reset window for
+  legacy credentials, rotating a committed secret, rebuilding stored data). An operator residue's
+  entry writes out the operational step — the command or procedure, and when it runs;
 - `unresolved` — anything else.
 
 There is no "partially resolved". A finding with any part remaining is not resolved: it is

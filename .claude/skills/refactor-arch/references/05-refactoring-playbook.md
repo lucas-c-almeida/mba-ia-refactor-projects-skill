@@ -98,10 +98,25 @@ class ReadingStore:
         self._connection = connection
 ```
 
-Also: add `.env.example` listing every key with placeholder values; add the real `.env` and any key
-files to the ignore file; and **rotate every secret that was committed** — it is in the history
-forever, and deleting the line does not remove it. Say that in the report; it is an action only the
-owner can take.
+Also, by the delivery rules of `04-architecture-guidelines.md` §2 (Configuration):
+
+- list every key in an example file, with secrets **empty** (`SIGNING_KEY=`), never a plausible
+  placeholder — and make the code treat an empty value as missing;
+- if the application does not load an environment file today, name and head the example as a list
+  of variables to export, and say "export" in the run instructions; adding a loader is a new runtime
+  dependency, so it is proposed;
+- add the real environment file, key files, database files, caches and the installed-dependency
+  directory to the ignore file — create it if the target has none, never shrink an existing one;
+- resolve file paths read from configuration against the project root, not the working directory:
+
+```python
+# config/settings.py
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+database_path = PROJECT_ROOT / os.environ.get("DATABASE_FILE", "data/app.db")
+```
+
+And **rotate every secret that was committed** — it is in the history forever, and deleting the
+line does not remove it. Say that in the report; it is an action only the owner can take.
 
 ---
 
@@ -155,6 +170,29 @@ subprocess.run(["archive-tool", "--input", path], shell=False, check=True, timeo
 ```
 
 For filesystem paths: resolve, then verify containment inside the intended root before opening.
+
+**Parameterizing moves the type check to the driver — put it at the boundary.** A concatenated
+statement turns any value into text, so an out-of-range number was just a string that matched
+nothing. A bound parameter is converted to the column's type by the driver, and a value outside
+that type's range — an integer wider than the driver accepts, a non-finite number — now raises
+inside the driver and answers `500` where the old code answered `404`. That is a regression the
+fix introduced. Whenever a value becomes a bound parameter, check its type and range first:
+
+```python
+# Before — parameterized, but the driver now sees whatever arrived
+item_id = request.args.get("id")
+row = conn.execute("SELECT * FROM stock_items WHERE id = ?", (item_id,)).fetchone()
+
+# After — the boundary admits only what the column can hold
+MAX_ID = 2**63 - 1                                   # the column's integer range
+raw = request.args.get("id", "")
+if not raw.isdigit() or int(raw) > MAX_ID:
+    raise NotFound("stock item")                     # same answer the original gave
+row = conn.execute("SELECT * FROM stock_items WHERE id = ?", (int(raw),)).fetchone()
+```
+
+For a non-integer column, reject non-finite values (`inf`, `nan`) before binding. The robustness
+entries of `06-validation-protocol.md` §2.3 send the limit values; a `REGRESSION` there is this case.
 
 ---
 
@@ -276,6 +314,53 @@ fix only stops one principal from acting on another's resource, it is safe — i
 model**, adding authentication rejects every current client, legitimate ones included: that is
 contract-changing, and the transformation is proposed — the identity model, the principals and the
 policy — not applied. Never invent a policy to make the fix applicable.
+
+**Exception — privileged operations (`04-architecture-guidelines.md` §6).** An operation that runs
+caller-supplied queries or code, resets data in bulk, serves maintenance or diagnostics, deletes an
+account by request id when no identity model exists (no operation verifies a presented credential),
+or computes a management aggregate (financial figures or per-principal rollups) has no legitimate anonymous caller, so closing it is **safe and is applied**, with or
+without an identity model. Remove it, or add the operator guard below. Ordinary domain-record
+changes and deletes, plain listings and lookups, sign-in and checkout keep the rule above — the
+boundary is in the guidelines §6.
+
+**Before** (Node — destructive and arbitrary-query operations open to everyone)
+
+```js
+app.post('/maintenance/wipe', (req, res) => {
+  db.exec('DELETE FROM orders; DELETE FROM customers;');
+  res.json({ ok: true });
+});
+app.post('/maintenance/run', (req, res) => {
+  db.all(req.body.sql, (err, rows) => res.json(rows));   // the caller chooses what runs
+});
+app.get('/reports/revenue', (req, res) => res.json(revenueByCustomer()));
+```
+
+**After** — the arbitrary-query route is removed (unsafe by construction); the wipe is removed from
+the request surface (a maintenance command can replace it); the report is guarded, closed by default
+
+```js
+// config.js
+const operatorToken = process.env.OPERATOR_TOKEN || null;      // unset by default: guard stays closed
+
+// routes/guards.js
+const crypto = require('crypto');
+function requireOperator(req, res, next) {
+  const given = Buffer.from(req.get('x-operator-token') || '');
+  const want = Buffer.from(config.operatorToken || '');
+  const ok = want.length > 0 && given.length === want.length && crypto.timingSafeEqual(given, want);
+  if (!ok) return res.status(403).json({ error: 'forbidden' });
+  next();
+}
+
+// routes/reports.js
+router.get('/reports/revenue', requireOperator, reports.revenue);
+```
+
+Cover it with two entries in the surface inventory: anonymous → `kind: "security"`, `expect:
+"rejected"`; with the operator credential → an ordinary entry whose shape must match the baseline
+(`06-validation-protocol.md` §2.1). An operation removed from the surface is recorded in the report
+as removed, with the reason.
 
 Two moves: put the decision in one policy function, and move the enforcement onto the *operation*
 rather than onto one of its doors.
@@ -645,6 +730,14 @@ Migration without a flag day: keep verifying old digests, and on a successful lo
 new KDF and replace the stored value. After a defined window, force a reset for whoever has not
 logged in. State this plan in the report — it is an operational decision, not just a code change.
 
+**What is left after the code change is `proposed`, not `unresolved`.** The legacy digests of users
+who have not signed in yet can only be retired by an operator action (the reset window, a forced
+reset). The code did everything code can do; the remainder is a decision with a date. Report it
+under `PROPOSED, NOT APPLIED`, with the operational step written out — the command or procedure,
+and when it should run — never as an `unresolved` finding (`03-report-template.md`). The same holds
+for any residue only an operator can clear: rotating a committed secret, rebuilding data the old
+code stored wrongly.
+
 ---
 
 ## RP-09 — Centralize error handling behind a domain taxonomy
@@ -830,19 +923,30 @@ type Parsed<T> = { ok: true; value: T } | { ok: false; errors: string[] };
 
 const MAX_PAGE = 200;
 
+const MAX_QUANTITY = 1_000_000;          // inside the column's range, and the domain's
+
 export function parseShipment(body: unknown): Parsed<{ shelf: string; quantity: number }> {
   const errors: string[] = [];
-  const b = (body ?? {}) as Record<string, unknown>;
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, errors: ['body must be an object'] };
+  }
+  const b = body as Record<string, unknown>;
 
   const shelf = typeof b.shelf === 'string' ? b.shelf.trim() : '';
   if (!shelf) errors.push('shelf is required');
   if (shelf.length > 32) errors.push('shelf must be at most 32 characters');
 
-  const quantity = Number(b.quantity);
-  if (!Number.isInteger(quantity)) errors.push('quantity must be an integer');
-  else if (quantity <= 0) errors.push('quantity must be greater than zero');
+  // No coercion: Number(true) is 1, Number([]) is 0, Number([7]) is 7. The type is checked as sent.
+  const quantity = b.quantity;
+  if (typeof quantity !== 'number' || !Number.isInteger(quantity)) {
+    errors.push('quantity must be an integer');
+  } else if (quantity <= 0 || quantity > MAX_QUANTITY) {
+    errors.push(`quantity must be between 1 and ${MAX_QUANTITY}`);
+  }
 
-  return errors.length ? { ok: false, errors } : { ok: true, value: { shelf, quantity } };
+  return errors.length
+    ? { ok: false, errors }
+    : { ok: true, value: { shelf, quantity: quantity as number } };
 }
 
 export const parseLimit = (raw: unknown): number => {
@@ -884,6 +988,13 @@ func (s *Shipment) Receive(qty int) error {
 A schema/validation library is preferable to hand-written checks when the project already has one.
 Do not add a dependency solely to satisfy this transformation; if there is none, hand-written checks
 at a single boundary are the correct answer.
+
+**Apply it to every input, not to the fields the audit cited.** Build the input inventory of
+`04-architecture-guidelines.md` §6: for each operation, every value read from the body, query, path
+and headers, and where it ends up. Every one that reaches a type-sensitive operation gets a parser
+like the one above — type as sent, no coercion, range, depth. Then declare the operation as a
+robustness entry (`06-validation-protocol.md` §2.3), listing all of those fields: the harness sends
+each wrong type and each limit value, and any `5xx` left is the field this step missed.
 
 ---
 
