@@ -45,7 +45,11 @@
  *   node probe.mjs capture --surface reports/surface.json --base-url http://127.0.0.1:8081 \
  *                          --out reports/baseline.json --only purge-archive --merge
  *
- * Exit codes: 0 = no regressions, 1 = at least one regression, 2 = usage or I/O error.
+ *   # a secret written as {{env:NAME}} in the inventory is supplied at call time, never stored
+ *   node probe.mjs capture ... --env OPERATOR_TOKEN=<value>
+ *
+ * Exit codes: 0 = no regressions, 1 = at least one regression (or NOT ROBUST / VIOLATED),
+ * 2 = usage or I/O error.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -67,6 +71,28 @@ const PRE_EXISTING_FAILURE = 'PRE-EXISTING FAILURE';
 const UNVERIFIED = 'UNVERIFIED';
 const FIXED = 'FIXED';
 const NOT_FIXED = 'NOT FIXED';
+const ROBUST = 'ROBUST';           // robustness variant: no server error, no crash (section 4.4)
+const NOT_ROBUST = 'NOT ROBUST';   // robustness variant: failed before and still fails
+const HOLDS = 'HOLDS';             // value entry: every assertion holds (section 4.5)
+const VIOLATED = 'VIOLATED';       // value entry: at least one assertion does not hold
+
+// Robustness matrix (protocol section 2.3). Every implementation emits the same variants,
+// in the same order, with the same ids.
+const INT64_MAX = '9223372036854775807';
+const INT64_OVERFLOW = '9223372036854775808';
+const NON_FINITE = '1e999';
+const NESTING_DEPTH = 64;
+const FIELD_LOCATIONS = ['body', 'query', 'header', 'path'];
+const FIELD_TYPES = ['string', 'number', 'integer', 'boolean', 'array', 'object'];
+const RAW_MARK = '__probe_raw_literal__';
+const OMIT = Symbol('omit');
+const REPEAT = Symbol('repeat');
+
+// Secrets are written as {{env:NAME}} in the inventory and resolved at call time (section 2.5).
+const ENV_PATTERN = /\{\{env:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+const SECRET_NAME = /secret|key|token|passw|pwd|credential|dsn|conn_str/i;
+const VALUE_OPS = ['equals', 'matches', 'absent', 'sameAsBaseline'];
+const PATH_TOKEN = /\.([^.[\]]+)|\[([0-9]+)\]|\[\*\]/y;
 
 // Value masks (protocol section 5.2), applied in this order. ASCII classes only, so that
 // every implementation masks exactly the same characters.
@@ -310,28 +336,291 @@ function bodyShape(bytes) {
   return { type: 'opaque', bytes: 'present' };
 }
 
-async function exercise(baseUrl, entry, timeoutSeconds) {
+// ---------------------------------------------------------------------------
+// Secrets by reference (protocol section 2.5)
+// ---------------------------------------------------------------------------
+
+/** Every NAME referenced as {{env:NAME}} anywhere inside a JSON-like value. */
+function envNames(value, names = new Set()) {
+  if (typeof value === 'string') {
+    for (const match of value.matchAll(ENV_PATTERN)) names.add(match[1]);
+  } else if (Array.isArray(value)) {
+    for (const item of value) envNames(item, names);
+  } else if (value !== null && typeof value === 'object') {
+    for (const [key, item] of Object.entries(value)) { envNames(key, names); envNames(item, names); }
+  }
+  return names;
+}
+
+function resolveEnv(value, env) {
+  if (typeof value === 'string') return value.replace(ENV_PATTERN, (_, name) => env[name]);
+  if (Array.isArray(value)) return value.map((item) => resolveEnv(item, env));
+  if (value !== null && typeof value === 'object') {
+    const out = {};
+    for (const [key, item] of Object.entries(value)) out[resolveEnv(key, env)] = resolveEnv(item, env);
+    return out;
+  }
+  return value;
+}
+
+// ---------------------------------------------------------------------------
+// Robustness matrix (protocol section 2.3)
+// ---------------------------------------------------------------------------
+
+/** A JSON number no serializer emits faithfully in every runtime: sent as literal text. */
+class Raw {
+  constructor(text) { this.text = text; }
+}
+
+const numeric = (type) => type === 'number' || type === 'integer';
+
+function nested() {
+  let value = {};
+  for (let i = 0; i < NESTING_DEPTH; i += 1) value = { a: value };
+  return value;
+}
+
+function bodyVariants(type) {
+  const variants = [['omitted', OMIT], ['null', null]];
+  variants.push(type === 'string' ? ['empty-string', ''] : ['string', 'x']);
+  if (!numeric(type)) variants.push(['number', 1]);
+  if (type !== 'boolean') variants.push(['boolean', true]);
+  if (type !== 'array') variants.push(['list', ['x']]);
+  if (type !== 'object') variants.push(['empty-object', {}]);
+  variants.push(['nested-object', nested()]);
+  if (numeric(type)) {
+    variants.push(['zero', 0], ['negative', -1], ['int64-max', new Raw(INT64_MAX)],
+      ['int64-overflow', new Raw(INT64_OVERFLOW)], ['non-finite', new Raw(NON_FINITE)]);
+  }
+  if (type === 'integer') variants.push(['fraction', 1.5]);
+  return variants;
+}
+
+function textVariants(type, location) {
+  const variants = [];
+  if (location !== 'path') variants.push(['omitted', OMIT], ['empty', '']);
+  if (type !== 'string') variants.push(['string', 'x']);
+  if (numeric(type)) {
+    variants.push(['zero', '0'], ['negative', '-1'], ['int64-max', INT64_MAX],
+      ['int64-overflow', INT64_OVERFLOW], ['non-finite', NON_FINITE], ['nan', 'NaN']);
+  }
+  if (type === 'integer') variants.push(['fraction', '1.5']);
+  if (location === 'query') variants.push(['repeated', REPEAT]);
+  return variants;
+}
+
+function setDotted(body, name, value) {
+  const keys = name.split('.');
+  let node = body;
+  for (const key of keys.slice(0, -1)) {
+    const next = node[key];
+    if (next === null || typeof next !== 'object' || Array.isArray(next)) node[key] = {};
+    node = node[key];
+  }
+  const last = keys[keys.length - 1];
+  if (value === OMIT) delete node[last];
+  else node[last] = value;
+}
+
+function withQuery(path, name, value) {
+  const cut = path.indexOf('?');
+  const base = cut < 0 ? path : path.slice(0, cut);
+  const query = cut < 0 ? '' : path.slice(cut + 1);
+  const params = query.split('&').filter((p) => p && p.split('=')[0] !== name);
+  if (value === REPEAT) params.push(`${name}=x`, `${name}=y`);
+  else if (value !== OMIT) params.push(`${name}=${value}`);
+  return base + (params.length ? `?${params.join('&')}` : '');
+}
+
+function checkFields(entry) {
+  const { fields } = entry;
+  if (!Array.isArray(fields) || fields.length === 0) {
+    throw new Error(`robustness entry '${entry.id}' needs a non-empty 'fields' list (protocol section 2.3)`);
+  }
+  if (entry.destructive) {
+    throw new Error(`robustness entry '${entry.id}' cannot be destructive: its variants would share one boot (protocol section 2.3)`);
+  }
+  for (const field of fields) {
+    if (!FIELD_LOCATIONS.includes(field.in) || !field.name || !FIELD_TYPES.includes(field.type)) {
+      throw new Error(`robustness entry '${entry.id}': each field needs 'in' (${FIELD_LOCATIONS.join('/')}), 'name' and 'type' (${FIELD_TYPES.join('/')})`);
+    }
+    if (field.in === 'path' && (!('value' in field) || !(entry.path ?? '').includes(`{${field.name}}`))) {
+      throw new Error(`robustness entry '${entry.id}': path field '${field.name}' needs a benign 'value' and a '{${field.name}}' placeholder in 'path'`);
+    }
+    const { body } = entry;
+    if (field.in === 'body' && body !== undefined && body !== null
+        && (typeof body !== 'object' || Array.isArray(body))) {
+      throw new Error(`robustness entry '${entry.id}': a body field needs an object 'body'`);
+    }
+  }
+}
+
+const asText = (value) => String(value);   // booleans as true/false, like probe.py
+
+/** The derived entries of one robustness entry, in a fixed order. */
+function expand(entry) {
+  if (entry.skip) return [entry];
+  checkFields(entry);
+  const { fields } = entry;
+  const derived = [];
+  for (const field of fields) {
+    const location = field.in;
+    const { name } = field;
+    const variants = location === 'body' ? bodyVariants(field.type) : textVariants(field.type, location);
+    for (const [label, original] of variants) {
+      let value = original;
+      let path = entry.path ?? '/';
+      for (const other of fields) {
+        if (other.in === 'path' && other !== field) path = path.split(`{${other.name}}`).join(asText(other.value));
+      }
+      let headers = { ...(entry.headers ?? {}) };
+      let body = entry.body !== undefined && entry.body !== null ? JSON.parse(JSON.stringify(entry.body)) : null;
+      let rawLiteral = null;
+      if (location === 'body') {
+        body = body ?? {};
+        if (value instanceof Raw) { rawLiteral = value.text; value = RAW_MARK; }
+        setDotted(body, name, value === OMIT || value === null || typeof value !== 'object'
+          ? value : JSON.parse(JSON.stringify(value)));
+      } else if (location === 'query') {
+        path = withQuery(path, name, value);
+      } else if (location === 'header') {
+        headers = Object.fromEntries(Object.entries(headers).filter(([k]) => k.toLowerCase() !== name.toLowerCase()));
+        if (value !== OMIT) headers[name] = value;
+      } else {
+        path = path.split(`{${name}}`).join(value);
+      }
+      derived.push({
+        id: `${entry.id}#${name}=${label}`, method: entry.method, path, headers, body,
+        kind: 'robustness', finding: entry.finding ?? null, _rawLiteral: rawLiteral, _base: entry.id,
+      });
+    }
+  }
+  return derived;
+}
+
+// ---------------------------------------------------------------------------
+// Value assertions (protocol section 2.4)
+// ---------------------------------------------------------------------------
+
+function parseJsonPath(path) {
+  if (typeof path !== 'string' || !path.startsWith('$')) {
+    throw new Error(`value assertion path must start with '$': ${JSON.stringify(path)}`);
+  }
+  const tokens = [];
+  let position = 1;
+  while (position < path.length) {
+    PATH_TOKEN.lastIndex = position;
+    const match = PATH_TOKEN.exec(path);
+    if (!match) throw new Error(`unsupported value assertion path: ${JSON.stringify(path)}`);
+    if (match[1] !== undefined) tokens.push(['key', match[1]]);
+    else if (match[2] !== undefined) tokens.push(['index', Number(match[2])]);
+    else tokens.push(['star', null]);
+    position = PATH_TOKEN.lastIndex;
+  }
+  return tokens;
+}
+
+/** [found, value]. A path with [*] yields the list of every match. */
+function extract(document, path) {
+  let nodes = [document];
+  let star = false;
+  for (const [kind, token] of parseJsonPath(path)) {
+    const following = [];
+    for (const node of nodes) {
+      if (kind === 'star') {
+        if (Array.isArray(node)) following.push(...node);
+      } else if (kind === 'index') {
+        if (Array.isArray(node) && token < node.length) following.push(node[token]);
+      } else if (node !== null && typeof node === 'object' && !Array.isArray(node)
+          && Object.prototype.hasOwnProperty.call(node, token)) {
+        following.push(node[token]);
+      }
+    }
+    star = star || kind === 'star';
+    nodes = following;
+  }
+  if (star) return [nodes.length > 0, nodes];
+  return nodes.length ? [true, nodes[0]] : [false, null];
+}
+
+function assertionOp(assertion) {
+  const ops = VALUE_OPS.filter((op) => op in assertion);
+  if (ops.length !== 1) {
+    throw new Error(`a value assertion needs exactly one of ${VALUE_OPS.join('/')}: ${serialize(assertion)}`);
+  }
+  return ops[0];
+}
+
+function checkAssertions(entry) {
+  const assertions = entry.assert;
+  if (!Array.isArray(assertions) || assertions.length === 0) {
+    throw new Error(`value entry '${entry.id}' needs a non-empty 'assert' list (protocol section 2.4)`);
+  }
+  for (const assertion of assertions) {
+    const op = assertionOp(assertion);
+    const keys = parseJsonPath(assertion.path).filter(([kind]) => kind === 'key').map(([, k]) => k);
+    if (op === 'sameAsBaseline' && keys.length && SECRET_NAME.test(keys[keys.length - 1])) {
+      throw new Error(`value entry '${entry.id}': sameAsBaseline would store the value of '${assertion.path}' `
+        + "in the capture; assert it with 'absent' or 'matches' instead (protocol section 2.5)");
+    }
+  }
+}
+
+function evaluate(assertions, document, foundDocument) {
+  return assertions.map((assertion) => {
+    const op = assertionOp(assertion);
+    const [found, value] = foundDocument ? extract(document, assertion.path) : [false, null];
+    if (op === 'sameAsBaseline') {
+      return { op, path: assertion.path, found, value: found ? value : null };
+    }
+    let holds;
+    if (op === 'absent') holds = !found;
+    else if (!found) holds = false;
+    else if (op === 'equals') holds = canonical(value) === canonical(assertion.equals);
+    else {
+      const pattern = new RegExp(assertion.matches);
+      const items = Array.isArray(value) && assertion.path.includes('[*]') ? value : [value];
+      holds = items.length > 0 && items.every((item) => typeof item === 'string' && pattern.test(item));
+    }
+    return { op, path: assertion.path, holds };
+  });
+}
+
+function parseJsonBody(bytes) {
+  try {
+    return [true, JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes))];
+  } catch {
+    return [false, null];
+  }
+}
+
+async function exercise(baseUrl, entry, timeoutSeconds, env = {}) {
   const id = entry.id ?? `${entry.method} ${entry.path}`;
   const method = (entry.method ?? 'GET').toUpperCase();
   const path = entry.path ?? '/';
+  const kind = entry.kind ?? 'contract';
   const record = {
-    id, method, path, kind: entry.kind ?? 'contract', finding: entry.finding ?? null,
+    id, method, path, kind, finding: entry.finding ?? null,
     expect: entry.expect ?? null, like: entry.like ?? null, destructive: Boolean(entry.destructive),
     state: SKIPPED, status: null, contentType: null, headers: null, shape: null, error: null,
   };
+  if (kind === 'value') record.assertions = null;
 
   if (entry.skip) {
     record.error = entry.skipReason ?? 'skipped by inventory';
     return record;
   }
 
-  const headers = { ...(entry.headers ?? {}) };
+  const headers = resolveEnv({ ...(entry.headers ?? {}) }, env);
   let body;
   if (entry.rawBody !== undefined && entry.rawBody !== null) {
     // Sent byte for byte: the point is a body the application's parser has not seen.
-    body = entry.rawBody;
+    body = resolveEnv(entry.rawBody, env);
   } else if (entry.body !== undefined && entry.body !== null) {
-    body = JSON.stringify(entry.body);
+    body = JSON.stringify(resolveEnv(entry.body, env));
+    if (entry._rawLiteral !== undefined && entry._rawLiteral !== null) {
+      body = body.split(`"${RAW_MARK}"`).join(entry._rawLiteral);
+    }
   }
   if (body !== undefined && !Object.keys(headers).some((h) => h.toLowerCase() === 'content-type')) {
     headers['Content-Type'] = 'application/json';
@@ -341,7 +630,7 @@ async function exercise(baseUrl, entry, timeoutSeconds) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
   try {
-    const response = await fetch(baseUrl.replace(/\/+$/, '') + path, {
+    const response = await fetch(baseUrl.replace(/\/+$/, '') + resolveEnv(path, env), {
       method, headers, body, signal: controller.signal, redirect: 'manual',
     });
     const bytes = new Uint8Array(await response.arrayBuffer());
@@ -350,6 +639,10 @@ async function exercise(baseUrl, entry, timeoutSeconds) {
     record.contentType = normalizeContentType(response.headers.get('content-type'));
     record.headers = contractHeaders(response.headers);
     record.shape = bodyShape(bytes);
+    if (kind === 'value') {
+      const [parsed, document] = parseJsonBody(bytes);
+      record.assertions = evaluate(entry.assert ?? [], document, parsed);
+    }
   } catch (err) {
     record.state = ERROR;             // refused, reset, timeout, truncated body
     record.error = `${err.name}: ${err.cause?.code ?? err.message}`;
@@ -360,14 +653,25 @@ async function exercise(baseUrl, entry, timeoutSeconds) {
 }
 
 /**
- * Contract entries first, security entries last: a hostile call may mutate state.
+ * Contract and value entries first, then security, then robustness: hostile and malformed
+ * calls may mutate state, and the contract entries must see the same datastore in both runs.
  *
  * A destructive entry is exercised only when --only names it and nothing else (protocol
  * section 2.2): it runs alone, on its own fresh boot, so that what it destroys cannot reach
- * any other entry.
+ * any other entry. --only accepts a robustness entry's id (all its variants) or a variant id.
  */
 function orderedEntries(surface, only) {
-  let entries = (surface.entries ?? []).filter((e) => !only || only.has(e.id));
+  const expanded = [];
+  for (const entry of surface.entries ?? []) {
+    const kind = entry.kind ?? 'contract';
+    if (kind === 'robustness') {
+      expanded.push(...expand(entry));
+    } else {
+      if (kind === 'value' && !entry.skip) checkAssertions(entry);
+      expanded.push(entry);
+    }
+  }
+  let entries = expanded.filter((e) => !only || only.has(e.id) || (e._base !== undefined && only.has(e._base)));
   const destructive = entries.filter((e) => e.destructive);
   if (destructive.length) {
     if (!only) {
@@ -378,19 +682,37 @@ function orderedEntries(surface, only) {
         + destructive.map((e) => e.id).sort(byCodePoint).join(','));
     }
   }
-  const isSecurity = (e) => (e.kind ?? 'contract') === 'security';
-  return [...entries.filter((e) => !isSecurity(e)), ...entries.filter(isSecurity)];
+  const kindOf = (e) => e.kind ?? 'contract';
+  return [
+    ...entries.filter((e) => kindOf(e) !== 'security' && kindOf(e) !== 'robustness'),
+    ...entries.filter((e) => kindOf(e) === 'security'),
+    ...entries.filter((e) => kindOf(e) === 'robustness'),
+  ];
 }
 
 const destructiveIds = (surface) => (surface.entries ?? [])
   .filter((e) => e.destructive).map((e) => e.id).sort(byCodePoint);
 
-async function capture(surface, baseUrl, timeoutSeconds, only) {
+async function capture(surface, baseUrl, timeoutSeconds, only, env = {}) {
+  const entries = orderedEntries(surface, only);
+  // Every secret the selected entries reference must be supplied before the first call:
+  // failing halfway would leave a partial capture that looks complete.
+  const missing = new Set();
+  for (const entry of entries) {
+    if (entry.skip) continue;
+    for (const key of ['path', 'headers', 'body', 'rawBody']) {
+      for (const name of envNames(entry[key])) if (!(name in env)) missing.add(name);
+    }
+  }
+  if (missing.size) {
+    throw new Error(`missing ${[...missing].sort(byCodePoint).join(', ')} for {{env:NAME}} placeholders: `
+      + 'pass --env NAME=VALUE or set it in the environment (protocol section 2.5)');
+  }
   const results = {};
   // Sequential on purpose: concurrency would change the application's observable
   // ordering and load, and the baseline must be reproducible.
-  for (const entry of orderedEntries(surface, only)) {
-    const record = await exercise(baseUrl, entry, timeoutSeconds);
+  for (const entry of entries) {
+    const record = await exercise(baseUrl, entry, timeoutSeconds, env);
     results[record.id] = record;
   }
   return {
@@ -503,6 +825,52 @@ function compareSecurity(baseline, current) {
   };
 }
 
+/**
+ * A malformed-input variant. Only the status class matters: hardening a wrong-typed input
+ * from 2xx to 4xx is the point of the fix (protocol section 4.4).
+ */
+function compareRobustness(baseline, current) {
+  if (isFailure(current)) {
+    return isFailure(baseline)
+      ? { state: NOT_ROBUST, details: [`fails before and after: ${describe(baseline)} -> ${describe(current)}`] }
+      : {
+        state: REGRESSION,
+        details: [`malformed input now fails with ${describe(current)} (baseline: ${describe(baseline)})`],
+      };
+  }
+  return { state: ROBUST, details: [`${describe(current)} (baseline: ${describe(baseline)})`] };
+}
+
+/** Assertions on values the transformation changes (protocol section 4.5). */
+function compareValue(baseline, current) {
+  if (stateOf(current) !== OBSERVED || serverError(current)) {
+    return {
+      state: VIOLATED,
+      details: [`no answer to assert on: ${describe(current)} (baseline: ${describe(baseline)})`],
+    };
+  }
+  const currentAssertions = current.assertions ?? [];
+  const baselineAssertions = baseline.assertions ?? [];
+  if (currentAssertions.length === 0) return { state: UNVERIFIED, details: ['no assertions recorded'] };
+  const violated = [];
+  const unverified = [];
+  currentAssertions.forEach((assertion, index) => {
+    if (assertion.op === 'sameAsBaseline') {
+      const before = baselineAssertions[index];
+      if (!before || !before.found) unverified.push(`sameAsBaseline ${assertion.path}: no baseline value`);
+      else if (!assertion.found) violated.push(`sameAsBaseline ${assertion.path}: absent now`);
+      else if (canonical(before.value) !== canonical(assertion.value)) {
+        violated.push(`sameAsBaseline ${assertion.path}: value differs from baseline`);
+      }
+    } else if (!assertion.holds) {
+      violated.push(`${assertion.op} ${assertion.path}: does not hold`);
+    }
+  });
+  if (violated.length) return { state: VIOLATED, details: violated };
+  if (unverified.length) return { state: UNVERIFIED, details: unverified };
+  return { state: HOLDS, details: [] };
+}
+
 function compareOne(baseline, current, baselineResults = {}, currentResults = {}) {
   if (!baseline) {
     return {
@@ -525,7 +893,10 @@ function compareOne(baseline, current, baselineResults = {}, currentResults = {}
     return { state: UNVERIFIED, details: [`skipped in replay: ${current.error}`] };
   }
 
-  if ((baseline.kind ?? current.kind) === 'security') {
+  const kind = baseline.kind ?? current.kind;
+  if (kind === 'robustness') return compareRobustness(baseline, current);
+  if (kind === 'value') return compareValue(baseline, current);
+  if (kind === 'security') {
     if ((baseline.expect ?? current.expect) === 'neutralized') {
       const likeId = baseline.like ?? current.like;
       return compareNeutralized(baseline, current, likeId,
@@ -614,10 +985,26 @@ function parseArgs(argv) {
     if (!token.startsWith('--')) continue;
     const key = token.slice(2);
     const next = argv[i + 1];
-    if (next === undefined || next.startsWith('--')) options[key] = true;
+    if (key === 'env') {
+      // Repeatable, like probe.py's --env.
+      if (next === undefined || next.startsWith('--')) throw new Error('--env expects NAME=VALUE');
+      options.env = [...(options.env ?? []), next];
+      i += 1;
+    } else if (next === undefined || next.startsWith('--')) options[key] = true;
     else { options[key] = next; i += 1; }
   }
   return options;
+}
+
+/** The process environment, overridden by --env NAME=VALUE pairs. */
+function buildEnv(pairs) {
+  const env = { ...process.env };
+  for (const pair of pairs ?? []) {
+    const cut = pair.indexOf('=');
+    if (cut <= 0) throw new Error(`--env expects NAME=VALUE, got ${JSON.stringify(pair)}`);
+    env[pair.slice(0, cut)] = pair.slice(cut + 1);
+  }
+  return env;
 }
 
 function printTable(rows) {
@@ -631,6 +1018,7 @@ function printTable(rows) {
 function summarize(rows) {
   const counts = {
     [PASS]: 0, [REGRESSION]: 0, [PRE_EXISTING_FAILURE]: 0, [UNVERIFIED]: 0, [FIXED]: 0, [NOT_FIXED]: 0,
+    [ROBUST]: 0, [NOT_ROBUST]: 0, [HOLDS]: 0, [VIOLATED]: 0,
   };
   for (const row of rows) counts[row.state] += 1;
   console.log('');
@@ -638,6 +1026,12 @@ function summarize(rows) {
     + `${counts[PRE_EXISTING_FAILURE]} PRE-EXISTING FAILURE, ${counts[UNVERIFIED]} UNVERIFIED`);
   if (counts[FIXED] || counts[NOT_FIXED]) {
     console.log(`  security: ${counts[FIXED]} FIXED, ${counts[NOT_FIXED]} NOT FIXED`);
+  }
+  if (counts[ROBUST] || counts[NOT_ROBUST]) {
+    console.log(`  robustness: ${counts[ROBUST]} ROBUST, ${counts[NOT_ROBUST]} NOT ROBUST`);
+  }
+  if (counts[HOLDS] || counts[VIOLATED]) {
+    console.log(`  values: ${counts[HOLDS]} HOLDS, ${counts[VIOLATED]} VIOLATED`);
   }
   return counts;
 }
@@ -656,13 +1050,13 @@ This script never boots the application.
 
   node probe.mjs capture --surface <path> --base-url <url> --out <path>
                          [--only <id,id,...>] [--merge] [--timeout <seconds>]
+                         [--env NAME=VALUE ...]
   node probe.mjs compare --baseline <path> [--surface <path> --base-url <url>]
-                         [--current <path>] [--out <path>] [--timeout <seconds>]`;
+                         [--current <path>] [--out <path>] [--timeout <seconds>]
+                         [--env NAME=VALUE ...]`;
 
 async function main() {
   const [mode, ...rest] = process.argv.slice(2);
-  const options = parseArgs(rest);
-  const timeout = Number(options.timeout ?? DEFAULT_TIMEOUT_SECONDS);
 
   if (mode !== 'capture' && mode !== 'compare') {
     console.error(USAGE);
@@ -670,6 +1064,9 @@ async function main() {
   }
 
   try {
+    const options = parseArgs(rest);
+    const timeout = Number(options.timeout ?? DEFAULT_TIMEOUT_SECONDS);
+    const env = buildEnv(options.env);
     if (mode === 'capture') {
       if (!options.surface || !options['base-url'] || !options.out) {
         console.error('capture needs --surface, --base-url and --out');
@@ -677,7 +1074,7 @@ async function main() {
       }
       const only = typeof options.only === 'string' ? new Set(options.only.split(',')) : null;
       const surface = readJson(options.surface);
-      let document = await capture(surface, options['base-url'], timeout, only);
+      let document = await capture(surface, options['base-url'], timeout, only, env);
       // Counted before merging: the numbers describe THIS run, not the whole file.
       const states = Object.values(document.results).map((r) => r.state);
       const count = (s) => states.filter((x) => x === s).length;
@@ -711,7 +1108,7 @@ async function main() {
       currentDoc = readJson(options.current);
     } else if (options['base-url'] && options.surface) {
       const surface = readJson(options.surface);
-      currentDoc = await capture(surface, options['base-url'], timeout, null);
+      currentDoc = await capture(surface, options['base-url'], timeout, null, env);
       if (options.out) writeJson(options.out, currentDoc);
       noteDestructive(surface, null);
     } else {
@@ -725,7 +1122,8 @@ async function main() {
       return 2;
     }
     printTable(rows);
-    return summarize(rows)[REGRESSION] > 0 ? 1 : 0;
+    const counts = summarize(rows);
+    return counts[REGRESSION] || counts[NOT_ROBUST] || counts[VIOLATED] ? 1 : 0;
   } catch (err) {
     console.error(`probe: ${err.message}`);
     return 2;

@@ -1,48 +1,71 @@
 'use strict';
 
-const { AppError, orFail } = require('../errors');
-const { PAYMENT_STATUS, decidePaymentStatus } = require('../models/payment');
-const { hashPassword, generateSecret } = require('../models/passwordHasher');
+const { decidePayment, maskCardNumber, PaymentStatus } = require('../models/payment');
+const { hashPassword, unusablePasswordHash } = require('../models/password');
+const {
+  NotFoundError, PaymentDeclinedError, PersistenceError,
+} = require('../models/errors');
 
-/** The checkout use case: plain values in, plain values out, no HTTP objects. */
+const COURSE_NOT_FOUND = 'Curso não encontrado';
+
 class CheckoutController {
-  constructor({ db, users, courses, enrollments, payments, auditLogs }) {
-    this.db = db;
+  constructor({ users, courses, enrollments, logger }) {
     this.users = users;
     this.courses = courses;
     this.enrollments = enrollments;
-    this.payments = payments;
-    this.auditLogs = auditLogs;
+    this.logger = logger;
   }
 
-  async checkout({ name, email, password, courseId, card }) {
-    const course = await orFail(this.courses.findActiveById(courseId), 'Curso não encontrado', 404);
-    if (!course) throw new AppError('Curso não encontrado', 404);
+  /**
+   * Buys a course: finds or creates the account by e-mail, decides the payment and records
+   * enrollment + payment + audit entry together. Returns the new enrollment id.
+   */
+  async checkout({ name, email, password, courseId, cardNumber }) {
+    const course = await this.findCourse(courseId);
+    const userId = await this.findOrCreateUser({ name, email, password });
 
-    const existingUser = await orFail(this.users.findByEmail(email), 'Erro DB');
+    this.logger.log(`Processando cartão ${maskCardNumber(cardNumber)}`);
+    const status = decidePayment(cardNumber);
+    if (status === PaymentStatus.DENIED) throw new PaymentDeclinedError();
 
-    if (decidePaymentStatus(card) === PAYMENT_STATUS.DENIED) {
-      throw new AppError('Pagamento recusado', 400);
-    }
-
-    // A new account with no password gets a generated secret nobody knows.
-    const passwordHash = existingUser ? null : await hashPassword(password || generateSecret());
-
-    const enrollmentId = await this.db.transaction(async (tx) => {
-      const userId = existingUser
-        ? existingUser.id
-        : await orFail(this.users.insert(tx, { name, email, passwordHash }), 'Erro ao criar usuário');
-
-      const newEnrollmentId = await orFail(this.enrollments.insert(tx, { userId, courseId }), 'Erro Matrícula');
-      await orFail(
-        this.payments.insert(tx, { enrollmentId: newEnrollmentId, amountCents: course.price_cents, status: PAYMENT_STATUS.PAID }),
-        'Erro Pagamento',
-      );
-      await this.auditLogs.insert(tx, `Checkout curso ${courseId} por ${userId}`);
-      return newEnrollmentId;
+    return this.enrollments.createWithPayment({
+      userId,
+      courseId,
+      amountCents: course.priceCents,
+      status,
+      auditAction: `Checkout curso ${courseId} por ${userId}`,
     });
+  }
 
-    return { enrollmentId };
+  async findCourse(courseId) {
+    let course;
+    try {
+      course = await this.courses.findActiveById(courseId);
+    } catch (err) {
+      // The original answered a failed course lookup like a missing course (404); that answer is
+      // kept, and the cause is logged instead of discarded.
+      this.logger.error('course lookup failed', err);
+      throw new NotFoundError(COURSE_NOT_FOUND);
+    }
+    if (!course) throw new NotFoundError(COURSE_NOT_FOUND);
+    return course;
+  }
+
+  async findOrCreateUser({ name, email, password }) {
+    let userId;
+    try {
+      userId = await this.users.findIdByEmail(email);
+    } catch (err) {
+      throw new PersistenceError('Erro DB', err);
+    }
+    if (userId !== null) return userId;
+
+    const passwordHash = password ? await hashPassword(password) : unusablePasswordHash();
+    try {
+      return await this.users.create({ name, email, passwordHash });
+    } catch (err) {
+      throw new PersistenceError('Erro ao criar usuário', err);
+    }
   }
 }
 

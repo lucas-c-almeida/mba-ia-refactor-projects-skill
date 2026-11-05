@@ -15,11 +15,26 @@ Exemplos de requisições estão em `api.http`.
 
 ## Configuração
 
-Veja `.env.example`. Variáveis lidas uma única vez em `src/config`:
+A aplicação não carrega arquivo `.env`: exporte as variáveis no ambiente antes de `npm start`.
 
-- `PORT` (padrão 3000).
-- `OPERATOR_TOKEN`: credencial das operações privilegiadas (`GET /api/admin/financial-report` e `DELETE /api/users/:id`), enviada no cabeçalho `X-Operator-Token`. Sem ela essas rotas respondem 403.
+| Variável | Obrigatória | Efeito |
+|---|---|---|
+| `PORT` | não (padrão `3000`) | Porta HTTP |
+| `OPERATOR_TOKEN` | não | Credencial de operador. As rotas `GET /api/admin/financial-report` e `DELETE /api/users/:id` exigem o header `X-Operator-Token` com este valor. **Sem a variável definida (ou vazia), essas rotas respondem `403`.** |
+
+```bash
+export OPERATOR_TOKEN=<um valor longo e aleatório>
+npm start
+```
 
 ## Estrutura
 
-`src/app.js` (raiz de composição) · `src/config` · `src/models` (domínio e persistência) · `src/controllers` (casos de uso) · `src/routes` (declaração de rotas) · `src/middlewares` (guarda de operador, fronteira de erros).
+```
+src/
+├── app.js           composition root: configuração, wiring, rotas, error handler, listen
+├── config/          leitura e validação do ambiente
+├── models/          regras de domínio, schema/seed e repositórios (persistência)
+├── controllers/     casos de uso (checkout, relatório financeiro, remoção de usuário)
+├── views/           rotas HTTP e validação de entrada
+└── middlewares/     guard de operador, error boundary, adaptador async
+```

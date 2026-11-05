@@ -1,13 +1,21 @@
 'use strict';
 
-const PAYMENT_STATUS = Object.freeze({ PAID: 'PAID', DENIED: 'DENIED' });
+const PaymentStatus = Object.freeze({ PAID: 'PAID', DENIED: 'DENIED' });
 
-// Stand-in for a real gateway: cards starting with this prefix are approved.
+// Approval rule preserved verbatim from the original implementation: a card number starting with
+// this prefix is approved, any other is denied. Whether it is a simulation stub or a business
+// rule is not stated anywhere in the project; it is kept as it was.
 const APPROVED_CARD_PREFIX = '4';
 
-/** Decides the payment outcome for a card number. Pure: no I/O. */
-function decidePaymentStatus(card) {
-  return card.startsWith(APPROVED_CARD_PREFIX) ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.DENIED;
+const LAST_DIGITS_SHOWN = 4;
+
+function decidePayment(cardNumber) {
+  return cardNumber.startsWith(APPROVED_CARD_PREFIX) ? PaymentStatus.PAID : PaymentStatus.DENIED;
 }
 
-module.exports = { PAYMENT_STATUS, decidePaymentStatus };
+/** The only form of a card number that may reach a log. */
+function maskCardNumber(cardNumber) {
+  return `****${cardNumber.slice(-LAST_DIGITS_SHOWN)}`;
+}
+
+module.exports = { PaymentStatus, decidePayment, maskCardNumber };

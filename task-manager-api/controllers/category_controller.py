@@ -1,81 +1,40 @@
-import logging
+"""Category use cases."""
+from database import commit, db
+from models.category import DEFAULT_COLOR, Category
+from models.errors import ValidationError
+from models.task import Task
 
-from models.category import Category
-from models.constants import DEFAULT_CATEGORY_COLOR
-from models.errors import NotFoundError, PersistenceError, ValidationError
-
-logger = logging.getLogger(__name__)
+CATEGORY_FIELDS = ('name', 'description', 'color')
 
 
 class CategoryController:
-    def __init__(self, categories, tasks, uow):
-        self._categories = categories
-        self._tasks = tasks
-        self._uow = uow
+    def list_categories(self):
+        """[(category, task_count)] in two queries."""
+        counts = Task.counts_per_category()
+        return [(category, counts.get(category.id, 0)) for category in Category.all_ordered()]
 
-    def _require_category(self, category_id):
-        category = self._categories.get(category_id)
-        if not category:
-            raise NotFoundError('Categoria não encontrada')
+    def create_category(self, fields):
+        """`fields` holds only what the request sent; absent optional fields take defaults."""
+        if not fields.get('name'):
+            raise ValidationError('Nome é obrigatório')
+        category = Category(name=fields['name'],
+                            description=fields.get('description', ''),
+                            color=fields.get('color', DEFAULT_COLOR))
+        db.session.add(category)
+        commit('Erro ao criar categoria')
         return category
 
-    def list_categories(self):
-        counts = self._tasks.counts_by_category()
-        result = []
-        for category in self._categories.list_all():
-            data = category.to_dict()
-            data['task_count'] = counts.get(category.id, 0)
-            result.append(data)
-        return result
+    def require_category(self, category_id):
+        return Category.get_or_404(category_id)
 
-    def create_category(self, data):
-        if not isinstance(data, dict) or not data:
-            raise ValidationError('Dados inválidos')
-        name = data.get('name')
-        if not name:
-            raise ValidationError('Nome é obrigatório')
-
-        category = Category()
-        category.name = name
-        category.description = data.get('description', '')
-        category.color = data.get('color', DEFAULT_CATEGORY_COLOR)
-
-        try:
-            self._categories.add(category)
-            self._uow.commit()
-            return category.to_dict()
-        except Exception:
-            self._uow.rollback()
-            logger.exception('Erro ao criar categoria')
-            raise PersistenceError('Erro ao criar categoria')
-
-    def update_category(self, category_id, data):
-        category = self._require_category(category_id)
-        if not isinstance(data, dict):
-            raise ValidationError('Dados inválidos')
-
-        if 'name' in data:
-            category.name = data['name']
-        if 'description' in data:
-            category.description = data['description']
-        if 'color' in data:
-            category.color = data['color']
-
-        try:
-            self._uow.commit()
-            return category.to_dict()
-        except Exception:
-            self._uow.rollback()
-            logger.exception('Erro ao atualizar categoria %s', category_id)
-            raise PersistenceError('Erro ao atualizar')
+    def update_category(self, category, fields):
+        for key in CATEGORY_FIELDS:
+            if key in fields:
+                setattr(category, key, fields[key])
+        commit('Erro ao atualizar')
+        return category
 
     def delete_category(self, category_id):
-        category = self._require_category(category_id)
-        try:
-            self._categories.delete(category)
-            self._uow.commit()
-            return {'message': 'Categoria deletada'}
-        except Exception:
-            self._uow.rollback()
-            logger.exception('Erro ao deletar categoria %s', category_id)
-            raise PersistenceError('Erro ao deletar')
+        category = Category.get_or_404(category_id)
+        db.session.delete(category)
+        commit('Erro ao deletar')

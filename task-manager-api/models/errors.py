@@ -1,4 +1,5 @@
-"""Domain error taxonomy. The delivery boundary maps these to responses in one place."""
+"""Domain error taxonomy (RP-09). The error boundary maps each one to its status and to the
+application's error body, `{"error": <message>}`."""
 
 
 class AppError(Exception):
@@ -30,5 +31,4 @@ class ConflictError(AppError):
 
 
 class PersistenceError(AppError):
-    """A write failed; the message is the intentional, client-facing one."""
     status = 500

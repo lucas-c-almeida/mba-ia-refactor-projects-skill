@@ -6,8 +6,9 @@ specific to a project, a framework or an ecosystem.
 
 **Sweep by entry, and by signal.** Phase 2 walks this catalog one entry at a time and, within each
 entry, one **detection signal** at a time, across the whole target — source, schema, and the data
-and scripts that reach the runtime — and records each entry's outcome and the signals it checked
-in the report's coverage table, hits or none. A file-by-file reading only catches what stands out
+and scripts that reach the runtime — and records one row per signal in the report's
+`## Signal Ledger`: where it looked, what it found, and whether each hit became a finding or was
+discarded with a reason (`03-report-template.md`). A file-by-file reading only catches what stands out
 in each file; an entry-level glance catches the entry's most familiar signal and stops there.
 
 ## How to use this catalog
@@ -616,7 +617,7 @@ rest. With the detectors on, exercise, each as its own command:
   requests the baseline will send;
 - for a CLI or a library, each command or exported entry point with a representative argument.
 
-List what was exercised in the AP-14 row of `## Catalog Coverage`. What was not exercised is not
+List what was exercised in the AP-14 rows of `## Signal Ledger`. What was not exercised is not
 covered, and a gap there goes into `## Verification Coverage`.
 
 Side benefit that matters for the deliverable: a forced warning arrives with a **stack trace naming
@@ -784,6 +785,15 @@ one (then also AP-01).
 
 **De-escalate to informational** — the code is genuinely reachable through a dynamic mechanism you
 identified, or it is a documented, intentionally staged extension point.
+
+**Not dead: written and never read by design.** A unit with **no reader** is dead only if it also
+has **no declared purpose** that needs no reader inside the application. An append-only audit
+trail, an event or access log, a history table, an outbox read by another process: these are
+written so that someone *outside* the code — an auditor, an operator, another system — can read
+them later. Their purpose is visible in the name, a comment, the schema, or the project's
+documentation. Reporting them as dead code is a false positive, and the transformation would delete
+evidence. If such a trail is incomplete or unreliable, that is a different finding; it is never
+AP-17.
 
 **Impact.** Dead code is read, searched, reviewed, migrated and maintained at full cost while
 delivering nothing. It misleads readers about what the system does, and it hides real code in the

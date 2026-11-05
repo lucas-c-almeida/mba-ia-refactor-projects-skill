@@ -42,11 +42,16 @@ Usage
   python probe.py capture --surface reports/surface.json --base-url http://127.0.0.1:8081 \
                           --out reports/baseline.json --only purge-archive --merge
 
-Exit codes: 0 = no regressions, 1 = at least one regression, 2 = usage or I/O error.
+  # a secret written as {{env:NAME}} in the inventory is supplied at call time, never stored
+  python probe.py capture ... --env OPERATOR_TOKEN=<value>
+
+Exit codes: 0 = no regressions, 1 = at least one regression (or NOT ROBUST / VIOLATED),
+2 = usage or I/O error.
 """
 
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -69,6 +74,28 @@ PRE_EXISTING_FAILURE = "PRE-EXISTING FAILURE"
 UNVERIFIED = "UNVERIFIED"
 FIXED = "FIXED"
 NOT_FIXED = "NOT FIXED"
+ROBUST = "ROBUST"              # robustness variant: no server error, no crash (section 4.4)
+NOT_ROBUST = "NOT ROBUST"      # robustness variant: failed before and still fails
+HOLDS = "HOLDS"                # value entry: every assertion holds (section 4.5)
+VIOLATED = "VIOLATED"          # value entry: at least one assertion does not hold
+
+# Robustness matrix (protocol section 2.3). Every implementation emits the same variants,
+# in the same order, with the same ids.
+INT64_MAX = "9223372036854775807"
+INT64_OVERFLOW = "9223372036854775808"
+NON_FINITE = "1e999"
+NESTING_DEPTH = 64
+FIELD_LOCATIONS = ("body", "query", "header", "path")
+FIELD_TYPES = ("string", "number", "integer", "boolean", "array", "object")
+RAW_MARK = "__probe_raw_literal__"
+OMIT = object()
+REPEAT = object()
+
+# Secrets are written as {{env:NAME}} in the inventory and resolved at call time (section 2.5).
+ENV_PATTERN = re.compile(r"\{\{env:([A-Za-z_][A-Za-z0-9_]*)\}\}")
+SECRET_NAME = re.compile(r"secret|key|token|passw|pwd|credential|dsn|conn_str", re.IGNORECASE)
+VALUE_OPS = ("equals", "matches", "absent", "sameAsBaseline")
+PATH_TOKEN = re.compile(r"\.([^.\[\]]+)|\[([0-9]+)\]|\[\*\]")
 
 # Value masks (protocol section 5.2), applied in this order. ASCII classes only, so that
 # every implementation masks exactly the same characters.
@@ -309,32 +336,337 @@ def _body_shape(payload):
     return {"type": "opaque", "bytes": "present"}
 
 
-def exercise(base_url, entry, timeout):
+# ---------------------------------------------------------------------------
+# Secrets by reference (protocol section 2.5)
+# ---------------------------------------------------------------------------
+
+def env_names(value):
+    """Every NAME referenced as {{env:NAME}} anywhere inside a JSON-like value."""
+    if isinstance(value, str):
+        return set(ENV_PATTERN.findall(value))
+    if isinstance(value, list):
+        return set().union(*[env_names(v) for v in value]) if value else set()
+    if isinstance(value, dict):
+        names = set()
+        for key, item in value.items():
+            names |= env_names(key) | env_names(item)
+        return names
+    return set()
+
+
+def resolve_env(value, env):
+    if isinstance(value, str):
+        return ENV_PATTERN.sub(lambda m: env[m.group(1)], value)
+    if isinstance(value, list):
+        return [resolve_env(v, env) for v in value]
+    if isinstance(value, dict):
+        return {resolve_env(k, env): resolve_env(v, env) for k, v in value.items()}
+    return value
+
+
+# ---------------------------------------------------------------------------
+# Robustness matrix (protocol section 2.3)
+# ---------------------------------------------------------------------------
+
+class _Raw(object):
+    """A JSON number no serializer emits faithfully in every runtime: sent as literal text."""
+
+    def __init__(self, text):
+        self.text = text
+
+
+def _numeric(field_type):
+    return field_type in ("number", "integer")
+
+
+def _nested():
+    value = {}
+    for _ in range(NESTING_DEPTH):
+        value = {"a": value}
+    return value
+
+
+def body_variants(field_type):
+    variants = [("omitted", OMIT), ("null", None)]
+    variants.append(("empty-string", "") if field_type == "string" else ("string", "x"))
+    if not _numeric(field_type):
+        variants.append(("number", 1))
+    if field_type != "boolean":
+        variants.append(("boolean", True))
+    if field_type != "array":
+        variants.append(("list", ["x"]))
+    if field_type != "object":
+        variants.append(("empty-object", {}))
+    variants.append(("nested-object", _nested()))
+    if _numeric(field_type):
+        variants.extend([("zero", 0), ("negative", -1), ("int64-max", _Raw(INT64_MAX)),
+                         ("int64-overflow", _Raw(INT64_OVERFLOW)),
+                         ("non-finite", _Raw(NON_FINITE))])
+    if field_type == "integer":
+        variants.append(("fraction", 1.5))
+    return variants
+
+
+def text_variants(field_type, location):
+    variants = []
+    if location != "path":
+        variants.extend([("omitted", OMIT), ("empty", "")])
+    if field_type != "string":
+        variants.append(("string", "x"))
+    if _numeric(field_type):
+        variants.extend([("zero", "0"), ("negative", "-1"), ("int64-max", INT64_MAX),
+                         ("int64-overflow", INT64_OVERFLOW), ("non-finite", NON_FINITE),
+                         ("nan", "NaN")])
+    if field_type == "integer":
+        variants.append(("fraction", "1.5"))
+    if location == "query":
+        variants.append(("repeated", REPEAT))
+    return variants
+
+
+def _set_dotted(body, name, value):
+    keys = name.split(".")
+    node = body
+    for key in keys[:-1]:
+        if not isinstance(node.get(key), dict):
+            node[key] = {}
+        node = node[key]
+    if value is OMIT:
+        node.pop(keys[-1], None)
+    else:
+        node[keys[-1]] = value
+
+
+def _with_query(path, name, value):
+    base, _, query = path.partition("?")
+    params = [p for p in query.split("&") if p and p.split("=", 1)[0] != name]
+    if value is REPEAT:
+        params.extend(["{0}=x".format(name), "{0}=y".format(name)])
+    elif value is not OMIT:
+        params.append("{0}={1}".format(name, value))
+    return base + ("?" + "&".join(params) if params else "")
+
+
+def _check_fields(entry):
+    fields = entry.get("fields")
+    if not isinstance(fields, list) or not fields:
+        raise ValueError("robustness entry '{0}' needs a non-empty 'fields' list (protocol "
+                         "section 2.3)".format(entry.get("id")))
+    if entry.get("destructive"):
+        raise ValueError("robustness entry '{0}' cannot be destructive: its variants would "
+                         "share one boot (protocol section 2.3)".format(entry.get("id")))
+    for field in fields:
+        if field.get("in") not in FIELD_LOCATIONS or not field.get("name") \
+                or field.get("type") not in FIELD_TYPES:
+            raise ValueError("robustness entry '{0}': each field needs 'in' ({1}), 'name' and "
+                             "'type' ({2})".format(entry.get("id"), "/".join(FIELD_LOCATIONS),
+                                                   "/".join(FIELD_TYPES)))
+        if field["in"] == "path":
+            if "value" not in field or "{" + field["name"] + "}" not in (entry.get("path") or ""):
+                raise ValueError("robustness entry '{0}': path field '{1}' needs a benign "
+                                 "'value' and a '{{{1}}}' placeholder in 'path'".format(
+                                     entry.get("id"), field["name"]))
+        if field["in"] == "body" and entry.get("body") is not None \
+                and not isinstance(entry.get("body"), dict):
+            raise ValueError("robustness entry '{0}': a body field needs an object 'body'"
+                             .format(entry.get("id")))
+
+
+def _as_text(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def expand(entry):
+    """The derived entries of one robustness entry, in a fixed order."""
+    if entry.get("skip"):
+        return [entry]
+    _check_fields(entry)
+    fields = entry["fields"]
+    derived = []
+    for field in fields:
+        location, name = field["in"], field["name"]
+        variants = body_variants(field["type"]) if location == "body" \
+            else text_variants(field["type"], location)
+        for label, value in variants:
+            path = entry.get("path") or "/"
+            for other in fields:
+                if other["in"] == "path" and other is not field:
+                    path = path.replace("{" + other["name"] + "}", _as_text(other["value"]))
+            headers = dict(entry.get("headers") or {})
+            body = json.loads(json.dumps(entry.get("body"))) if entry.get("body") is not None \
+                else None
+            raw_literal = None
+            if location == "body":
+                body = body if body is not None else {}
+                if isinstance(value, _Raw):
+                    raw_literal = value.text
+                    value = RAW_MARK
+                _set_dotted(body, name, value)
+            elif location == "query":
+                path = _with_query(path, name, value)
+            elif location == "header":
+                headers = {k: v for k, v in headers.items() if k.lower() != name.lower()}
+                if value is not OMIT:
+                    headers[name] = value
+            else:
+                path = path.replace("{" + name + "}", value)
+            derived.append({"id": "{0}#{1}={2}".format(entry.get("id"), name, label),
+                            "method": entry.get("method"), "path": path, "headers": headers,
+                            "body": body, "kind": "robustness", "finding": entry.get("finding"),
+                            "_rawLiteral": raw_literal, "_base": entry.get("id")})
+    return derived
+
+
+# ---------------------------------------------------------------------------
+# Value assertions (protocol section 2.4)
+# ---------------------------------------------------------------------------
+
+def parse_json_path(path):
+    if not isinstance(path, str) or not path.startswith("$"):
+        raise ValueError("value assertion path must start with '$': {0!r}".format(path))
+    tokens, position = [], 1
+    while position < len(path):
+        match = PATH_TOKEN.match(path, position)
+        if not match:
+            raise ValueError("unsupported value assertion path: {0!r}".format(path))
+        if match.group(1) is not None:
+            tokens.append(("key", match.group(1)))
+        elif match.group(2) is not None:
+            tokens.append(("index", int(match.group(2))))
+        else:
+            tokens.append(("star", None))
+        position = match.end()
+    return tokens
+
+
+def extract(document, path):
+    """(found, value). A path with [*] yields the list of every match."""
+    tokens = parse_json_path(path)
+    nodes = [document]
+    star = False
+    for kind, token in tokens:
+        following = []
+        for node in nodes:
+            if kind == "star":
+                if isinstance(node, list):
+                    following.extend(node)
+            elif kind == "index":
+                if isinstance(node, list) and token < len(node):
+                    following.append(node[token])
+            elif isinstance(node, dict) and token in node:
+                following.append(node[token])
+        star = star or kind == "star"
+        nodes = following
+    if star:
+        return bool(nodes), nodes
+    return (True, nodes[0]) if nodes else (False, None)
+
+
+def normalize_value(value):
+    """Integral floats as integers: the JS runtime has a single number type."""
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, list):
+        return [normalize_value(v) for v in value]
+    if isinstance(value, dict):
+        return {k: normalize_value(v) for k, v in value.items()}
+    return value
+
+
+def _assertion_op(assertion):
+    ops = [op for op in VALUE_OPS if op in assertion]
+    if len(ops) != 1:
+        raise ValueError("a value assertion needs exactly one of {0}: {1}".format(
+            "/".join(VALUE_OPS), json.dumps(assertion, sort_keys=True)))
+    return ops[0]
+
+
+def _check_assertions(entry):
+    assertions = entry.get("assert")
+    if not isinstance(assertions, list) or not assertions:
+        raise ValueError("value entry '{0}' needs a non-empty 'assert' list (protocol section "
+                         "2.4)".format(entry.get("id")))
+    for assertion in assertions:
+        op = _assertion_op(assertion)
+        tokens = parse_json_path(assertion.get("path"))
+        keys = [token for kind, token in tokens if kind == "key"]
+        if op == "sameAsBaseline" and keys and SECRET_NAME.search(keys[-1]):
+            raise ValueError("value entry '{0}': sameAsBaseline would store the value of '{1}' "
+                             "in the capture; assert it with 'absent' or 'matches' instead "
+                             "(protocol section 2.5)".format(entry.get("id"),
+                                                             assertion.get("path")))
+
+
+def evaluate(assertions, document, found_document):
+    results = []
+    for assertion in assertions:
+        op = _assertion_op(assertion)
+        found, value = extract(document, assertion["path"]) if found_document else (False, None)
+        value = normalize_value(value)
+        if op == "sameAsBaseline":
+            results.append({"op": op, "path": assertion["path"], "found": found,
+                            "value": value if found else None})
+            continue
+        if op == "absent":
+            holds = not found
+        elif not found:
+            holds = False
+        elif op == "equals":
+            holds = _canonical(value) == _canonical(normalize_value(assertion["equals"]))
+        else:
+            pattern = re.compile(assertion["matches"])
+            items = value if isinstance(value, list) and "[*]" in assertion["path"] else [value]
+            holds = bool(items) and all(isinstance(item, str) and pattern.search(item)
+                                        for item in items)
+        results.append({"op": op, "path": assertion["path"], "holds": holds})
+    return results
+
+
+def _parse_json_body(payload):
+    try:
+        return True, json.loads(payload.decode("utf-8"), parse_constant=_reject_constant)
+    except (UnicodeDecodeError, ValueError):
+        return False, None
+
+
+def exercise(base_url, entry, timeout, env=None):
     """Issue one call and return its recorded result. Never raises."""
     entry_id = entry.get("id") or "{0} {1}".format(entry.get("method"), entry.get("path"))
     method = (entry.get("method") or "GET").upper()
     path = entry.get("path") or "/"
+    kind = entry.get("kind") or "contract"
     record = {"id": entry_id, "method": method, "path": path,
-              "kind": entry.get("kind") or "contract", "finding": entry.get("finding"),
+              "kind": kind, "finding": entry.get("finding"),
               "expect": entry.get("expect"), "like": entry.get("like"),
               "destructive": bool(entry.get("destructive")),
               "state": SKIPPED, "status": None, "contentType": None, "headers": None,
               "shape": None, "error": None}
+    if kind == "value":
+        record["assertions"] = None
 
     if entry.get("skip"):
         record["error"] = entry.get("skipReason") or "skipped by inventory"
         return record
 
-    url = base_url.rstrip("/") + path
-    body = entry.get("body")
-    raw_body = entry.get("rawBody")
+    env = env or {}
+    url = base_url.rstrip("/") + resolve_env(path, env)
+    body = resolve_env(entry.get("body"), env)
+    raw_body = resolve_env(entry.get("rawBody"), env)
     data = None
-    headers = dict(entry.get("headers") or {})
+    headers = resolve_env(dict(entry.get("headers") or {}), env)
     if raw_body is not None:
         # Sent byte for byte: the point is a body the application's parser has not seen.
         data = raw_body.encode("utf-8")
     elif body is not None:
-        data = json.dumps(body).encode("utf-8")
+        # Compact and unescaped, exactly as JSON.stringify: both probes send the same bytes.
+        text = json.dumps(body, separators=(",", ":"), ensure_ascii=False)
+        if entry.get("_rawLiteral") is not None:
+            text = text.replace('"' + RAW_MARK + '"', entry["_rawLiteral"])
+        data = text.encode("utf-8")
     if data is not None and not any(name.lower() == "content-type" for name in headers):
         headers["Content-Type"] = "application/json"
 
@@ -360,18 +692,32 @@ def exercise(base_url, entry, timeout):
     record["contentType"] = normalize_content_type(message.get("Content-Type") if message else None)
     record["headers"] = contract_headers(message) if message else {}
     record["shape"] = _body_shape(payload)
+    if kind == "value":
+        parsed, document = _parse_json_body(payload)
+        record["assertions"] = evaluate(entry.get("assert") or [], document, parsed)
     return record
 
 
 def ordered_entries(surface, only=None):
     """
-    Contract entries first, security entries last: a hostile call may mutate state.
+    Contract and value entries first, then security, then robustness: hostile and malformed
+    calls may mutate state, and the contract entries must see the same datastore in both runs.
 
     A destructive entry is exercised only when --only names it and nothing else (protocol
     section 2.2): it runs alone, on its own fresh boot, so that what it destroys cannot reach
-    any other entry.
+    any other entry. --only accepts a robustness entry's id (all its variants) or a variant id.
     """
-    entries = [e for e in surface.get("entries", []) if only is None or e.get("id") in only]
+    expanded = []
+    for entry in surface.get("entries", []):
+        kind = entry.get("kind") or "contract"
+        if kind == "robustness":
+            expanded.extend(expand(entry))
+        else:
+            if kind == "value" and not entry.get("skip"):
+                _check_assertions(entry)
+            expanded.append(entry)
+    entries = [e for e in expanded
+               if only is None or e.get("id") in only or e.get("_base") in only]
     destructive = [e for e in entries if e.get("destructive")]
     if destructive:
         if only is None:
@@ -380,19 +726,35 @@ def ordered_entries(surface, only=None):
             raise ValueError("a destructive entry must be captured alone (--only <its id>), "
                              "on its own fresh boot (protocol section 2.2): "
                              + ",".join(sorted(e.get("id") for e in destructive)))
-    regular = [e for e in entries if (e.get("kind") or "contract") != "security"]
-    hostile = [e for e in entries if (e.get("kind") or "contract") == "security"]
-    return regular + hostile
+    def kind_of(entry):
+        return entry.get("kind") or "contract"
+    regular = [e for e in entries if kind_of(e) not in ("security", "robustness")]
+    hostile = [e for e in entries if kind_of(e) == "security"]
+    malformed = [e for e in entries if kind_of(e) == "robustness"]
+    return regular + hostile + malformed
 
 
 def destructive_ids(surface):
     return sorted(e.get("id") for e in surface.get("entries", []) if e.get("destructive"))
 
 
-def capture(surface, base_url, timeout, only=None):
+def capture(surface, base_url, timeout, only=None, env=None):
+    env = env or {}
+    entries = ordered_entries(surface, only)
+    # Every secret the selected entries reference must be supplied before the first call:
+    # failing halfway would leave a partial capture that looks complete.
+    missing = set()
+    for entry in entries:
+        if not entry.get("skip"):
+            for key in ("path", "headers", "body", "rawBody"):
+                missing |= {name for name in env_names(entry.get(key)) if name not in env}
+    if missing:
+        raise ValueError("missing {0} for {{{{env:NAME}}}} placeholders: pass --env NAME=VALUE "
+                         "or set it in the environment (protocol section 2.5)".format(
+                             ", ".join(sorted(missing))))
     results = {}
-    for entry in ordered_entries(surface, only):
-        record = exercise(base_url, entry, timeout)
+    for entry in entries:
+        record = exercise(base_url, entry, timeout, env)
         results[record["id"]] = record
     return {
         "version": PROTOCOL_VERSION,
@@ -501,6 +863,51 @@ def compare_security(baseline, current):
         _describe(current), _describe(baseline))]
 
 
+def compare_robustness(baseline, current):
+    """
+    A malformed-input variant. Only the status class matters: hardening a wrong-typed input
+    from 2xx to 4xx is the point of the fix (protocol section 4.4).
+    """
+    if _is_failure(current):
+        if _is_failure(baseline):
+            return NOT_ROBUST, ["fails before and after: {0} -> {1}".format(
+                _describe(baseline), _describe(current))]
+        return REGRESSION, ["malformed input now fails with {0} (baseline: {1})".format(
+            _describe(current), _describe(baseline))]
+    return ROBUST, ["{0} (baseline: {1})".format(_describe(current), _describe(baseline))]
+
+
+def compare_value(baseline, current):
+    """Assertions on values the transformation changes (protocol section 4.5)."""
+    if _state(current) != OBSERVED or _server_error(current):
+        return VIOLATED, ["no answer to assert on: {0} (baseline: {1})".format(
+            _describe(current), _describe(baseline))]
+    current_assertions = current.get("assertions") or []
+    baseline_assertions = baseline.get("assertions") or []
+    if not current_assertions:
+        return UNVERIFIED, ["no assertions recorded"]
+    violated, unverified = [], []
+    for index, assertion in enumerate(current_assertions):
+        if assertion.get("op") == "sameAsBaseline":
+            before = baseline_assertions[index] if index < len(baseline_assertions) else None
+            if not before or not before.get("found"):
+                unverified.append("sameAsBaseline {0}: no baseline value".format(
+                    assertion.get("path")))
+            elif not assertion.get("found"):
+                violated.append("sameAsBaseline {0}: absent now".format(assertion.get("path")))
+            elif _canonical(before.get("value")) != _canonical(assertion.get("value")):
+                violated.append("sameAsBaseline {0}: value differs from baseline".format(
+                    assertion.get("path")))
+        elif not assertion.get("holds"):
+            violated.append("{0} {1}: does not hold".format(assertion.get("op"),
+                                                            assertion.get("path")))
+    if violated:
+        return VIOLATED, violated
+    if unverified:
+        return UNVERIFIED, unverified
+    return HOLDS, []
+
+
 def compare_one(baseline, current, baseline_results=None, current_results=None):
     """Return (state, details) for one entry."""
     if baseline is None:
@@ -516,7 +923,12 @@ def compare_one(baseline, current, baseline_results=None, current_results=None):
     if _state(current) == SKIPPED:
         return UNVERIFIED, ["skipped in replay: {0}".format(current.get("error"))]
 
-    if (baseline.get("kind") or current.get("kind")) == "security":
+    kind = baseline.get("kind") or current.get("kind")
+    if kind == "robustness":
+        return compare_robustness(baseline, current)
+    if kind == "value":
+        return compare_value(baseline, current)
+    if kind == "security":
         if (baseline.get("expect") or current.get("expect")) == "neutralized":
             like_id = baseline.get("like") or current.get("like")
             return compare_neutralized(baseline, current, like_id,
@@ -614,7 +1026,7 @@ def print_table(rows):
 
 def summarize(rows):
     counts = {state: 0 for state in (PASS, REGRESSION, PRE_EXISTING_FAILURE, UNVERIFIED,
-                                     FIXED, NOT_FIXED)}
+                                     FIXED, NOT_FIXED, ROBUST, NOT_ROBUST, HOLDS, VIOLATED)}
     for row in rows:
         counts[row["state"]] += 1
     print("")
@@ -622,7 +1034,23 @@ def summarize(rows):
         counts[PASS], counts[REGRESSION], counts[PRE_EXISTING_FAILURE], counts[UNVERIFIED]))
     if counts[FIXED] or counts[NOT_FIXED]:
         print("  security: {0} FIXED, {1} NOT FIXED".format(counts[FIXED], counts[NOT_FIXED]))
+    if counts[ROBUST] or counts[NOT_ROBUST]:
+        print("  robustness: {0} ROBUST, {1} NOT ROBUST".format(counts[ROBUST],
+                                                              counts[NOT_ROBUST]))
+    if counts[HOLDS] or counts[VIOLATED]:
+        print("  values: {0} HOLDS, {1} VIOLATED".format(counts[HOLDS], counts[VIOLATED]))
     return counts
+
+
+def build_env(pairs):
+    """The process environment, overridden by --env NAME=VALUE pairs."""
+    env = dict(os.environ)
+    for pair in pairs or []:
+        name, sep, value = pair.partition("=")
+        if not sep or not name:
+            raise ValueError("--env expects NAME=VALUE, got {0!r}".format(pair))
+        env[name] = value
+    return env
 
 
 def _note_destructive(surface, only):
@@ -649,6 +1077,8 @@ def main(argv=None):
     capture_parser.add_argument("--merge", action="store_true",
                                 help="merge into an existing --out instead of replacing it")
     capture_parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    capture_parser.add_argument("--env", action="append",
+                                help="NAME=VALUE for {{env:NAME}} placeholders (repeatable)")
 
     compare_parser = sub.add_parser("compare", help="diff a current capture against a baseline")
     compare_parser.add_argument("--surface", help="surface inventory JSON (needed with --base-url)")
@@ -657,6 +1087,8 @@ def main(argv=None):
     compare_parser.add_argument("--current", help="use this already-captured file instead")
     compare_parser.add_argument("--out", help="optionally write the current capture here")
     compare_parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    compare_parser.add_argument("--env", action="append",
+                                help="NAME=VALUE for {{env:NAME}} placeholders (repeatable)")
 
     # Text skeletons carry response content; never let a console codepage crash the report.
     if hasattr(sys.stdout, "reconfigure"):
@@ -671,7 +1103,7 @@ def main(argv=None):
         if args.mode == "capture":
             only = set(args.only.split(",")) if args.only else None
             surface = read_json(args.surface)
-            document = capture(surface, args.base_url, args.timeout, only)
+            document = capture(surface, args.base_url, args.timeout, only, build_env(args.env))
             # Counted before merging: the numbers describe THIS run, not the whole file.
             states = [r["state"] for r in document["results"].values()]
             if args.merge:
@@ -696,7 +1128,8 @@ def main(argv=None):
             current_doc = read_json(args.current)
         elif args.base_url and args.surface:
             surface = read_json(args.surface)
-            current_doc = capture(surface, args.base_url, args.timeout)
+            current_doc = capture(surface, args.base_url, args.timeout, None,
+                                  build_env(args.env))
             if args.out:
                 write_json(args.out, current_doc)
             _note_destructive(surface, None)
@@ -711,7 +1144,7 @@ def main(argv=None):
             return 2
         print_table(rows)
         counts = summarize(rows)
-        return 1 if counts[REGRESSION] else 0
+        return 1 if counts[REGRESSION] or counts[NOT_ROBUST] or counts[VIOLATED] else 0
 
     except (OSError, ValueError) as err:
         print("probe: {0}".format(err), file=sys.stderr)

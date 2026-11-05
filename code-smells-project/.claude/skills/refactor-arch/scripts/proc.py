@@ -40,6 +40,7 @@ Usage
   python proc.py status --state <file>
   python proc.py wait   --port 8081 [--timeout 60]
   python proc.py copy   --from <dir> --to <new dir> [--exclude <name> ...]
+  python proc.py id
 
 Every command prints one JSON line (keys sorted) and exits with:
   0 ok (status: running; wait: ready)                        2 usage or I/O error
@@ -117,12 +118,30 @@ def windows_snapshot():
     return table
 
 
+def linux_start_token(pid):
+    """Linux: the start time in clock ticks, field 22 of /proc/<pid>/stat. Read from the
+    kernel, so it works in a slim image that ships no `ps` (round 6, G9). The command name
+    (field 2) may contain spaces and parentheses, so fields are counted from the last ')'."""
+    try:
+        with open("/proc/{0}/stat".format(pid), "rb") as handle:
+            data = handle.read().decode("latin-1")
+    except OSError:
+        return None
+    fields = data[data.rfind(")") + 2:].split()
+    return "proc:" + fields[19] if len(fields) > 19 else None
+
+
+HAS_PROCFS = not IS_WINDOWS and os.path.exists("/proc/self/stat")
+
+
 def start_token(pid, snapshot=None):
     """The OS start time of a live process, or None if it is not running."""
     if IS_WINDOWS:
         table = snapshot if snapshot is not None else windows_snapshot()
         entry = (table or {}).get(pid)
         return entry[1] if entry else None
+    if HAS_PROCFS:
+        return linux_start_token(pid)
     out = _run(["ps", "-o", "lstart=", "-p", str(pid)])
     token = (out or "").strip()
     return token or None
@@ -432,6 +451,20 @@ def cmd_copy(args):
                 EXIT_OK)
 
 
+# ---------------------------------------------------------------------------
+# id
+#
+# A run identifier for container names, scratch directories and file names. A timestamp
+# alone collided when two runs started in the same minute (round 6, G9); an agent cannot
+# produce randomness by itself, so the tool does.
+# ---------------------------------------------------------------------------
+
+def cmd_id(_args):
+    suffix = "".join("{0:02x}".format(b) for b in bytearray(os.urandom(4)))
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+    return emit({"runId": "{0}-{1}".format(stamp, suffix)}, EXIT_OK)
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     command = []
@@ -463,6 +496,7 @@ def main(argv=None):
     copy_parser.add_argument("--from", dest="source", required=True)
     copy_parser.add_argument("--to", dest="dest", required=True)
     copy_parser.add_argument("--exclude", action="append")
+    sub.add_parser("id", help="print a unique run identifier (timestamp + random suffix)")
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -480,6 +514,8 @@ def main(argv=None):
             return cmd_copy(args)
         if args.mode == "wait":
             return cmd_wait(args)
+        if args.mode == "id":
+            return cmd_id(args)
         return cmd_status(args)
     except (OSError, ValueError, KeyError, shutil.Error) as err:
         return emit({"error": "{0}: {1}".format(type(err).__name__, err)}, EXIT_USAGE)

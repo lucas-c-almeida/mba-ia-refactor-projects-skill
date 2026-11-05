@@ -1,105 +1,61 @@
+"""Reporting use cases. Every figure comes from a set-based query (RP-10)."""
 from datetime import timedelta
 
-from models.constants import (
-    HIGH_PRIORITY_MAX, PRIORITY_LABELS, RECENT_ACTIVITY_DAYS, STATUS_DONE, TASK_STATUSES,
-)
-from models.errors import NotFoundError
+from models.category import Category
+from models.clock import utc_now
+from models.task import (HIGH_PRIORITY_THRESHOLD, MAX_PRIORITY, MIN_PRIORITY, STATUS_CANCELLED,
+                         STATUS_DONE, STATUS_IN_PROGRESS, STATUS_PENDING, VALID_STATUSES, Task,
+                         completion_rate)
+from models.user import User
 
-
-def completion_rate(done, total):
-    return round((done / total) * 100, 2) if total > 0 else 0
+RECENT_ACTIVITY_DAYS = 7
 
 
 class ReportController:
-    def __init__(self, tasks, users, categories, clock):
-        self._tasks = tasks
-        self._users = users
-        self._categories = categories
-        self._clock = clock
+    def __init__(self, clock=utc_now):
+        self._now = clock
 
     def summary(self):
-        now = self._clock()
-        by_status = self._tasks.count_by_status()
-        by_priority = self._tasks.count_by_priority()
-        overdue = self._tasks.overdue(now)
+        now = self._now()
         since = now - timedelta(days=RECENT_ACTIVITY_DAYS)
-        totals = self._tasks.totals_by_user()
-
-        user_stats = []
-        for user in self._users.list_all():
-            total, completed = totals.get(user.id, (0, 0))
-            user_stats.append({
-                'user_id': user.id,
-                'user_name': user.name,
-                'total_tasks': total,
-                'completed_tasks': completed,
-                'completion_rate': completion_rate(completed, total),
-            })
-
+        by_status = Task.counts_by(Task.status)
+        by_priority = Task.counts_by(Task.priority)
+        per_user = Task.counts_per_user()
+        overdue = Task.overdue(now)
         return {
-            'generated_at': str(now),
-            'overview': {
-                'total_tasks': self._tasks.total(),
-                'total_users': self._users.count(),
-                'total_categories': self._categories.count(),
-            },
-            'tasks_by_status': {
-                'pending': by_status.get('pending', 0),
-                'in_progress': by_status.get('in_progress', 0),
-                'done': by_status.get(STATUS_DONE, 0),
-                'cancelled': by_status.get('cancelled', 0),
-            },
-            'tasks_by_priority': {
-                label: by_priority.get(level, 0) for level, label in PRIORITY_LABELS.items()
-            },
-            'overdue': {
-                'count': len(overdue),
-                'tasks': [
-                    {
-                        'id': t.id,
-                        'title': t.title,
-                        'due_date': str(t.due_date),
-                        'days_overdue': (now - t.due_date).days,
-                    }
-                    for t in overdue
-                ],
-            },
-            'recent_activity': {
-                'tasks_created_last_7_days': self._tasks.count_created_since(since),
-                'tasks_completed_last_7_days': self._tasks.count_done_updated_since(since),
-            },
-            'user_productivity': user_stats,
+            'generated_at': now,
+            'totals': {'tasks': Task.count_all(), 'users': User.count_all(),
+                       'categories': Category.count_all()},
+            'by_status': {status: by_status.get(status, 0) for status in VALID_STATUSES},
+            'by_priority': {priority: by_priority.get(priority, 0)
+                            for priority in range(MIN_PRIORITY, MAX_PRIORITY + 1)},
+            'overdue': [(task, (now - task.due_date).days) for task in overdue],
+            'created_recently': Task.count_created_since(since),
+            'done_recently': Task.count_done_since(since),
+            'per_user': [self._productivity(user, *per_user.get(user.id, (0, 0)))
+                         for user in User.all_ordered()],
         }
 
-    def user_report(self, user_id):
-        user = self._users.get(user_id)
-        if not user:
-            raise NotFoundError('Usuário não encontrado')
+    @staticmethod
+    def _productivity(user, total, done):
+        return user, total, done, completion_rate(done, total)
 
-        now = self._clock()
-        tasks = self._tasks.for_user(user_id)
-        counts = dict.fromkeys(TASK_STATUSES, 0)
-        overdue = 0
-        high_priority = 0
+    def user_report(self, user_id):
+        user = User.get_or_404(user_id)
+        now = self._now()
+        tasks = Task.for_user(user_id)
+        counts = {status: 0 for status in VALID_STATUSES}
         for task in tasks:
             if task.status in counts:
                 counts[task.status] += 1
-            if task.priority <= HIGH_PRIORITY_MAX:
-                high_priority += 1
-            if task.is_overdue(now):
-                overdue += 1
-
         total = len(tasks)
-        return {
-            'user': {'id': user.id, 'name': user.name, 'email': user.email},
-            'statistics': {
-                'total_tasks': total,
-                'done': counts[STATUS_DONE],
-                'pending': counts['pending'],
-                'in_progress': counts['in_progress'],
-                'cancelled': counts['cancelled'],
-                'overdue': overdue,
-                'high_priority': high_priority,
-                'completion_rate': completion_rate(counts[STATUS_DONE], total),
-            },
+        return user, {
+            'total_tasks': total,
+            'done': counts[STATUS_DONE],
+            'pending': counts[STATUS_PENDING],
+            'in_progress': counts[STATUS_IN_PROGRESS],
+            'cancelled': counts[STATUS_CANCELLED],
+            'overdue': sum(1 for task in tasks if task.is_overdue(now)),
+            'high_priority': sum(1 for task in tasks if task.priority <= HIGH_PRIORITY_THRESHOLD),
+            'completion_rate': completion_rate(counts[STATUS_DONE], total),
         }

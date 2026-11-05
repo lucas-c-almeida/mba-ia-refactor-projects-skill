@@ -114,6 +114,8 @@ medição que o projeto se protege (§5).
 | **D24** | Comandos analisáveis, scratch dentro do perímetro | Paths literais, sem `$VAR`; scratch do ambiente primeiro; toda cópia por `proc copy` *(depois da rodada 3)* |
 | **D25** | Nunca `cd`, nunca encadear | Regra inviolável no topo da skill e do `CLAUDE.md`, com checagem antes de cada comando e linha `Commands:` no relatório *(depois da rodada 4)* |
 | **D26** | Correções operacionais da rodada 4 | `proc wait` no lugar de laço de polling; shell de container escolhido na Fase 1; bloco da Fase 1 guardado no relatório; camada 1 exercita o que roda; ordenação conferida *(rodada 5)* |
+| **D27** | Operação privilegiada | Fechar operação cujo único chamador legítimo é um operador é seguro, com ou sem identidade (emenda à D15) *(rodada 6)* |
+| **D28** | Verificação gerada, não escrita | A matriz de entrada malformada é gerada pelo harness; o que muda em valor vira asserção executável; segredo vai por referência *(rodada 7)* |
 
 ---
 
@@ -1418,6 +1420,44 @@ escritos; a regra manda propor quando ambíguo. Remover uma rota muda o contrato
 objetivo. A guarda desligada por padrão exige que o operador configure a variável para reabilitar a
 operação, e o relatório diz qual.
 
+### D28 — Verificação gerada, não escrita (rodada 7)
+
+**Contexto.** Na rodada 6 o replay disse `0 REGRESSION` nos três projetos, e três verificadores
+independentes acharam 13 defeitos que ele não podia ver, dois deles introduzidos pela própria
+correção. Consolidação e causas em [`round6-skill-results.md`](rounds/round6-skill-results.md); lista
+congelada em [`round7-changes.md`](rounds/round7-changes.md).
+
+**Falha de raciocínio.** A regra "tipo errado → 4xx é seguro" existia e foi aplicada, mas campo a
+campo, onde a Fase 2 olhou. E o replay só tinha as entradas que o agente escreveu, então herdava o
+mesmo ponto cego. Uma verificação escrita por quem fez a correção mede a atenção de quem corrigiu,
+não o código. O mesmo vale para o "verificado à mão" em prosa e para o achado que aparecia na tabela
+de cobertura e não virava finding.
+
+**Decisão.** (1) **Entrada `robustness`**: o agente declara os campos que cada operação lê; o
+harness gera a matriz normativa (tipos errados, aninhamento, limites de 64 bits, não finito) e
+compara só a classe de status. `NOT ROBUST` (falhava e continua falhando) é finding `unresolved`,
+não `PRE-EXISTING FAILURE`: entrada malformada que derruba o processo é defeito de AP-11 de qualquer
+idade. (2) **Entrada `value`**: asserções executáveis (`equals`, `matches`, `absent`,
+`sameAsBaseline`) sobre o que a transformação muda em valor. (3) **`{{env:NAME}}`**: segredo é
+referência, resolvida na chamada, nunca gravada. (4) **Livro de sinais** no lugar da tabela por
+entrada: uma linha por sinal, com onde olhou e o destino de cada ocorrência. (5) **Ambiguidade de
+classificação** vai para o gate humano; "ambíguo → propõe" só sem pessoa (`--yes`). (6) Ajustes
+menores: placeholder de segredo vazio, `.gitignore` preservado, caminho persistido relativo ao
+projeto, resíduo de operador é `proposed`, trilha de auditoria não é código morto, `proc` lê
+`/proc/<pid>/stat` e emite `proc id`.
+
+**Alternativas rejeitadas.** *O agente escreve as variantes no inventário*: mais barato, mas a
+cobertura varia por execução e repete a falha que se queria corrigir (decisão do autor,
+2026-11-04). *Comparar shape também na matriz*: endurecer 2xx → 4xx viraria regressão falsa em todo
+campo corrigido. *`sameAsBaseline` livre*: gravaria na captura o valor de um campo secreto; o harness
+recusa por nome. *Quarto projeto nesta rodada*: recusado pelo autor; a rodada não produz evidência
+nova de generalização.
+
+**Custo aceito.** Muito mais código de harness em duas implementações que precisam mandar
+requisições byte-idênticas (o teste de conformidade compara o log do servidor). Rodadas mais longas:
+dezenas de variantes por operação. E a contaminação: o autor conhece os alvos, então o recall da
+rodada 7 sobre eles mede se a skill pega o que já se sabia, não se generaliza.
+
 ---
 
 ## 4. O princípio emergente: a skill nunca degrada em silêncio
@@ -1508,7 +1548,7 @@ frequentemente falsa: é o formato exato de uma alucinação bem-sucedida.
 
 ## 6. Estado do registro
 
-D1–D26 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3, D24 depois dela, D25 e D26 depois da rodada 4, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
+D1–D28 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3, D24 depois dela, D25 e D26 depois da rodada 4, D27 na rodada 6, D28 na rodada 7, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
 este documento foi escrito. Duas dessas decisões (D6 e D13) já foram revertidas uma vez, e
 o registro das reversões foi mantido deliberadamente: a versão final de cada uma é menos
 instrutiva do que o caminho que levou a ela.
@@ -1534,3 +1574,9 @@ e a comparação dele com a rodada 2. A partir desta revisão o autor não está
 alvos. A única entrada nova do catálogo (AP-20) vem de Karwin, *SQL Antipatterns*. O recall da
 rodada 3 na família que ela cobre é declarado contaminado em
 [`round3-changes.md`](rounds/round3-changes.md), e não conta como evidência de generalização.
+
+**Revisão da rodada 7 (2026-11-04).** D28 foi escrita por uma sessão que leu o código, os
+relatórios, o gabarito (Partes 1 e 2) e a verificação independente dos três alvos. Diferente da
+D27, ela muda o que a auditoria procura (livro de sinais, AP-17), e por isso o recall da rodada 7 é
+declarado contaminado em [`round7-changes.md`](rounds/round7-changes.md). Nenhum quarto projeto foi
+rodado.
