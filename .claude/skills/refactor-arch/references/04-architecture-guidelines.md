@@ -213,7 +213,8 @@ observes is **not applied**. It is recorded under `PROPOSED, NOT APPLIED` with i
   error — with the centralized handler, keeping the status code;
 - masking the value of a leaked secret or credential (a password hash, a key, a token) while
   keeping the field and its type: no legitimate client reads a secret back;
-- a new rejection that passes the legitimate-use test below;
+- a new rejection that passes the legitimate-use test below — including removing or guarding a
+  **privileged operation** (defined below), even when the application has no identity model;
 - deleting dead code;
 - replacing a deprecated API with its documented equivalent, when the observable behaviour is the
   same;
@@ -224,10 +225,67 @@ a request is decided by one question: *who gets the new rejection?*
 
 | Situation | Who is rejected | Decision |
 |---|---|---|
-| The application has **no identity model**: no login, no session, no token. Every client is anonymous. | Every current client, legitimate ones included — none of them sends credentials, because none exist | **Contract-changing.** Propose: the identity model, who the principals are, and the policy. Nothing can separate a good caller from a bad one without a product decision. |
+| The application has **no identity model**: no login, no session, no token. Every client is anonymous. The operation is a **business operation** (see below). | Every current client, legitimate ones included — none of them sends credentials, because none exist | **Contract-changing.** Propose: the identity model, who the principals are, and the policy. Nothing can separate a good caller from a bad one without a product decision. |
+| The operation is **privileged** (see below), whether or not an identity model exists. | Only callers who are not operators — no legitimate client calls it anonymously | **Safe.** Apply: remove it, or guard it with an operator credential read from configuration, closed by default. |
 | The application **already identifies callers**, but an operation does not check that the caller may act on the resource (a missing ownership or role check). | Only a caller acting on someone else's resource or above their role | **Safe.** Apply: scope the lookup to the verified principal and enforce the policy on the operation (RP-04). |
 | A **value no legitimate client sends**: invalid on its face, whatever the product decides — an injection payload, a malformed identifier, a value of the wrong type, an unknown enumerated value, a value that breaks an invariant the domain already states (a period that ends before it starts). | Only illegitimate or broken requests | **Safe.** Apply it (RP-02, RP-11), and cover it with a security entry in the surface inventory (`06-validation-protocol.md` §2.1). |
 | A **rule that requires a product decision**: a maximum, a format stricter than what clients send today, a newly required field. | Possibly legitimate clients | **Contract-changing.** Propose it. |
+
+**Privileged operations.** The first row's reasoning ("every client is anonymous, so every client is
+rejected") holds for operations that ordinary clients exist to call. It does not hold for an
+operation whose only legitimate caller is an operator. An operation is **privileged** when any of
+these signals is observable in the code:
+
+- it executes a query, command or code that arrives in the request (the caller chooses what runs);
+- it destroys or resets data in bulk — truncating, dropping or reseeding tables or collections,
+  wiping a store;
+- it deletes or deactivates an **account** — the entity that holds credentials or that sign-in
+  authenticates — by an identifier taken from the request, in an application with no identity model.
+  With no identity model there is no "caller's own account", so the deletion cannot be anyone's
+  legitimate self-service action. (Where an identity model exists, deleting one's own account is a
+  business operation, and deleting another's is the ownership check of the second row);
+
+  **What "identity model" means here: verification, not issuance.** An application has an identity
+  model only when at least one operation **verifies** a credential, session or token that a client
+  presents, and decides something from it. Sign-in endpoints that return a token no operation ever
+  checks, a role or user id read from the request body, and a "current user" the code never
+  establishes do **not** make an identity model: no client depends on presenting anything, so the
+  first row's reasoning ("every current client would be rejected") is exactly as true as with no
+  login at all;
+- it exists for maintenance, diagnostics or operations: a path or name under an administrative,
+  internal, debug, maintenance, reset or seed namespace, or a debug console;
+- it returns a **management aggregate** — revenue, sales or other financial figures, or activity
+  per customer or per user, rollups that name or rank principals — which no single principal could
+  need about the others. An aggregate that is only a **count of records by state** or a
+  catalog-wide total with no financial or per-principal content is a plain read: business
+  operation, propose.
+
+What does **not** make an operation privileged, however destructive or broad it looks:
+
+- deleting, editing or creating an ordinary **domain record** (a catalog item, a task, a category,
+  an order line): users manage those in normal use, and a client that does so anonymously today is
+  legitimate;
+- a plain **listing or lookup** of records, including a listing of the accounts themselves. It may
+  be a disclosure problem, but closing it rejects clients that read it today. The credential field in
+  such a response is fixed by masking (catalog AP-08); the access question is proposed;
+- signing in, registering, checking out.
+
+Those stay under the first row. When the signals are ambiguous — a delete that could be a user's own
+action on their own records — it is a business operation: propose.
+
+How to fix a privileged operation, in order of preference:
+
+1. **Remove it from the public surface** when it is unsafe by construction — it runs
+   caller-supplied code or queries, or it resets data. If the project documents an operational use,
+   keep it as a maintenance script outside the request surface (a command, not a route).
+2. **Guard it** when it is a legitimate operator function (a management report, an account
+   removal): require an operator credential supplied by configuration (environment), compare it in
+   constant time, and fail **closed** — with no credential configured, the operation answers
+   `403` (or `404`). Never a literal in the source (catalog AP-01). This is a guard on one
+   operation, not an identity model: it invents no users, roles or policy.
+
+Both change what only a non-operator observes. Record the guard in the report (the variable's name,
+and that it is unset by default) so the operator knows how to enable the operation.
 
 This is the same reasoning that makes parameterizing a query safe: it changes only what an
 illegitimate request observes. The decision depends on facts you can read in the code — whether an

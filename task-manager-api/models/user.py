@@ -1,35 +1,28 @@
-"""User entity: columns, credential rules and persistence queries."""
 import hashlib
 import hmac
-import re
-
-from sqlalchemy import func
-from werkzeug.security import check_password_hash, generate_password_hash
+import os
 
 from database import db
-from models.clock import utcnow
-from models.errors import NotFoundError
+from models.clock import utc_now
+from models.constants import DEFAULT_ROLE, USER_ROLES
 
-ROLE_USER = 'user'
-ROLE_ADMIN = 'admin'
-ROLE_MANAGER = 'manager'
-USER_ROLES = (ROLE_USER, ROLE_ADMIN, ROLE_MANAGER)
-DEFAULT_ROLE = ROLE_USER
+PASSWORD_SCHEME = 'pbkdf2_sha256'
+PASSWORD_ITERATIONS = 600_000
+SALT_BYTES = 16
+LEGACY_DIGEST_LENGTH = 32  # an unsalted MD5 hex digest written by earlier versions
+MASKED_PASSWORD = '********'
 
-MIN_PASSWORD_LENGTH = 4
-EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$')
 
-# Value returned in place of the stored credential: the field and its type are kept for
-# existing clients, the secret is not (AP-08). Removing the field is proposed, not applied.
-MASKED_SECRET = '********'
-
-_LEGACY_MD5_PATTERN = re.compile(r'^[0-9a-f]{32}$')
-
-MSG_NOT_FOUND = 'Usuário não encontrado'
+def _derive(password, salt, iterations):
+    return hashlib.pbkdf2_hmac('sha256', password.encode(), salt, iterations)
 
 
 class User(db.Model):
     __tablename__ = 'users'
+    __table_args__ = (
+        db.CheckConstraint(
+            'role IN (%s)' % ', '.join("'%s'" % r for r in USER_ROLES), name='ck_users_role'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -37,49 +30,39 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(50), default=DEFAULT_ROLE)
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=utcnow)
+    created_at = db.Column(db.DateTime, default=utc_now)
 
-    # --- credential rules ---------------------------------------------------------------
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'email': self.email,
+            # The stored credential is never returned; the field and its type are kept.
+            'password': MASKED_PASSWORD,
+            'role': self.role,
+            'active': self.active,
+            'created_at': str(self.created_at),
+        }
 
-    def set_password(self, plain_password):
-        """Store a salted, slow, one-way hash (Werkzeug's password KDF)."""
-        self.password = generate_password_hash(plain_password)
+    def set_password(self, pwd):
+        salt = os.urandom(SALT_BYTES)
+        digest = _derive(pwd, salt, PASSWORD_ITERATIONS)
+        self.password = '%s$%d$%s$%s' % (PASSWORD_SCHEME, PASSWORD_ITERATIONS, salt.hex(), digest.hex())
 
-    def check_password(self, plain_password):
-        if self.has_legacy_password_hash():
-            legacy = hashlib.md5(plain_password.encode()).hexdigest()
+    def _is_legacy_digest(self):
+        return len(self.password) == LEGACY_DIGEST_LENGTH and '$' not in self.password
+
+    def check_password(self, pwd):
+        if self._is_legacy_digest():
+            legacy = hashlib.md5(pwd.encode()).hexdigest()
             return hmac.compare_digest(self.password, legacy)
-        return check_password_hash(self.password, plain_password)
+        try:
+            _, iterations, salt_hex, digest_hex = self.password.split('$')
+            expected = _derive(pwd, bytes.fromhex(salt_hex), int(iterations))
+            return hmac.compare_digest(expected.hex(), digest_hex)
+        except ValueError:
+            return False
 
-    def has_legacy_password_hash(self):
-        """Hashes written before the KDF migration: unsalted MD5, upgraded on the next login."""
-        return bool(self.password) and bool(_LEGACY_MD5_PATTERN.match(self.password))
-
-    # --- persistence --------------------------------------------------------------------
-
-    @staticmethod
-    def find(user_id):
-        return db.session.get(User, user_id)
-
-    @staticmethod
-    def get_or_fail(user_id):
-        user = User.find(user_id)
-        if not user:
-            raise NotFoundError(MSG_NOT_FOUND)
-        return user
-
-    @staticmethod
-    def find_by_email(email):
-        return User.query.filter_by(email=email).first()
-
-    @staticmethod
-    def list_all():
-        return User.query.order_by(User.id).all()
-
-    @staticmethod
-    def count_all():
-        return db.session.query(func.count(User.id)).scalar()
-
-
-def is_valid_email(email):
-    return isinstance(email, str) and bool(EMAIL_PATTERN.match(email))
+    def needs_password_upgrade(self):
+        """True while the stored credential is still the legacy unsalted digest."""
+        return self._is_legacy_digest()

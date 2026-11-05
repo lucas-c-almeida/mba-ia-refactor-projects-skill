@@ -1,57 +1,49 @@
 'use strict';
 
-const { decidePaymentStatus, PaymentStatus } = require('../models/payment');
-const { hashPassword, generatePassword } = require('../models/password');
-const { NotFoundError, PaymentDeclinedError, PersistenceError } = require('../errors');
+const { AppError, orFail } = require('../errors');
+const { PAYMENT_STATUS, decidePaymentStatus } = require('../models/payment');
+const { hashPassword, generateSecret } = require('../models/passwordHasher');
 
-const COURSE_NOT_FOUND = 'Curso não encontrado';
-
-// Wraps a datastore step so its failure answers with the text that step always answered with.
-async function step(failureMessage, work) {
-    try {
-        return await work();
-    } catch (err) {
-        throw new PersistenceError(failureMessage, err);
-    }
-}
-
+/** The checkout use case: plain values in, plain values out, no HTTP objects. */
 class CheckoutController {
-    constructor({ db, courses, users, enrollments, payments, auditLog, logger }) {
-        Object.assign(this, { db, courses, users, enrollments, payments, auditLog, logger });
+  constructor({ db, users, courses, enrollments, payments, auditLogs }) {
+    this.db = db;
+    this.users = users;
+    this.courses = courses;
+    this.enrollments = enrollments;
+    this.payments = payments;
+    this.auditLogs = auditLogs;
+  }
+
+  async checkout({ name, email, password, courseId, card }) {
+    const course = await orFail(this.courses.findActiveById(courseId), 'Curso não encontrado', 404);
+    if (!course) throw new AppError('Curso não encontrado', 404);
+
+    const existingUser = await orFail(this.users.findByEmail(email), 'Erro DB');
+
+    if (decidePaymentStatus(card) === PAYMENT_STATUS.DENIED) {
+      throw new AppError('Pagamento recusado', 400);
     }
 
-    // Plain values in, plain values out: callable from any entry point.
-    async checkout({ name, email, password, courseId, cardNumber }) {
-        let course;
-        try {
-            course = await this.courses.findActiveById(courseId);
-        } catch (err) {
-            // The original answered a failed course lookup with the same 404 as a missing
-            // course; that observable behaviour is preserved verbatim.
-            this.logger.error('course lookup failed', err);
-            course = undefined;
-        }
-        if (!course) throw new NotFoundError(COURSE_NOT_FOUND);
+    // A new account with no password gets a generated secret nobody knows.
+    const passwordHash = existingUser ? null : await hashPassword(password || generateSecret());
 
-        const existing = await step('Erro DB', () => this.users.findIdByEmail(email));
+    const enrollmentId = await this.db.transaction(async (tx) => {
+      const userId = existingUser
+        ? existingUser.id
+        : await orFail(this.users.insert(tx, { name, email, passwordHash }), 'Erro ao criar usuário');
 
-        // Decide the payment before anything is written, so a declined card leaves no trace.
-        const status = decidePaymentStatus(cardNumber);
-        if (status === PaymentStatus.DENIED) throw new PaymentDeclinedError();
+      const newEnrollmentId = await orFail(this.enrollments.insert(tx, { userId, courseId }), 'Erro Matrícula');
+      await orFail(
+        this.payments.insert(tx, { enrollmentId: newEnrollmentId, amountCents: course.price_cents, status: PAYMENT_STATUS.PAID }),
+        'Erro Pagamento',
+      );
+      await this.auditLogs.insert(tx, `Checkout curso ${courseId} por ${userId}`);
+      return newEnrollmentId;
+    });
 
-        const passwordHash = existing ? null : await hashPassword(password || generatePassword());
-
-        return this.db.transaction(async () => {
-            const userId = existing
-                ? existing.id
-                : await step('Erro ao criar usuário', () => this.users.create({ name, email, passwordHash }));
-            const enrollmentId = await step('Erro Matrícula', () => this.enrollments.create(userId, courseId));
-            await step('Erro Pagamento', () => this.payments.create(enrollmentId, course.priceCents, status));
-            await this.auditLog.record(`Checkout curso ${courseId} por ${userId}`);
-            this.logger.info(`checkout completed: enrollment ${enrollmentId}`);
-            return { enrollmentId };
-        });
-    }
+    return { enrollmentId };
+  }
 }
 
 module.exports = { CheckoutController };

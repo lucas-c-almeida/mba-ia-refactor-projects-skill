@@ -1,35 +1,24 @@
-"""Composition root: the only place that names concrete implementations (AP-06).
-
-    python app.py                    # development server, configured from the environment
-    flask --app app run              # the factory create_app() is discovered by Flask
-
-Configuration is read once by config/settings.py; see .env.example for every key.
-"""
-
+"""Composition root: loads configuration, builds the object graph, registers routes and the error boundary."""
 import logging
-from types import SimpleNamespace
 
 from flask import Flask
 from flask_cors import CORS
 
-from adapters.notificador import NotificadorConsole
 from config.settings import load_settings
+from controllers.health_controller import HealthController
 from controllers.pedido_controller import PedidoController
 from controllers.produto_controller import ProdutoController
 from controllers.relatorio_controller import RelatorioController
-from controllers.sistema_controller import SistemaController
 from controllers.usuario_controller import UsuarioController
-from middlewares.db_session import ConexaoPorRequisicao
 from middlewares.error_handler import registrar_tratamento_de_erros
-from models import database
+from models.database import Database
 from models.pedido import PedidoRepository
 from models.produto import ProdutoRepository
 from models.relatorio import RelatorioRepository
-from models.sistema import SistemaRepository
+from models.saude import SaudeRepository
+from models.seed import semear
 from models.usuario import UsuarioRepository
-from views import registrar_rotas
-
-logger = logging.getLogger("loja")
+from routes import pedido_routes, produto_routes, relatorio_routes, system_routes, usuario_routes
 
 
 def create_app(settings=None):
@@ -40,37 +29,23 @@ def create_app(settings=None):
     app.config["DEBUG"] = settings.debug
     CORS(app)
 
-    database.inicializar(settings.db_path)
-    conexao = ConexaoPorRequisicao(settings.db_path)
-    conexao.registrar(app)
+    db = Database(settings.db_path)
+    db.initialize(semear)
 
-    produtos = ProdutoRepository(conexao)
-    usuarios = UsuarioRepository(conexao)
-    controllers = SimpleNamespace(
-        produtos=ProdutoController(produtos),
-        usuarios=UsuarioController(usuarios),
-        pedidos=PedidoController(PedidoRepository(conexao), produtos, usuarios, NotificadorConsole()),
-        relatorios=RelatorioController(RelatorioRepository(conexao)),
-        sistema=SistemaController(SistemaRepository(conexao), settings),
+    app.register_blueprint(produto_routes.criar_blueprint(ProdutoController(ProdutoRepository(db))))
+    app.register_blueprint(usuario_routes.criar_blueprint(UsuarioController(UsuarioRepository(db))))
+    app.register_blueprint(pedido_routes.criar_blueprint(PedidoController(PedidoRepository(db))))
+    app.register_blueprint(
+        relatorio_routes.criar_blueprint(RelatorioController(RelatorioRepository(db)), settings.operator_token)
     )
-
-    registrar_rotas(app, controllers)
+    app.register_blueprint(system_routes.criar_blueprint(HealthController(SaudeRepository(db), settings)))
     registrar_tratamento_de_erros(app)
     return app
 
 
-def main():
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-    settings = load_settings()
-    app = create_app(settings)
-
-    logger.info("=" * 50)
-    logger.info("SERVIDOR INICIADO")
-    logger.info("Rodando em http://localhost:%s", settings.port)
-    logger.info("=" * 50)
-
-    app.run(host=settings.host, port=settings.port, debug=settings.debug)
-
-
 if __name__ == "__main__":
-    main()
+    configuracao = load_settings()
+    logging.basicConfig(level=logging.INFO)
+    aplicacao = create_app(configuracao)
+    logging.getLogger(__name__).info("Servidor iniciado em http://%s:%s", configuracao.host, configuracao.port)
+    aplicacao.run(host=configuracao.host, port=configuracao.port, debug=configuracao.debug)

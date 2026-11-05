@@ -1,68 +1,56 @@
 'use strict';
 
-// Composition root: the only place that names concrete implementations and wires them.
 const express = require('express');
-
 const { loadConfig } = require('./config');
 const { Database } = require('./models/database');
-const { createSchema, seed } = require('./models/schema');
+const { initSchema } = require('./models/schema');
 const {
-    CourseRepository,
-    UserRepository,
-    EnrollmentRepository,
-    PaymentRepository,
-    AuditLogRepository,
-    FinancialReportRepository,
+  UserRepository, CourseRepository, EnrollmentRepository, PaymentRepository, AuditLogRepository, FinancialReportRepository,
 } = require('./models/repositories');
 const { CheckoutController } = require('./controllers/checkoutController');
 const { ReportController } = require('./controllers/reportController');
 const { UserController } = require('./controllers/userController');
-const checkoutRoutes = require('./routes/checkoutRoutes');
-const reportRoutes = require('./routes/reportRoutes');
-const userRoutes = require('./routes/userRoutes');
-const errorHandler = require('./middlewares/errorHandler');
+const { createOperatorGuard } = require('./middlewares/operatorGuard');
+const { errorBoundary } = require('./middlewares/errorBoundary');
+const { registerRoutes } = require('./routes');
 
-function createApp({ db, logger }) {
-    const users = new UserRepository(db);
+const DATABASE_FILE = ':memory:';
 
-    const checkoutController = new CheckoutController({
-        db,
-        courses: new CourseRepository(db),
-        users,
-        enrollments: new EnrollmentRepository(db),
-        payments: new PaymentRepository(db),
-        auditLog: new AuditLogRepository(db),
-        logger,
-    });
-    const reportController = new ReportController({ reports: new FinancialReportRepository(db) });
-    const userController = new UserController({ users });
+/** Composition root: the only place that names concrete implementations and wires them. */
+async function createApp(config) {
+  const db = await Database.open(DATABASE_FILE);
+  await initSchema(db);
 
-    const app = express();
-    app.use(express.json());
-    app.use(checkoutRoutes(checkoutController));
-    app.use(reportRoutes(reportController));
-    app.use(userRoutes(userController));
-    app.use(errorHandler(logger));
-    return app;
+  const users = new UserRepository(db);
+  const courses = new CourseRepository(db);
+  const controllers = {
+    checkout: new CheckoutController({
+      db, users, courses, enrollments: new EnrollmentRepository(), payments: new PaymentRepository(), auditLogs: new AuditLogRepository(),
+    }),
+    reports: new ReportController({ reports: new FinancialReportRepository(db) }),
+    users: new UserController({ users }),
+  };
+
+  const app = express();
+  app.use(express.json());
+  registerRoutes(app, { ...controllers, requireOperator: createOperatorGuard(config.operatorToken) });
+  app.use(errorBoundary());
+  return app;
 }
 
-async function start() {
-    const config = loadConfig();
-    const logger = console;
-    const db = await Database.open(config.databaseFile);
-    await createSchema(db);
-    await seed(db);
-
-    createApp({ db, logger }).listen(config.port, () => {
-        logger.info(`Frankenstein LMS rodando na porta ${config.port}...`);
-    });
+async function main() {
+  const config = loadConfig();
+  const app = await createApp(config);
+  app.listen(config.port, () => {
+    console.log(`Frankenstein LMS rodando na porta ${config.port}...`);
+  });
 }
 
 if (require.main === module) {
-    start().catch((err) => {
-        console.error('failed to start', err);
-        process.exit(1);
-    });
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }
 
-module.exports = { createApp, start };
+module.exports = { createApp };

@@ -1,13 +1,9 @@
-"""Service-level routes: index and health check."""
 import datetime
 
 from flask import Blueprint
 
-API_NAME = 'Task Manager API'
-API_VERSION = '1.0'
 
-
-def create_system_blueprint():
+def build_system_blueprint():
     bp = Blueprint('system', __name__)
 
     @bp.route('/health')
@@ -16,6 +12,6 @@ def create_system_blueprint():
 
     @bp.route('/')
     def index():
-        return {'message': API_NAME, 'version': API_VERSION}
+        return {'message': 'Task Manager API', 'version': '1.0'}
 
     return bp

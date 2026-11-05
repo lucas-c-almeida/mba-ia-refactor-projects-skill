@@ -1,54 +1,69 @@
-"""Populate the database with initial data.
+"""Script para popular o banco com dados iniciais.
 
-Account passwords are configuration, never source (AP-01): set SEED_ADMIN_PASSWORD,
-SEED_USER_PASSWORD and SEED_MANAGER_PASSWORD (see .env.example). The script fails loudly when
-one is missing.
+A senha das contas de exemplo vem da variável de ambiente SEED_PASSWORD. Sem ela, uma senha
+aleatória é gerada e exibida uma única vez.
 """
+import os
+import secrets
 from datetime import timedelta
 
+from sqlalchemy import delete, func, select
+
 from app import create_app
-from config.settings import load_seed_passwords
 from database import db
 from models.category import Category
-from models.clock import utcnow
+from models.clock import utc_now
 from models.task import Task
-from models.user import ROLE_ADMIN, ROLE_MANAGER, ROLE_USER, User
+from models.user import User
+
+SEED_USERS = (
+    ('João Silva', 'joao@email.com', 'admin'),
+    ('Maria Santos', 'maria@email.com', 'user'),
+    ('Pedro Oliveira', 'pedro@email.com', 'manager'),
+)
+
+SEED_CATEGORIES = (
+    ('Backend', 'Tarefas de backend', '#3498db'),
+    ('Frontend', 'Tarefas de frontend', '#2ecc71'),
+    ('DevOps', 'Tarefas de infraestrutura', '#e74c3c'),
+    ('Bug', 'Correção de bugs', '#e67e22'),
+)
 
 
-def _user(name, email, role, password):
-    user = User(name=name, email=email, role=role)
-    user.set_password(password)
-    db.session.add(user)
-    return user
+def _count(model):
+    return db.session.scalar(select(func.count()).select_from(model))
 
 
-def _category(name, description, color):
-    category = Category(name=name, description=description, color=color)
-    db.session.add(category)
-    return category
-
-
-def seed_data():
-    passwords = load_seed_passwords()
-    app = create_app()
+def seed_data(app, password):
     with app.app_context():
-        Task.query.delete()
-        User.query.delete()
-        Category.query.delete()
+        for model in (Task, User, Category):
+            db.session.execute(delete(model))
         db.session.commit()
 
-        u1 = _user('João Silva', 'joao@email.com', ROLE_ADMIN, passwords.admin)
-        u2 = _user('Maria Santos', 'maria@email.com', ROLE_USER, passwords.user)
-        u3 = _user('Pedro Oliveira', 'pedro@email.com', ROLE_MANAGER, passwords.manager)
+        users = []
+        for name, email, role in SEED_USERS:
+            user = User()
+            user.name = name
+            user.email = email
+            user.set_password(password)
+            user.role = role
+            db.session.add(user)
+            users.append(user)
         db.session.commit()
 
-        c1 = _category('Backend', 'Tarefas de backend', '#3498db')
-        c2 = _category('Frontend', 'Tarefas de frontend', '#2ecc71')
-        c3 = _category('DevOps', 'Tarefas de infraestrutura', '#e74c3c')
-        c4 = _category('Bug', 'Correção de bugs', '#e67e22')
+        categories = []
+        for name, description, color in SEED_CATEGORIES:
+            category = Category()
+            category.name = name
+            category.description = description
+            category.color = color
+            db.session.add(category)
+            categories.append(category)
         db.session.commit()
 
-        now = utcnow()
+        u1, u2, u3 = users
+        c1, c2, c3, c4 = categories
+        now = utc_now()
         tasks_data = [
             {'title': 'Implementar autenticação JWT', 'description': 'Adicionar autenticação real com JWT', 'status': 'pending', 'priority': 1, 'user_id': u1.id, 'category_id': c1.id, 'due_date': now - timedelta(days=3)},
             {'title': 'Criar tela de login', 'description': 'Tela de login responsiva', 'status': 'in_progress', 'priority': 2, 'user_id': u2.id, 'category_id': c2.id, 'due_date': now + timedelta(days=5)},
@@ -61,18 +76,23 @@ def seed_data():
             {'title': 'Configurar monitoramento', 'description': 'Prometheus + Grafana', 'status': 'pending', 'priority': 4, 'user_id': u3.id, 'category_id': c3.id, 'due_date': now + timedelta(days=20)},
             {'title': 'Melhorar validações de input', 'description': 'Usar marshmallow ou pydantic', 'status': 'pending', 'priority': 3, 'user_id': u1.id, 'category_id': c1.id, 'tags': 'improvement,validation'},
         ]
-        db.session.add_all(Task(**data) for data in tasks_data)
+
+        for entry in tasks_data:
+            task = Task()
+            for field, value in entry.items():
+                setattr(task, field, value)
+            db.session.add(task)
         db.session.commit()
 
-        print('Seed concluído com sucesso!')
-        print(f'  {User.count_all()} usuários')
-        print(f'  {Category.count_all()} categorias')
-        print(f'  {Task.count_all()} tasks')
-
-        # Release the pooled connections before the process exits (AP-13).
-        db.session.remove()
-        db.engine.dispose()
+        print("Seed concluído com sucesso!")
+        print(f"  {_count(User)} usuários")
+        print(f"  {_count(Category)} categorias")
+        print(f"  {_count(Task)} tasks")
 
 
 if __name__ == '__main__':
-    seed_data()
+    seed_password = os.environ.get('SEED_PASSWORD')
+    if not seed_password:
+        seed_password = secrets.token_urlsafe(12)
+        print(f"SEED_PASSWORD não definida: senha gerada para as contas de exemplo: {seed_password}")
+    seed_data(create_app(), seed_password)

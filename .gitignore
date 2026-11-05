@@ -9,6 +9,7 @@ venv/
 
 # Claude Code agent worktrees
 .claude/worktrees/
+.worktrees/
 
 # SQLite
 *.db

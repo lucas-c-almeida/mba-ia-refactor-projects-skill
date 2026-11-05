@@ -781,12 +781,22 @@ superfície), não só o import (R4-6). (e) A ordenação é conferida antes de 
 de arquivo inteiro termina na última linha real (checklist da seção C). **Não** mexe no catálogo:
 os ✗ dos scorecards ficam adiados pela contaminação declarada.
 
+### D27 — **Operação privilegiada** ✅ decidido
+
+Emenda à D15, depois da devolução do avaliador sobre AP-04. O teste de uso legítimo distingue
+operação de **negócio** (sem identidade: proposta) de operação **privilegiada** (executa consulta ou
+código vindo da requisição, reinicia dados em massa, manutenção/diagnóstico, remove conta, agrega
+todos os principais): seu único chamador legítimo é um operador, então fechá-la só atinge uso
+ilegítimo e é `safe`, com ou sem identidade. Correção: **remover** da superfície se insegura por
+construção; senão **proteger** com credencial de operador vinda de configuração, fail-closed. Não é
+modelo de identidade. Lista em `docs/rounds/round6-changes.md`. ADR em `docs/decisions.md`.
+
 ---
 
 ## 9. Perguntas em aberto
 
-Nenhuma. D1–D26 decididas. Rodada 5: lista de mudanças congelada em
-`docs/rounds/round5-changes.md`; implementação em `feat/round5`.
+Nenhuma. D1–D27 decididas. Rodada 6: lista de mudanças congelada em
+`docs/rounds/round6-changes.md`; implementação em `feat/round6`.
 
 ---
 

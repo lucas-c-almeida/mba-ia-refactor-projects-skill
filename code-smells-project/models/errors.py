@@ -1,45 +1,30 @@
-"""Domain error taxonomy (AP-09). Mapped to HTTP responses in one place:
-middlewares/error_handler.py."""
+"""Domain error taxonomy. The delivery layer maps these to protocol responses."""
 
 
 class AppError(Exception):
-    status = 500
+    """Base class. `sucesso_false` keeps the legacy body shape of routes that add it."""
 
-    def __init__(self, message, extra=None):
-        super().__init__(message)
-        self.message = message
-        self.extra = dict(extra or {})
-
-    def body(self):
-        body = {"erro": self.message}
-        body.update(self.extra)
-        return body
+    def __init__(self, mensagem, sucesso_false=False):
+        super().__init__(mensagem)
+        self.mensagem = mensagem
+        self.sucesso_false = sucesso_false
 
 
 class ValidationError(AppError):
-    status = 400
-
-
-class BusinessRuleError(AppError):
-    status = 400
+    """The input is invalid."""
 
 
 class NotFoundError(AppError):
-    status = 404
+    """The requested record does not exist."""
 
 
-class AuthenticationError(AppError):
-    status = 401
+class UnauthorizedError(AppError):
+    """Credentials were not accepted."""
 
 
-class HealthCheckError(AppError):
-    """The health check keeps its own error body: {"status": "erro", "detalhes": ...}."""
-
-    status = 500
-
-    def body(self):
-        return {"status": "erro", "detalhes": self.message}
+class ForbiddenError(AppError):
+    """The operation is not allowed for the caller."""
 
 
-# The body flag some error responses carried in the original API; kept so the shape is unchanged.
-FALHA = {"sucesso": False}
+class ServicoIndisponivelError(AppError):
+    """A dependency (the datastore) failed. Carries a safe message, never the driver text."""

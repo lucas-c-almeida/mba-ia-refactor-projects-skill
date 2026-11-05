@@ -1,34 +1,23 @@
-"""Category routes: parse -> call one controller method -> render."""
 from flask import Blueprint, jsonify, request
 
-from routes import presenters
 
-
-def create_category_blueprint(controller):
+def build_category_blueprint(controller):
     bp = Blueprint('categories', __name__)
 
     @bp.route('/categories', methods=['GET'])
     def get_categories():
-        result = []
-        for category, task_count in controller.list_categories():
-            data = presenters.category_dict(category)
-            data['task_count'] = task_count
-            result.append(data)
-        return jsonify(result), 200
+        return jsonify(controller.list_categories()), 200
 
     @bp.route('/categories', methods=['POST'])
     def create_category():
-        category = controller.create(request.get_json())
-        return jsonify(presenters.category_dict(category)), 201
+        return jsonify(controller.create_category(request.get_json())), 201
 
-    @bp.route('/categories/<int:category_id>', methods=['PUT'])
-    def update_category(category_id):
-        category = controller.update(category_id, request.get_json())
-        return jsonify(presenters.category_dict(category)), 200
+    @bp.route('/categories/<int:cat_id>', methods=['PUT'])
+    def update_category(cat_id):
+        return jsonify(controller.update_category(cat_id, request.get_json())), 200
 
-    @bp.route('/categories/<int:category_id>', methods=['DELETE'])
-    def delete_category(category_id):
-        controller.delete(category_id)
-        return jsonify({'message': 'Categoria deletada'}), 200
+    @bp.route('/categories/<int:cat_id>', methods=['DELETE'])
+    def delete_category(cat_id):
+        return jsonify(controller.delete_category(cat_id)), 200
 
     return bp
