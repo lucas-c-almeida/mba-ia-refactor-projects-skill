@@ -1,0 +1,12 @@
+# local configuration and secrets
+.env
+
+# SQLite database (Flask-SQLAlchemy resolves sqlite:///tasks.db inside instance/)
+instance/
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

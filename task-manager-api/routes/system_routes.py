@@ -1,0 +1,21 @@
+"""Service metadata routes."""
+from datetime import datetime
+
+from flask import Blueprint
+
+API_NAME = 'Task Manager API'
+API_VERSION = '1.0'
+
+
+def create_system_blueprint():
+    bp = Blueprint('system', __name__)
+
+    @bp.route('/health')
+    def health():
+        return {'status': 'ok', 'timestamp': str(datetime.now())}
+
+    @bp.route('/')
+    def index():
+        return {'message': API_NAME, 'version': API_VERSION}
+
+    return bp
