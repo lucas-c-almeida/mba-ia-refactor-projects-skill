@@ -791,12 +791,26 @@ ilegítimo e é `safe`, com ou sem identidade. Correção: **remover** da superf
 construção; senão **proteger** com credencial de operador vinda de configuração, fail-closed. Não é
 modelo de identidade. Lista em `docs/rounds/round6-changes.md`. ADR em `docs/decisions.md`.
 
+### D28 — **Verificação gerada, não escrita** ✅ decidido
+
+Depois da rodada 6 e da verificação independente (`docs/rounds/round6-skill-results.md`, G1–G10).
+Lista congelada em `docs/rounds/round7-changes.md`. (a) **`kind: "robustness"`**: o agente declara os
+campos de cada operação; o harness gera a matriz de entrada malformada e compara só a classe de
+status (`ROBUST` / `NOT ROBUST` / `REGRESSION`); `NOT ROBUST` é `unresolved`. (b) **`kind: "value"`**:
+asserções executáveis; "verificado à mão" vira entrada ou `UNVERIFIED`. (c) **`{{env:NAME}}`**:
+segredo por referência, nunca gravado. (d) **Livro de sinais** no relatório, uma linha por sinal.
+(e) **Ambiguidade privilegiada/negócio decidida no gate**. (f) Defaults de configuração, ignore file,
+resíduo de operador `proposed`, AP-17 sem trilha de auditoria, `proc` via `/proc` e `proc id`.
+Decisão do autor: matriz gerada pelo harness, não escrita; sem quarto projeto. Recall da rodada 7
+declarado contaminado.
+
 ---
 
 ## 9. Perguntas em aberto
 
-Nenhuma. D1–D27 decididas. Rodada 6: lista de mudanças congelada em
-`docs/rounds/round6-changes.md`; implementação em `feat/round6`.
+Nenhuma. D1–D28 decididas. Rodada 7: lista de mudanças congelada em
+`docs/rounds/round7-changes.md`; implementação em `feat/round7`. Falta executar a skill nos 3
+projetos (sessões novas, gate humano), repetir a verificação independente e fazer o merge em `main`.
 
 ---
 
