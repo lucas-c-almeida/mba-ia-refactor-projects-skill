@@ -808,9 +808,12 @@ declarado contaminado.
 
 ## 9. Perguntas em aberto
 
-Nenhuma. D1–D28 decididas. Rodada 7: lista de mudanças congelada em
-`docs/rounds/round7-changes.md`; implementação em `feat/round7`. Falta executar a skill nos 3
-projetos (sessões novas, gate humano), repetir a verificação independente e fazer o merge em `main`.
+Nenhuma decisão em aberto. D1–D28 decididas. Rodada 7 executada nos 3 projetos (sessões novas,
+gate humano, sem `--yes`) e entregue em `release/delivery-r7`; relatório em
+`docs/rounds/round7-report.md`. Pendências registradas lá (§7): repetir a verificação independente
+sobre a entrega da rodada 7, escrever os scorecards da rodada 7 (Parte 1 e Parte 1+2) e os candidatos
+para a próxima rodada (header de pedido em preflight, stderr com processo destacado, campo
+`Root cause of:`).
 
 ---
 

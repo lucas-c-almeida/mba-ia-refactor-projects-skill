@@ -1,19 +1,20 @@
+"""Report routes: parse → call the controller → render."""
 from flask import Blueprint, jsonify
 
-from middlewares.operator_guard import require_operator
+from routes import presenters
 
 
-def build_report_blueprint(controller):
+def create_report_blueprint(controller, operator_guard):
     bp = Blueprint('reports', __name__)
 
     @bp.route('/reports/summary', methods=['GET'])
-    @require_operator
+    @operator_guard.require
     def summary_report():
-        return jsonify(controller.summary()), 200
+        """Per-user productivity across every account: an operator report."""
+        return jsonify(presenters.summary_report(controller.summary())), 200
 
     @bp.route('/reports/user/<int:user_id>', methods=['GET'])
-    @require_operator
     def user_report(user_id):
-        return jsonify(controller.user_report(user_id)), 200
+        return jsonify(presenters.user_report(*controller.user_report(user_id))), 200
 
     return bp

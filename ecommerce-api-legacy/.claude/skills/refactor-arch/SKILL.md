@@ -173,19 +173,24 @@ If a field cannot be determined, print `undetermined — <reason>`. Never guess 
 
 **Read `references/02-antipattern-catalog.md` and `references/03-report-template.md` before starting.**
 
-0. **Snapshot the target** before anything executes: copy it with `proc copy` to a pristine
-   snapshot outside the target, under the scratch root chosen per
-   `references/06-validation-protocol.md` §1.1 (the environment's own scratch directory first). Every execution of the original — here and
-   in Phase 3 — happens in a fresh copy of that snapshot, never in `<target>`, in the isolation
-   mode Phase 1 detected (§1.3), and is logged.
+0. **Snapshot the target** before anything executes. First get the run id with **one** `proc id`
+   call; it names the snapshot, every run copy and every container of this run (protocol §1.3) —
+   never a timestamp alone. Copy the target with `proc copy` to a pristine snapshot outside it,
+   under the scratch root chosen per `references/06-validation-protocol.md` §1.1 (the
+   environment's own scratch directory first). Every execution of the original — here and in
+   Phase 3 — happens in a fresh copy of that snapshot, never in `<target>`, in the isolation mode
+   Phase 1 detected (§1.3), and is logged.
 1. **Sweep by catalog entry, and by signal within the entry.** For each entry of the catalog in
    turn, check **each of its detection signals** across all the source files identified in
    Phase 1 — and across the data and scripts that reach the runtime (schema, seed and migration
    scripts, fixtures loaded at boot, configuration files). A file-by-file reading finds what
    stands out in each file; an entry-level glance finds the entry's most familiar signal and stops.
-   Only a per-signal sweep finds what each entry actually asks for. Record every entry in the
-   report's `## Catalog Coverage` table — including the entries with no hit — with the signals
-   you checked.
+   Only a per-signal sweep finds what each entry actually asks for. Record **one row per signal**
+   in the report's `## Signal Ledger`: where you looked, how many occurrences, and for each hit
+   either the finding it became or `discarded: <reason>`. Before writing the report, check the
+   ledger against the findings: a hit with no finding and no reason, or anything the report shows
+   as a problem elsewhere (an advisory, a warning) that is not a finding, is a defect of the audit
+   (`03-report-template.md`).
 2. For each match, record: catalog id, name, severity, file, exact line range, what you actually saw,
    why it matters, what to do.
 3. Apply the severity rules in the catalog. **Severity follows impact in this context, not the
@@ -203,7 +208,10 @@ If a field cannot be determined, print `undetermined — <reason>`. Never guess 
 6. Mark each finding `contract-safe` or `contract-changing` per the gate in
    `references/04-architecture-guidelines.md` §6 — including its **legitimate-use test** for
    authorization and validation, and its rule for dependency upgrades. Phase 3 needs this
-   classification.
+   classification. When an operation's classification as **privileged or business** is
+   ambiguous under §6, do not decide it: list it under `## Classification Decisions`, with the
+   signals for each reading and what Phase 3 does under each answer. The person decides at the
+   gate.
 7. Write the report to `<target>/reports/audit-<YYYYMMDD-HHMM>.md` and copy it to
    `<target>/reports/audit-latest.md`, opening with the Phase 1 block exactly as printed
    (`03-report-template.md`). Print it to the terminal as well. The timestamped file is
@@ -231,15 +239,20 @@ Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
 >
 ```
 
+When `## Classification Decisions` has entries, add before the `>`:
+`For each classification decision, answer privileged or business (e.g. "y D1=privileged D2=business"). An unanswered decision is treated as business (proposed).`
+
 Then **wait for the answer**. Do not call any write tool until it arrives.
 
-- `y` → Phase 3 over all findings.
+- `y` → Phase 3 over all findings. Classification answers that came with it are recorded in the
+  report header and applied in Phase 3 exactly as given; an unanswered one is business (proposed).
 - `n` → stop. Confirm no process or container of this run is alive, delete the snapshot
   directory, confirm the report path. Make no further change.
 - `c` → Phase 3 over CRITICAL and HIGH only; list the deferred items in the final report.
 - `--yes` was passed → **do not print the prompt** (nobody is there to answer it). Print the total
   block followed by `Confirmation: --yes (auto-approved, not human-reviewed)`, behave as `y`, and
-  record the same line in the report.
+  record the same line in the report. Every classification decision takes the default: business,
+  proposed.
 
 ---
 
@@ -260,7 +273,16 @@ If the snapshot is lost before the baseline is captured, the validation is `UNVE
    how a hostile request is handled — `expect: "rejected"` when the fix is a validation,
    `"neutralized"` with a benign sibling (`like`) when it is escaping or parameterization — naming
    the finding id. Mark operations that delete or reset state `destructive` (§2.2); do not skip
-   them.
+   them. Then add:
+   - a **robustness entry** (§2.3) for **every** operation that reads request input, listing
+     every field it reads — body, query, path and headers — with its expected type. The harness
+     generates the malformed-input matrix; do not hand-write variants, and do not limit the list
+     to fields a finding named;
+   - a **value entry** (§2.4) for each transformation whose effect is a value rather than a shape
+     — money representation, ordering, a masked or removed field, a search that now matches;
+   - every credential the requests carry (a seeded password, an operator token) written as
+     `{{env:NAME}}` and supplied with `--env` at capture and replay (§2.5). No secret value is
+     written to `reports/`.
 2. Boot the original **from a fresh run copy of the snapshot** with the Phase 1 boot command, in
    the run's isolation mode (§1.3), on a port chosen per §1.2, and wait for readiness. **You**
    decide what to run; the container runtime or `proc` owns the process; the harness never boots
@@ -304,6 +326,13 @@ If the baseline cannot be captured, say so explicitly, continue, and mark the fi
     configuration, closed by default (RP-04). Business operations stay contract-changing: ordinary
     domain-record changes and deletes, plain listings and lookups (account listings included),
     sign-in, registration, checkout. The exact boundary is `04-architecture-guidelines.md` §6.
+    An operation listed under `Classification Decisions` follows the answer given at the gate
+    (unanswered or `--yes`: business, proposed); record the answer next to the finding.
+  - **Malformed input — every input, not only the cited ones.** Build the input inventory of
+    `04-architecture-guidelines.md` §6: every value each operation reads from the request, followed
+    to where it is used. Every one that reaches a type-sensitive operation gets a type and range
+    check at the boundary (RP-11) — and every query you parameterize gets the range of its
+    column (RP-02). A wrong-typed value answering `4xx` instead of `5xx` is safe.
   - **Dependency upgrades.** Within the same major version: safe. A major version, or one whose
     changelog announces a behaviour change: safe only if the replay covers the behaviour that
     changes (contract headers included); otherwise propose it.
@@ -315,6 +344,16 @@ If the baseline cannot be captured, say so explicitly, continue, and mark the fi
   - **New runtime dependencies.** A fix that needs a dependency the application does not have
     today (a production server, a new library) changes what whoever deploys it must install:
     propose it.
+- **What you deliver around the code is code too** (`04-architecture-guidelines.md` §2,
+  Configuration; RP-01): an example secret is empty, never a plausible placeholder, and the code
+  treats empty and placeholder as unset; an environment-file example exists only if the
+  application loads it (a new loader is proposed), otherwise it is a list of variables to export;
+  the ignore file is created or extended — never shrunk — so a provision-and-run leaves the tree
+  clean; file paths from configuration resolve against the project root. Never remove a
+  dependency as unused without checking its use by configuration and the runtime.
+- **Operator residue is proposed.** What only an operator action can finish once the code is done
+  — a reset window for legacy credentials, rotating a committed secret — goes under
+  `PROPOSED, NOT APPLIED` with the operational step written out, not into `unresolved` (RP-08).
 - **Rewrite in place.** Content migrates into the new layers and the superseded files are removed.
   Do not leave a parallel copy in `legacy/`, `old/` or a second source tree — that is dead code, and
   the next audit would rightly flag it. Git history is the backup.
@@ -330,10 +369,16 @@ If the baseline cannot be captured, say so explicitly, continue, and mark the fi
    on its own fresh boot (§2.2). This full replay is **mandatory**; replays you run between
    transformations are optional smoke checks and do not replace it.
 3. Classify every contract entry: `PASS` / `REGRESSION` / `PRE-EXISTING FAILURE` / `UNVERIFIED`,
-   and every security entry: `FIXED` / `NOT FIXED` / `REGRESSION` / `UNVERIFIED`.
+   every security entry: `FIXED` / `NOT FIXED` / `REGRESSION` / `UNVERIFIED`, every robustness
+   variant: `ROBUST` / `NOT ROBUST` / `REGRESSION` / `UNVERIFIED`, and every value entry:
+   `HOLDS` / `VIOLATED` / `UNVERIFIED`.
    An entry that already failed in the baseline and fails now is `PRE-EXISTING FAILURE`, never
    `✗` — do not take credit for it and do not take blame for it. A security entry `NOT FIXED`
-   whose finding you applied means the finding is not resolved.
+   whose finding you applied means the finding is not resolved. A `NOT ROBUST` variant is not
+   pre-existing in that sense: malformed input that still crashes is an AP-11 defect Phase 3 had to
+   close, so fix it, or report it `unresolved`. A `VIOLATED` value entry moves the finding it
+   checks to `unresolved`. Never describe a check as "verified by hand": it is a value entry, or
+   it is `UNVERIFIED`.
 4. If a regression is found, fix it and replay. If it cannot be fixed, report it plainly.
 5. If you add a surface entry after the baseline — an edge case the refactoring revealed — capture
    it **against the original** first (protocol §4.3). An entry that only ever ran against the new
@@ -396,6 +441,8 @@ PHASE 3: REFACTORING COMPLETE
   ✓ Application boots without errors
   ✓ Public surface replayed: <P> PASS, <R> REGRESSION, <F> PRE-EXISTING FAILURE, <U> UNVERIFIED
     Security entries: <X> FIXED, <Y> NOT FIXED   (only when the inventory has security entries)
+  ✓ Malformed input: <n> ROBUST, <k> NOT ROBUST, <g> REGRESSION over <o> operations
+  ✓ Values: <h> HOLDS, <v> VIOLATED, <w> UNVERIFIED
   ✓ Findings resolved: <r>/<total>  (<p> proposed, <u> unresolved)
   <re-audit line — see below>
     Re-audit passes: <1|2>; fixed after re-audit: <f> (<m> of them missed-in-phase-2)
@@ -408,8 +455,12 @@ PHASE 3: REFACTORING COMPLETE
 
 ## Verification Coverage
 <full, or the degraded-verification block naming what went unverified and why>
+Fixtures by reference: <the {{env:NAME}} names used, never their values — or "none">
 ================================
 ```
+
+The malformed-input line is `✓` only when every variant is `ROBUST`; the values line only when
+every value entry `HOLDS` (`03-report-template.md`).
 
 The processes line is `✓` only when every start has a matching stop through its handle, nothing
 is left running, and there is no process `INCIDENT` (a process action outside the log, or one that

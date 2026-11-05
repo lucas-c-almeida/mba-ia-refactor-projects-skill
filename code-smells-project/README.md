@@ -2,6 +2,17 @@
 
 API de E-commerce em Python/Flask usada como entrada do desafio `refactor-arch`.
 
+## Estrutura
+
+```
+app.py            raiz de composição (create_app) e ponto de entrada
+config/           configuração lida do ambiente (settings.py) e lista de variáveis
+models/           regras de domínio e persistência (SQLite)
+controllers/      casos de uso
+views/            rotas HTTP e validação de entrada
+middlewares/      tratamento de erros, conexão por requisição, guarda de operador
+```
+
 ## Como rodar
 
 ```bash
@@ -9,26 +20,16 @@ pip install -r requirements.txt
 python app.py
 ```
 
-A aplicação sobe em `http://localhost:5000`. O banco SQLite (`loja.db`) é criado automaticamente no primeiro boot, já com produtos e usuários de exemplo.
+A aplicação sobe em `http://localhost:5000`. O banco SQLite (`loja.db`, na raiz do projeto) é criado automaticamente no primeiro boot, já com produtos e usuários de exemplo.
 
-## Estrutura
+A configuração vem de variáveis de ambiente — **exporte-as** antes de iniciar; a aplicação não lê arquivo `.env`. A lista completa, com o significado de cada uma, está em `config/variables.example`. As principais:
 
+- `OPERATOR_TOKEN` — credencial de operador para `GET /relatorios/vendas` (cabeçalho `X-Operator-Token`). Sem ela, a rota responde 403.
+- `SEED_ADMIN_PASSWORD`, `SEED_JOAO_PASSWORD`, `SEED_MARIA_PASSWORD` — senhas das contas de exemplo, usadas só no primeiro boot. Sem elas, as contas são criadas sem senha utilizável.
+- `APP_DEBUG=true` — liga o modo debug (desligado por padrão).
+
+```bash
+export OPERATOR_TOKEN=...
+export SEED_JOAO_PASSWORD=...
+python app.py
 ```
-app.py            composition root (create_app)
-config/           leitura única do ambiente (settings.py)
-models/           entidades, regras e persistência (SQLite), erros de domínio
-controllers/      casos de uso (valores simples entrada/saída)
-routes/           declaração das rotas (parse -> controller -> render)
-middlewares/      fronteira de erros e guarda de operador
-```
-
-Convenção de nomes: o vocabulário de domínio (produtos, pedidos, usuários) e as rotas ficam em português, porque são o contrato da API; os termos técnicos de infraestrutura (`Settings`, `Database`, `create_app`) ficam em inglês.
-
-## Configuração (variáveis de ambiente)
-
-Veja `.env.example`. Pontos importantes:
-
-- `APP_DEBUG` fica desligado por padrão.
-- `SECRET_KEY` não tem valor embutido; sem ele, uma chave aleatória é gerada a cada processo.
-- `OPERATOR_TOKEN` habilita `GET /relatorios/vendas` (enviar o header `x-operator-token`). Sem ele, a rota responde 403.
-- As rotas `/admin/query` e `/admin/reset-db` foram removidas (executavam SQL recebido e apagavam todos os dados sem autenticação).

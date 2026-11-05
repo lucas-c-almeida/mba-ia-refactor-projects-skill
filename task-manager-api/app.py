@@ -1,4 +1,7 @@
-"""Composition root: the only module that wires configuration, models, controllers and routes."""
+"""Composition root: configuration, infrastructure, controllers, routes, error boundary.
+
+Importing this module has no side effects; `create_app()` builds the application (RP-06).
+"""
 import logging
 
 from flask import Flask
@@ -9,53 +12,42 @@ from controllers.category_controller import CategoryController
 from controllers.report_controller import ReportController
 from controllers.task_controller import TaskController
 from controllers.user_controller import UserController
-from database import db, enable_sqlite_foreign_keys, upgrade_legacy_tables
+from database import db, enforce_foreign_keys
 from middlewares.error_handler import register_error_handlers
+from middlewares.operator_guard import OperatorGuard
+from models import category, task, user  # noqa: F401 — registers the tables for create_all
 from models.clock import utc_now
-from models.repositories import CategoryRepository, TaskRepository, UnitOfWork, UserRepository
-from routes.category_routes import build_category_blueprint
-from routes.report_routes import build_report_blueprint
-from routes.request import JsonRequest
-from routes.system_routes import build_system_blueprint
-from routes.task_routes import build_task_blueprint
-from routes.user_routes import build_user_blueprint
+from routes import register_routes
 
 
 def create_app(settings=None):
     settings = settings or load_settings()
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s %(message)s')
 
     app = Flask(__name__)
-    app.request_class = JsonRequest
-    app.config['SQLALCHEMY_DATABASE_URI'] = settings.database_uri
+    app.config['SQLALCHEMY_DATABASE_URI'] = settings.database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = settings.secret_key
-    app.config['OPERATOR_TOKEN'] = settings.operator_token
+    if settings.secret_key:
+        app.config['SECRET_KEY'] = settings.secret_key
 
-    CORS(app)
+    CORS(app, origins=settings.cors_origins)
     db.init_app(app)
 
-    tasks = TaskRepository()
-    users = UserRepository()
-    categories = CategoryRepository()
-    uow = UnitOfWork()
-
-    app.register_blueprint(build_task_blueprint(TaskController(tasks, users, categories, uow, utc_now)))
-    app.register_blueprint(build_user_blueprint(UserController(users, tasks, uow, utc_now)))
-    app.register_blueprint(build_category_blueprint(CategoryController(categories, tasks, uow)))
-    app.register_blueprint(build_report_blueprint(ReportController(tasks, users, categories, utc_now)))
-    app.register_blueprint(build_system_blueprint())
+    controllers = {
+        'tasks': TaskController(clock=utc_now),
+        'users': UserController(clock=utc_now),
+        'reports': ReportController(clock=utc_now),
+        'categories': CategoryController(),
+    }
+    register_routes(app, controllers, OperatorGuard(settings.operator_token))
     register_error_handlers(app)
 
     with app.app_context():
-        import models  # noqa: F401  (registers the tables on the metadata)
-        enable_sqlite_foreign_keys(db.engine)
+        enforce_foreign_keys(db.engine)
         db.create_all()
-        upgrade_legacy_tables(db.engine)
-
     return app
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
-    config = load_settings()
-    create_app(config).run(debug=config.debug, host=config.host, port=config.port)
+    runtime = load_settings()
+    create_app(runtime).run(debug=runtime.debug, host=runtime.host, port=runtime.port)

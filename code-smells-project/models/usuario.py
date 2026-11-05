@@ -1,68 +1,63 @@
-"""User persistence and password handling."""
-import hmac
+"""User accounts: persistence. Passwords are never returned in clear."""
 
-from werkzeug.security import check_password_hash, generate_password_hash
+TIPO_PADRAO = "cliente"
 
-from models.constants import VALOR_MASCARADO
-
-_PREFIXOS_HASH = ("scrypt:", "pbkdf2:")
-
-
-def hash_senha(senha):
-    return generate_password_hash(senha)
+# The field stays in user responses (clients read its presence and type); its value
+# is never the stored credential.
+SENHA_MASCARADA = "********"
 
 
-def _eh_hash(armazenada):
-    return isinstance(armazenada, str) and armazenada.startswith(_PREFIXOS_HASH)
-
-
-def _confere(armazenada, senha):
-    if _eh_hash(armazenada):
-        return check_password_hash(armazenada, senha)
-    # Legacy row stored as plain text: constant-time comparison, upgraded on first sign-in.
-    return hmac.compare_digest((armazenada or "").encode("utf-8"), senha.encode("utf-8"))
-
-
-def _para_dict(row):
+def _para_dict(linha) -> dict:
     return {
-        "id": row["id"],
-        "nome": row["nome"],
-        "email": row["email"],
-        "senha": VALOR_MASCARADO,
-        "tipo": row["tipo"],
-        "criado_em": row["criado_em"],
+        "id": linha["id"],
+        "nome": linha["nome"],
+        "email": linha["email"],
+        "senha": SENHA_MASCARADA,
+        "tipo": linha["tipo"],
+        "criado_em": linha["criado_em"],
     }
 
 
 class UsuarioRepository:
-    def __init__(self, db):
-        self._db = db
+    def __init__(self, obter_conexao):
+        self._obter_conexao = obter_conexao
 
-    def listar(self):
-        with self._db.session() as conn:
-            return [_para_dict(row) for row in conn.execute("SELECT * FROM usuarios").fetchall()]
+    def listar(self) -> list:
+        linhas = self._obter_conexao().execute("SELECT * FROM usuarios").fetchall()
+        return [_para_dict(linha) for linha in linhas]
 
-    def buscar_por_id(self, usuario_id):
-        with self._db.session() as conn:
-            row = conn.execute("SELECT * FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
-            return _para_dict(row) if row else None
+    def buscar_por_id(self, usuario_id: int):
+        linha = self._obter_conexao().execute(
+            "SELECT * FROM usuarios WHERE id = ?", (usuario_id,)
+        ).fetchone()
+        return _para_dict(linha) if linha else None
 
-    def criar(self, nome, email, senha, tipo="cliente"):
-        with self._db.session() as conn:
-            cursor = conn.execute(
+    def existe(self, usuario_id: int) -> bool:
+        return self._obter_conexao().execute(
+            "SELECT 1 FROM usuarios WHERE id = ?", (usuario_id,)
+        ).fetchone() is not None
+
+    def credenciais_por_email(self, email: str) -> list:
+        """Every account answering to the email, oldest first, with its stored credential."""
+        return self._obter_conexao().execute(
+            "SELECT id, nome, email, tipo, senha FROM usuarios WHERE email = ? ORDER BY id",
+            (email,),
+        ).fetchall()
+
+    def criar(self, nome, email, senha_armazenada, tipo=TIPO_PADRAO) -> int:
+        conexao = self._obter_conexao()
+        with conexao:
+            cursor = conexao.execute(
                 "INSERT INTO usuarios (nome, email, senha, tipo) VALUES (?, ?, ?, ?)",
-                (nome, email, hash_senha(senha), tipo),
+                (nome, email, senha_armazenada, tipo),
             )
-            return cursor.lastrowid
+        return cursor.lastrowid
 
-    def autenticar(self, email, senha):
-        """Return the public user fields when the credentials match, else None."""
-        with self._db.session() as conn:
-            rows = conn.execute("SELECT * FROM usuarios WHERE email = ? ORDER BY id", (email,)).fetchall()
-            for row in rows:
-                if not _confere(row["senha"], senha):
-                    continue
-                if not _eh_hash(row["senha"]):
-                    conn.execute("UPDATE usuarios SET senha = ? WHERE id = ?", (hash_senha(senha), row["id"]))
-                return {"id": row["id"], "nome": row["nome"], "email": row["email"], "tipo": row["tipo"]}
-            return None
+    def substituir_senha(self, usuario_id: int, senha_armazenada: str) -> None:
+        conexao = self._obter_conexao()
+        with conexao:
+            conexao.execute("UPDATE usuarios SET senha = ? WHERE id = ?",
+                            (senha_armazenada, usuario_id))
+
+    def contar(self) -> int:
+        return self._obter_conexao().execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]

@@ -1,44 +1,48 @@
-"""Sales report: aggregates in the database, the discount rule in a pure function."""
-from models.constants import FAIXAS_DESCONTO, STATUS_APROVADO, STATUS_CANCELADO, STATUS_PENDENTE
+"""Sales report: the discount rule and the aggregate query."""
+from models.pedido import StatusPedido
+
+# Revenue discount tiers, highest threshold first: (revenue above, rate).
+FAIXAS_DE_DESCONTO = (
+    (10000, 0.10),
+    (5000, 0.05),
+    (1000, 0.02),
+)
+CASAS_DECIMAIS = 2
 
 
-def calcular_desconto(faturamento):
-    for limite, taxa in FAIXAS_DESCONTO:
+def calcular_desconto(faturamento: float) -> float:
+    for limite, taxa in FAIXAS_DE_DESCONTO:
         if faturamento > limite:
             return faturamento * taxa
     return 0
 
 
-def montar_relatorio(total_pedidos, faturamento, pendentes, aprovados, cancelados):
+def montar_relatorio(total_pedidos, faturamento, por_status) -> dict:
     desconto = calcular_desconto(faturamento)
     return {
         "total_pedidos": total_pedidos,
-        "faturamento_bruto": round(faturamento, 2),
-        "desconto_aplicavel": round(desconto, 2),
-        "faturamento_liquido": round(faturamento - desconto, 2),
-        "pedidos_pendentes": pendentes,
-        "pedidos_aprovados": aprovados,
-        "pedidos_cancelados": cancelados,
-        "ticket_medio": round(faturamento / total_pedidos, 2) if total_pedidos > 0 else 0,
+        "faturamento_bruto": round(faturamento, CASAS_DECIMAIS),
+        "desconto_aplicavel": round(desconto, CASAS_DECIMAIS),
+        "faturamento_liquido": round(faturamento - desconto, CASAS_DECIMAIS),
+        "pedidos_pendentes": por_status.get(StatusPedido.PENDENTE, 0),
+        "pedidos_aprovados": por_status.get(StatusPedido.APROVADO, 0),
+        "pedidos_cancelados": por_status.get(StatusPedido.CANCELADO, 0),
+        "ticket_medio": round(faturamento / total_pedidos, CASAS_DECIMAIS) if total_pedidos > 0 else 0,
     }
 
 
 class RelatorioRepository:
-    def __init__(self, db):
-        self._db = db
+    def __init__(self, obter_conexao):
+        self._obter_conexao = obter_conexao
 
-    def vendas(self):
-        with self._db.session() as conn:
-            row = conn.execute(
-                """
-                SELECT COUNT(*) AS total,
-                       SUM(total) AS faturamento,
-                       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS pendentes,
-                       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS aprovados,
-                       COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) AS cancelados
-                FROM pedidos
-                """,
-                (STATUS_PENDENTE, STATUS_APROVADO, STATUS_CANCELADO),
-            ).fetchone()
-        faturamento = row["faturamento"] if row["faturamento"] is not None else 0
-        return montar_relatorio(row["total"], faturamento, row["pendentes"], row["aprovados"], row["cancelados"])
+    def totais(self):
+        """(order count, revenue, count per status). Revenue is summed in whole cents;
+        TOTAL() never overflows, and is exact while the sum stays below 2**53 cents."""
+        conexao = self._obter_conexao()
+        total_pedidos, centavos = conexao.execute(
+            "SELECT COUNT(*), TOTAL(CAST(ROUND(total * 100) AS INTEGER)) FROM pedidos"
+        ).fetchone()
+        por_status = dict(conexao.execute(
+            "SELECT status, COUNT(*) FROM pedidos GROUP BY status").fetchall())
+        faturamento = (centavos or 0) / 100
+        return total_pedidos, faturamento, por_status

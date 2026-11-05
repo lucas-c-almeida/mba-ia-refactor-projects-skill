@@ -82,6 +82,30 @@ startup, not lazily at first use; provide a committed example file listing every
 placeholder values; distinguish per-environment values from constants — a constant does not belong
 in configuration at all.
 
+What the refactoring delivers around configuration is part of the code, and it is held to the same
+standard — a default the refactoring introduces is a defect the refactoring introduced:
+
+- **A secret's example value is empty, or invalid by construction**, never a plausible word (a
+  sample password, a "replace me" marker, the service's name). Whoever copies the example file without editing it must end
+  up with the feature closed, not open with a value everyone knows. The code that reads the secret
+  treats an empty value **and** the example's placeholder as "not configured" (fail closed).
+- **An example file implies a loader.** If the refactoring writes an environment-file example,
+  either the application loads that file at startup — and a loader the application does not have
+  today is a new runtime dependency, so it is proposed (§6) — or the file is named and headed as
+  a **list of variables to export**, and the project's run instructions say "export these
+  variables", never "copy to `.env`". An example that nothing reads is a configuration that
+  silently does not apply.
+- **The ignore file covers what the application now produces.** Create or extend the target's
+  version-control ignore file so that a provision-and-run leaves the working tree clean: local
+  secrets file, database files, caches, the language's virtual environment or installed
+  dependency directory, logs. Never delete or shrink an existing ignore file; never remove a
+  dependency as "unused" without searching for its import **and** for its use by configuration or
+  by the runtime (a loader, a plugin, a driver named in a URL).
+- **Persisted paths are resolved against the project, not the working directory.** A database
+  file, upload folder or log path read from configuration is resolved relative to the project
+  root (the entry point's location), so starting the application from another directory uses the
+  same data instead of creating a new, empty store.
+
 ### Error handling
 
 One centralized boundary at the outermost layer: framework error middleware, a top-level handler, or
@@ -231,6 +255,25 @@ a request is decided by one question: *who gets the new rejection?*
 | A **value no legitimate client sends**: invalid on its face, whatever the product decides — an injection payload, a malformed identifier, a value of the wrong type, an unknown enumerated value, a value that breaks an invariant the domain already states (a period that ends before it starts). | Only illegitimate or broken requests | **Safe.** Apply it (RP-02, RP-11), and cover it with a security entry in the surface inventory (`06-validation-protocol.md` §2.1). |
 | A **rule that requires a product decision**: a maximum, a format stricter than what clients send today, a newly required field. | Possibly legitimate clients | **Contract-changing.** Propose it. |
 
+**The input inventory — every operation, not only the ones a finding names.** The fourth row is
+not applied field by field. In Phase 3, list every value each operation derives from the request
+(body, query, path, headers) and follow it to where it is used. Every value that reaches a
+**type-sensitive operation** — a database driver or query builder, arithmetic or comparison,
+a string or collection method, a length or index, deserialization, a file path — gets a check of
+**type and range** at the boundary, before the controller sees it:
+
+- the expected type, with no silent coercion of a different one (a boolean is not a number, a
+  list is not a string, an object is not a scalar);
+- for a number: finite, and inside the range of where it is stored or used — the column or
+  field type, the driver's integer width, the domain's own bounds when the domain states them;
+- for a nested structure: the depth and size the operation actually needs.
+
+A wrong-typed or out-of-range value then answers the application's own `4xx`, which is safe by
+the fourth row; a missing optional value keeps its current default. Whether Phase 2 cited the
+field does not matter: the audit names the pattern, and the fix applies it to every input that
+has the pattern. The robustness entries of `06-validation-protocol.md` §2.3 hold the result to
+it — a variant that still answers `5xx` is a finding left `unresolved`.
+
 **Privileged operations.** The first row's reasoning ("every client is anonymous, so every client is
 rejected") holds for operations that ordinary clients exist to call. It does not hold for an
 operation whose only legitimate caller is an operator. An operation is **privileged** when any of
@@ -270,8 +313,16 @@ What does **not** make an operation privileged, however destructive or broad it 
   such a response is fixed by masking (catalog AP-08); the access question is proposed;
 - signing in, registering, checking out.
 
-Those stay under the first row. When the signals are ambiguous — a delete that could be a user's own
-action on their own records — it is a business operation: propose.
+Those stay under the first row.
+
+**Ambiguous classification is decided by the person, at the gate.** When the signals point both
+ways — a delete that could be a user's own action on their own records, a read of one principal's
+activity that could be a profile or a management rollup — do not decide it alone, and do not let
+two runs decide it differently. Phase 2 lists it under `Classification decisions` in the report
+(`03-report-template.md`): the operation, the signals for each side, and what Phase 3 will do under
+each answer. The person answers at the confirmation gate; Phase 3 applies that answer and records
+it next to the finding. Only when nobody can answer — a run under `--yes` — does the default apply:
+business operation, propose.
 
 How to fix a privileged operation, in order of preference:
 
@@ -280,8 +331,8 @@ How to fix a privileged operation, in order of preference:
    keep it as a maintenance script outside the request surface (a command, not a route).
 2. **Guard it** when it is a legitimate operator function (a management report, an account
    removal): require an operator credential supplied by configuration (environment), compare it in
-   constant time, and fail **closed** — with no credential configured, the operation answers
-   `403` (or `404`). Never a literal in the source (catalog AP-01). This is a guard on one
+   constant time, and fail **closed** — with no credential configured, or with an empty value or
+   the example file's placeholder (§2, Configuration), the operation answers `403` (or `404`). Never a literal in the source (catalog AP-01). This is a guard on one
    operation, not an identity model: it invents no users, roles or policy.
 
 Both change what only a non-operator observes. Record the guard in the report (the variable's name,
@@ -290,7 +341,8 @@ and that it is unset by default) so the operator knows how to enable the operati
 This is the same reasoning that makes parameterizing a query safe: it changes only what an
 illegitimate request observes. The decision depends on facts you can read in the code — whether an
 identity model exists, whether the value could come from a legitimate client — never on a guess
-about who the principals are. When those facts are ambiguous, propose.
+about who the principals are. When those facts are ambiguous, the person decides at the gate
+(above); without a person, propose.
 
 **The error contract.** Clients program against the errors an application **means** to produce: a
 `404` with a documented body, a validation error listing the fields. Those are contract, status and

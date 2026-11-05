@@ -1,24 +1,35 @@
+"""Operator credential for privileged operations (RP-04).
+
+Not an identity model: one shared credential, configured through OPERATOR_TOKEN and sent in the
+X-Operator-Token header. With no credential configured (unset or empty), every privileged
+operation answers 403 — closed by default.
+"""
 import hmac
 from functools import wraps
 
-from flask import current_app, request
+from flask import request
 
 from models.errors import ForbiddenError
 
 OPERATOR_HEADER = 'X-Operator-Token'
+FORBIDDEN_MESSAGE = 'Operação restrita ao operador'
 
 
-def require_operator(view):
-    """Guard for operator-only operations. Closed by default: with no OPERATOR_TOKEN
-    configured every call is answered with 403."""
+class OperatorGuard:
+    def __init__(self, operator_token):
+        self._token = operator_token.encode() if operator_token else None
 
-    @wraps(view)
-    def guarded(*args, **kwargs):
-        expected = current_app.config.get('OPERATOR_TOKEN')
-        given = request.headers.get(OPERATOR_HEADER, '')
-        allowed = bool(expected) and hmac.compare_digest(given.encode(), expected.encode())
-        if not allowed:
-            raise ForbiddenError('Acesso restrito')
-        return view(*args, **kwargs)
+    def is_operator(self):
+        """True only when a credential is configured and the request presents it."""
+        if not self._token:
+            return False
+        presented = request.headers.get(OPERATOR_HEADER, '').encode()
+        return hmac.compare_digest(presented, self._token)
 
-    return guarded
+    def require(self, view):
+        @wraps(view)
+        def guarded(*args, **kwargs):
+            if not self.is_operator():
+                raise ForbiddenError(FORBIDDEN_MESSAGE)
+            return view(*args, **kwargs)
+        return guarded
