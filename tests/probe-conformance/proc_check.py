@@ -18,6 +18,7 @@ Run through tests/probe-conformance/run.py.
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -132,6 +133,17 @@ def check_one(impl, work, decoy, failures):
     shapes.append(("exits", sorted(doc)))
 
     shapes.extend(check_copy(impl, work, expect, failures))
+
+    # Run ids: same format in both implementations, and two calls never collide (R11).
+    ids = []
+    for _ in range(2):
+        code, doc = call(impl, "id")
+        expect("id", code, 0)
+        ids.append(doc.get("runId") or "")
+    if not all(re.match(r"^[0-9]{12}-[0-9a-f]{8}$", i) for i in ids) or ids[0] == ids[1]:
+        failures.append("proc {0}: id must be <YYYYMMDDHHMM>-<8 hex> and unique per call: {1}"
+                        .format(impl, ids))
+    shapes.append(("id", sorted(doc)))
     return shapes
 
 
