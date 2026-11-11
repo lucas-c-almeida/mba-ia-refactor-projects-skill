@@ -1,13 +1,14 @@
 # Runtime data
-loja.db
 *.db
-*.sqlite3
-
-# Local secrets
-.env
+*.db-journal
+*.db-wal
+*.db-shm
 
 # Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Local secrets
+.env

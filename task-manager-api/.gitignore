@@ -1,12 +1,8 @@
-# local configuration and secrets
-.env
-
-# SQLite database (Flask-SQLAlchemy resolves sqlite:///tasks.db inside instance/)
+# Runtime artifacts: a provision-and-run must leave the tree clean.
 instance/
 *.db
-
-# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+.env

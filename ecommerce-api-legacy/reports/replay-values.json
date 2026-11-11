@@ -1,0 +1,1460 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "capturedAt": "2026-11-11T19:52:56Z",
+  "results": {
+    "delete-user-robustness#X-Operator-Token=empty": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#X-Operator-Token=empty",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "delete-user-robustness#X-Operator-Token=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#X-Operator-Token=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "delete-user-robustness#id=fraction": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=fraction",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1.5",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=int64-max": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=int64-max",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/9223372036854775807",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=int64-overflow": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=int64-overflow",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/9223372036854775808",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=nan": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=nan",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/NaN",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=negative": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=negative",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/-1",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "delete-user-robustness#id=non-finite": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=non-finite",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1e999",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=string",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/x",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=zero": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=zero",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/0",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-financial-report-anonymous": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "get-financial-report-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "get-financial-report-membership": {
+      "assertions": [
+        {
+          "holds": true,
+          "op": "matches",
+          "path": "$[*].course"
+        },
+        {
+          "holds": true,
+          "op": "matches",
+          "path": "$[*].students[*].student"
+        }
+      ],
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-10",
+      "headers": {},
+      "id": "get-financial-report-membership",
+      "kind": "value",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-financial-report-operator": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "get-financial-report-operator",
+      "kind": "contract",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-financial-report-robustness#X-Operator-Token=empty": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "get-financial-report-robustness#X-Operator-Token=empty",
+      "kind": "robustness",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "get-financial-report-robustness#X-Operator-Token=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "get-financial-report-robustness#X-Operator-Token=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "post-checkout-denied": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-denied",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Pagamento recusado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-existing-user": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-existing-user",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-malformed-json": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-18",
+      "headers": {},
+      "id": "post-checkout-malformed-json",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-missing-fields": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-missing-fields",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-new-user": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-new-user",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-no-password": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-no-password",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-robustness#c_id=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=fraction": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=fraction",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=int64-max": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=int64-max",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=int64-overflow": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=int64-overflow",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=negative": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=negative",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "post-checkout-robustness#c_id=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=non-finite": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=non-finite",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=zero": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=zero",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=number": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=number": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=empty-string": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-robustness#pwd=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=null": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-robustness#pwd=number": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=omitted": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-robustness#usr=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=number": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-unknown-course": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-unknown-course",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    }
+  },
+  "version": 3
+}

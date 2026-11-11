@@ -1,4 +1,3 @@
-"""Service metadata routes."""
 from datetime import datetime
 
 from flask import Blueprint

@@ -1,19 +1,40 @@
 {
   "baseUrl": "http://127.0.0.1:3000",
-  "capturedAt": "2026-11-05T02:36:07Z",
+  "capturedAt": "2026-11-11T06:53:55Z",
   "results": {
-    "delete-user-existing": {
+    "delete-user-anonymous": {
+      "contentType": "text/html",
+      "destructive": true,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "delete-user-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "delete-user-operator": {
       "contentType": "text/html",
       "destructive": true,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "delete-user-existing",
+      "id": "delete-user-operator",
       "kind": "contract",
       "like": null,
       "method": "DELETE",
-      "path": "/api/users/1",
+      "path": "/api/users/2",
       "shape": {
         "lines": [
           "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
@@ -23,20 +44,146 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "delete-user-missing-id": {
+    "delete-user-robustness#X-Operator-Token=empty": {
       "contentType": "text/html",
       "destructive": false,
       "error": null,
       "expect": null,
-      "finding": null,
+      "finding": "AP-11",
       "headers": {},
-      "id": "delete-user-missing-id",
-      "kind": "contract",
+      "id": "delete-user-robustness#X-Operator-Token=empty",
+      "kind": "robustness",
       "like": null,
       "method": "DELETE",
       "path": "/api/users/999",
       "shape": {
         "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "delete-user-robustness#X-Operator-Token=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#X-Operator-Token=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/999",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "delete-user-robustness#id=fraction": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=fraction",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1.5",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=int64-max": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=int64-max",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/9223372036854775807",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=int64-overflow": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=int64-overflow",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/9223372036854775808",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=nan": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=nan",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/NaN",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=negative": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=negative",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/-1",
+      "shape": {
+        "lines": [
           "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
         ],
         "type": "text"
@@ -44,14 +191,98 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-admin-financial-report": {
+    "delete-user-robustness#id=non-finite": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=non-finite",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/1e999",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=string",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/x",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "delete-user-robustness#id=zero": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "delete-user-robustness#id=zero",
+      "kind": "robustness",
+      "like": null,
+      "method": "DELETE",
+      "path": "/api/users/0",
+      "shape": {
+        "lines": [
+          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "get-financial-report-anonymous": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-04",
+      "headers": {},
+      "id": "get-financial-report-anonymous",
+      "kind": "security",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "get-financial-report-operator": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "get-admin-financial-report",
+      "id": "get-financial-report-operator",
       "kind": "contract",
       "like": null,
       "method": "GET",
@@ -79,7 +310,49 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-admin-financial-report-values": {
+    "get-financial-report-robustness#X-Operator-Token=empty": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "get-financial-report-robustness#X-Operator-Token=empty",
+      "kind": "robustness",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "get-financial-report-robustness#X-Operator-Token=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "get-financial-report-robustness#X-Operator-Token=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "lines": [
+          "Forbidden"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 403
+    },
+    "get-financial-report-values": {
       "assertions": [
         {
           "found": true,
@@ -95,7 +368,7 @@
           "op": "sameAsBaseline",
           "path": "$[*].revenue",
           "value": [
-            3988,
+            1994,
             994
           ]
         },
@@ -105,9 +378,7 @@
           "path": "$[*].students[*].student",
           "value": [
             "Leonan",
-            "Sem Senha",
-            "Texto",
-            "Valor",
+            "Maria",
             "Guilherme",
             "Leonan"
           ]
@@ -119,8 +390,6 @@
           "value": [
             997,
             997,
-            997,
-            997,
             497,
             497
           ]
@@ -130,9 +399,9 @@
       "destructive": false,
       "error": null,
       "expect": null,
-      "finding": null,
+      "finding": "AP-10",
       "headers": {},
-      "id": "get-admin-financial-report-values",
+      "id": "get-financial-report-values",
       "kind": "value",
       "like": null,
       "method": "GET",
@@ -160,35 +429,26 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "get-unknown-route": {
+    "post-checkout-card-not-string": {
       "contentType": "text/html",
-      "destructive": false,
+      "destructive": true,
       "error": null,
-      "expect": null,
-      "finding": null,
+      "expect": "rejected",
+      "finding": "AP-11",
       "headers": {},
-      "id": "get-unknown-route",
-      "kind": "contract",
+      "id": "post-checkout-card-not-string",
+      "kind": "security",
       "like": null,
-      "method": "GET",
-      "path": "/api/nope",
+      "method": "POST",
+      "path": "/api/checkout",
       "shape": {
         "lines": [
-          "<!DOCTYPE html>",
-          "</body>",
-          "</head>",
-          "</html>",
-          "<body>",
-          "<head>",
-          "<html lang=\"en\">",
-          "<meta charset=\"utf-<n>\">",
-          "<pre>Cannot GET /api/nope</pre>",
-          "<title>Error</title>"
+          "Bad Request"
         ],
         "type": "text"
       },
       "state": "OBSERVED",
-      "status": 404
+      "status": 400
     },
     "post-checkout-denied": {
       "contentType": "text/html",
@@ -211,14 +471,14 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "post-checkout-existing-user-paid": {
+    "post-checkout-existing-user": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "post-checkout-existing-user-paid",
+      "id": "post-checkout-existing-user",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -232,6 +492,27 @@
       },
       "state": "OBSERVED",
       "status": 200
+    },
+    "post-checkout-malformed-json": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": "rejected",
+      "finding": "AP-18",
+      "headers": {},
+      "id": "post-checkout-malformed-json",
+      "kind": "security",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
     },
     "post-checkout-missing-fields": {
       "contentType": "text/html",
@@ -254,14 +535,14 @@
       "state": "OBSERVED",
       "status": 400
     },
-    "post-checkout-new-user-paid": {
+    "post-checkout-new-user": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
       "expect": null,
       "finding": null,
       "headers": {},
-      "id": "post-checkout-new-user-paid",
+      "id": "post-checkout-new-user",
       "kind": "contract",
       "like": null,
       "method": "POST",
@@ -298,15 +579,666 @@
       "state": "OBSERVED",
       "status": 200
     },
-    "post-checkout-string-course-id": {
+    "post-checkout-robustness#c_id=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=fraction": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=fraction",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=int64-max": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=int64-max",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=int64-overflow": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=int64-overflow",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=negative": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=negative",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Curso não encontrado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 404
+    },
+    "post-checkout-robustness#c_id=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=non-finite": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=non-finite",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#c_id=zero": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#c_id=zero",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=number": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#card=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#card=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=number": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#eml=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#eml=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=empty-string": {
       "contentType": "application/json",
       "destructive": false,
       "error": null,
       "expect": null,
-      "finding": null,
+      "finding": "AP-11",
       "headers": {},
-      "id": "post-checkout-string-course-id",
-      "kind": "contract",
+      "id": "post-checkout-robustness#pwd=empty-string",
+      "kind": "robustness",
       "like": null,
       "method": "POST",
       "path": "/api/checkout",
@@ -319,6 +1251,281 @@
       },
       "state": "OBSERVED",
       "status": 200
+    },
+    "post-checkout-robustness#pwd=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=null": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-robustness#pwd=number": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#pwd=omitted": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#pwd=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-robustness#usr=boolean": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=boolean",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=empty-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=empty-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=empty-string": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=empty-string",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=list": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=list",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=nested-object": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=nested-object",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=null": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=null",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=number": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=number",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-robustness#usr=omitted": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-11",
+      "headers": {},
+      "id": "post-checkout-robustness#usr=omitted",
+      "kind": "robustness",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Bad Request"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
     },
     "post-checkout-unknown-course": {
       "contentType": "text/html",
@@ -340,1368 +1547,6 @@
       },
       "state": "OBSERVED",
       "status": 404
-    },
-    "post-checkout-value": {
-      "assertions": [
-        {
-          "holds": true,
-          "op": "equals",
-          "path": "$.msg"
-        },
-        {
-          "found": true,
-          "op": "sameAsBaseline",
-          "path": "$.enrollment_id",
-          "value": 6
-        }
-      ],
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": null,
-      "headers": {},
-      "id": "post-checkout-value",
-      "kind": "value",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "properties": {
-          "enrollment_id": "number",
-          "msg": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "rob-delete-user#X-Operator-Token=empty": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#X-Operator-Token=empty",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/999",
-      "shape": {
-        "lines": [
-          "Forbidden"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 403
-    },
-    "rob-delete-user#X-Operator-Token=omitted": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#X-Operator-Token=omitted",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/999",
-      "shape": {
-        "lines": [
-          "Forbidden"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 403
-    },
-    "rob-delete-user#id=fraction": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#id=fraction",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/1.5",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-delete-user#id=int64-max": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#id=int64-max",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/9223372036854775807",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-delete-user#id=int64-overflow": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#id=int64-overflow",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/9223372036854775808",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-delete-user#id=nan": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#id=nan",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/NaN",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-delete-user#id=negative": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#id=negative",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/-1",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-delete-user#id=non-finite": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#id=non-finite",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/1e999",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-delete-user#id=string": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#id=string",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/x",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-delete-user#id=zero": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-delete-user#id=zero",
-      "kind": "robustness",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/0",
-      "shape": {
-        "lines": [
-          "Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco."
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "rob-get-admin-financial-report#X-Operator-Token=empty": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-get-admin-financial-report#X-Operator-Token=empty",
-      "kind": "robustness",
-      "like": null,
-      "method": "GET",
-      "path": "/api/admin/financial-report",
-      "shape": {
-        "lines": [
-          "Forbidden"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 403
-    },
-    "rob-get-admin-financial-report#X-Operator-Token=omitted": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-get-admin-financial-report#X-Operator-Token=omitted",
-      "kind": "robustness",
-      "like": null,
-      "method": "GET",
-      "path": "/api/admin/financial-report",
-      "shape": {
-        "lines": [
-          "Forbidden"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 403
-    },
-    "rob-post-checkout#Content-Type=empty": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#Content-Type=empty",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#Content-Type=omitted": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#Content-Type=omitted",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "properties": {
-          "enrollment_id": "number",
-          "msg": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "rob-post-checkout#c_id=boolean": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=boolean",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=empty-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=empty-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=fraction": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=fraction",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=int64-max": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=int64-max",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=int64-overflow": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=int64-overflow",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=list": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=list",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=negative": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=negative",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Curso não encontrado"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 404
-    },
-    "rob-post-checkout#c_id=nested-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=nested-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=non-finite": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=non-finite",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=null": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=null",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=omitted": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=omitted",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=string": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=string",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#c_id=zero": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#c_id=zero",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#card=boolean": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#card=boolean",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#card=empty-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#card=empty-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#card=empty-string": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#card=empty-string",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#card=list": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#card=list",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#card=nested-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#card=nested-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#card=null": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#card=null",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#card=number": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#card=number",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#card=omitted": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#card=omitted",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#eml=boolean": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#eml=boolean",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#eml=empty-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#eml=empty-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#eml=empty-string": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#eml=empty-string",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#eml=list": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#eml=list",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#eml=nested-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#eml=nested-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#eml=null": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#eml=null",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#eml=number": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#eml=number",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#eml=omitted": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#eml=omitted",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#pwd=boolean": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#pwd=boolean",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#pwd=empty-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#pwd=empty-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#pwd=empty-string": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#pwd=empty-string",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "properties": {
-          "enrollment_id": "number",
-          "msg": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "rob-post-checkout#pwd=list": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#pwd=list",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#pwd=nested-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#pwd=nested-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#pwd=null": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#pwd=null",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "properties": {
-          "enrollment_id": "number",
-          "msg": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "rob-post-checkout#pwd=number": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#pwd=number",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#pwd=omitted": {
-      "contentType": "application/json",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#pwd=omitted",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "properties": {
-          "enrollment_id": "number",
-          "msg": "string"
-        },
-        "type": "object"
-      },
-      "state": "OBSERVED",
-      "status": 200
-    },
-    "rob-post-checkout#usr=boolean": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#usr=boolean",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#usr=empty-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#usr=empty-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#usr=empty-string": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#usr=empty-string",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#usr=list": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#usr=list",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#usr=nested-object": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#usr=nested-object",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#usr=null": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#usr=null",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#usr=number": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#usr=number",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "rob-post-checkout#usr=omitted": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": null,
-      "finding": "AP-11",
-      "headers": {},
-      "id": "rob-post-checkout#usr=omitted",
-      "kind": "robustness",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "sec-delete-user-anonymous": {
-      "contentType": "text/html",
-      "destructive": true,
-      "error": null,
-      "expect": "rejected",
-      "finding": "AP-04",
-      "headers": {},
-      "id": "sec-delete-user-anonymous",
-      "kind": "security",
-      "like": null,
-      "method": "DELETE",
-      "path": "/api/users/1",
-      "shape": {
-        "lines": [
-          "Forbidden"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 403
-    },
-    "sec-get-admin-financial-report-anonymous": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": "rejected",
-      "finding": "AP-04",
-      "headers": {},
-      "id": "sec-get-admin-financial-report-anonymous",
-      "kind": "security",
-      "like": null,
-      "method": "GET",
-      "path": "/api/admin/financial-report",
-      "shape": {
-        "lines": [
-          "Forbidden"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 403
-    },
-    "sec-post-checkout-boolean-course": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
-      "headers": {},
-      "id": "sec-post-checkout-boolean-course",
-      "kind": "security",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
-    },
-    "sec-post-checkout-numeric-card": {
-      "contentType": "text/html",
-      "destructive": false,
-      "error": null,
-      "expect": "rejected",
-      "finding": "AP-11",
-      "headers": {},
-      "id": "sec-post-checkout-numeric-card",
-      "kind": "security",
-      "like": null,
-      "method": "POST",
-      "path": "/api/checkout",
-      "shape": {
-        "lines": [
-          "Bad Request"
-        ],
-        "type": "text"
-      },
-      "state": "OBSERVED",
-      "status": 400
     }
   },
   "version": 3

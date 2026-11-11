@@ -1,5 +1,4 @@
-"""Domain error taxonomy (RP-09). The error boundary maps each one to its status and to the
-application's error body, `{"error": <message>}`."""
+"""Domain error taxonomy (RP-09). The HTTP mapping lives in middlewares/error_handler.py."""
 
 
 class AppError(Exception):

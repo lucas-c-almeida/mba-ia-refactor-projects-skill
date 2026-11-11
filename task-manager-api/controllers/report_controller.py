@@ -1,61 +1,65 @@
-"""Reporting use cases. Every figure comes from a set-based query (RP-10)."""
+"""Report use cases. Figures are computed in the database, not by loading tables (RP-10)."""
 from datetime import timedelta
 
-from models.category import Category
-from models.clock import utc_now
-from models.task import (HIGH_PRIORITY_THRESHOLD, MAX_PRIORITY, MIN_PRIORITY, STATUS_CANCELLED,
-                         STATUS_DONE, STATUS_IN_PROGRESS, STATUS_PENDING, VALID_STATUSES, Task,
-                         completion_rate)
-from models.user import User
+from models.errors import NotFoundError
+from models.task import (HIGH_PRIORITY_MAX, PRIORITY_LABELS, STATUS_CANCELLED, STATUS_DONE,
+                         STATUS_IN_PROGRESS, STATUS_PENDING, completion_rate)
 
 RECENT_ACTIVITY_DAYS = 7
+USER_NOT_FOUND = 'Usuário não encontrado'
 
 
 class ReportController:
-    def __init__(self, clock=utc_now):
-        self._now = clock
+    def __init__(self, tasks, users, categories, clock):
+        self._tasks = tasks
+        self._users = users
+        self._categories = categories
+        self._clock = clock
 
     def summary(self):
-        now = self._now()
+        now = self._clock.now()
+        by_status = self._tasks.count_by_status()
+        by_priority = self._tasks.count_by_priority()
+        overdue = self._tasks.list_overdue(now)
         since = now - timedelta(days=RECENT_ACTIVITY_DAYS)
-        by_status = Task.counts_by(Task.status)
-        by_priority = Task.counts_by(Task.priority)
-        per_user = Task.counts_per_user()
-        overdue = Task.overdue(now)
+        totals = self._tasks.totals_by_user()
+
+        productivity = []
+        for user in self._users.list_all():
+            total, done = totals.get(user.id, (0, 0))
+            productivity.append({'user': user, 'total': total, 'done': done,
+                                 'rate': completion_rate(done, total)})
+
         return {
             'generated_at': now,
-            'totals': {'tasks': Task.count_all(), 'users': User.count_all(),
-                       'categories': Category.count_all()},
-            'by_status': {status: by_status.get(status, 0) for status in VALID_STATUSES},
-            'by_priority': {priority: by_priority.get(priority, 0)
-                            for priority in range(MIN_PRIORITY, MAX_PRIORITY + 1)},
+            'total_tasks': self._tasks.count(),
+            'total_users': self._users.count(),
+            'total_categories': self._categories.count(),
+            'by_status': {status: by_status.get(status, 0) for status in
+                          (STATUS_PENDING, STATUS_IN_PROGRESS, STATUS_DONE, STATUS_CANCELLED)},
+            'by_priority': {label: by_priority.get(priority, 0)
+                            for priority, label in PRIORITY_LABELS.items()},
             'overdue': [(task, (now - task.due_date).days) for task in overdue],
-            'created_recently': Task.count_created_since(since),
-            'done_recently': Task.count_done_since(since),
-            'per_user': [self._productivity(user, *per_user.get(user.id, (0, 0)))
-                         for user in User.all_ordered()],
+            'created_recently': self._tasks.count_created_since(since),
+            'completed_recently': self._tasks.count_done_updated_since(since),
+            'productivity': productivity,
         }
 
-    @staticmethod
-    def _productivity(user, total, done):
-        return user, total, done, completion_rate(done, total)
-
     def user_report(self, user_id):
-        user = User.get_or_404(user_id)
-        now = self._now()
-        tasks = Task.for_user(user_id)
-        counts = {status: 0 for status in VALID_STATUSES}
+        user = self._users.get(user_id)
+        if not user:
+            raise NotFoundError(USER_NOT_FOUND)
+        now = self._clock.now()
+        tasks = self._tasks.list_for_user(user_id)
+        counts = {STATUS_DONE: 0, STATUS_PENDING: 0, STATUS_IN_PROGRESS: 0, STATUS_CANCELLED: 0}
         for task in tasks:
             if task.status in counts:
                 counts[task.status] += 1
-        total = len(tasks)
-        return user, {
-            'total_tasks': total,
-            'done': counts[STATUS_DONE],
-            'pending': counts[STATUS_PENDING],
-            'in_progress': counts[STATUS_IN_PROGRESS],
-            'cancelled': counts[STATUS_CANCELLED],
+        return {
+            'user': user,
+            'total': len(tasks),
+            'by_status': counts,
             'overdue': sum(1 for task in tasks if task.is_overdue(now)),
-            'high_priority': sum(1 for task in tasks if task.priority <= HIGH_PRIORITY_THRESHOLD),
-            'completion_rate': completion_rate(counts[STATUS_DONE], total),
+            'high_priority': sum(1 for task in tasks if task.priority <= HIGH_PRIORITY_MAX),
+            'rate': completion_rate(counts[STATUS_DONE], len(tasks)),
         }

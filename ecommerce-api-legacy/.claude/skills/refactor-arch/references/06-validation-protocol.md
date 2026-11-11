@@ -439,6 +439,12 @@ Rules:
   `headers`, and require the baseline's status and shape. If the harness run cannot carry the
   credential, call the operation once by hand with it, and report that result as verified by hand —
   never as passed by the replay.
+- **An operation guarded field by field** (`04-architecture-guidelines.md` §6, "One operation, both
+  kinds of field") needs one entry per path: for each privileged field, an anonymous request that
+  changes it, filed as `kind: "security"`, `finding: "AP-04"`, `expect: "rejected"`; the same change
+  with the operator credential, as an ordinary entry; and, with no credential, an ordinary-field
+  edit and a resend of the stored value, as ordinary entries. These last two are what shows the
+  guard did not close the whole operation.
 - A security entry whose finding ends up `PROPOSED, NOT APPLIED` is expected to come back
   `NOT FIXED`. Say so next to the result, so that nobody mistakes it for a failed fix.
 

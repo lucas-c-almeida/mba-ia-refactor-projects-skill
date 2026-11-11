@@ -804,16 +804,27 @@ resíduo de operador `proposed`, AP-17 sem trilha de auditoria, `proc` via `/pro
 Decisão do autor: matriz gerada pelo harness, não escrita; sem quarto projeto. Recall da rodada 7
 declarado contaminado.
 
+### D29 — **Tomar ou bloquear conta é operação privilegiada** ✅ decidido
+
+Emenda à D27, depois da revisão da entrega da rodada 7 contra o comentário do avaliador. Sem modelo de
+identidade, mudar o segredo, o identificador de login, o papel ou o estado de uma conta escolhida
+pelo id da requisição é privilegiado: não existe "conta do próprio chamador". A classificação é por
+**efeito**, não por rota: operação mista é dividida campo a campo, só o pedido que **muda** um campo
+privilegiado exige a credencial de operador, reenviar o valor guardado não é mudança, e a recusa
+acontece antes de qualquer escrita. Edição comum de perfil e registros de domínio continuam negócio.
+Lista em `docs/rounds/round8-changes.md`. ADR em `docs/decisions.md`.
+
 ---
 
 ## 9. Perguntas em aberto
 
-Nenhuma decisão em aberto. D1–D28 decididas. Rodada 7 executada nos 3 projetos (sessões novas,
-gate humano, sem `--yes`) e entregue em `release/delivery-r7`; relatório em
-`docs/rounds/round7-report.md`. Pendências registradas lá (§7): repetir a verificação independente
-sobre a entrega da rodada 7, escrever os scorecards da rodada 7 (Parte 1 e Parte 1+2) e os candidatos
-para a próxima rodada (header de pedido em preflight, stderr com processo destacado, campo
-`Root cause of:`).
+Nenhuma decisão em aberto. D1–D29 decididas. Rodada 8 (D29) executada nos 3 projetos (sessões novas,
+gate humano, sem `--yes`) e entregue em `release/delivery-r8`; relatório em
+`docs/rounds/round8-report.md`. Candidatos registrados lá (§6): contagem da linha da re-auditoria,
+revisão de classificação depois do gate e comparação de valor sem ordem no probe. Continuam abertas as
+pendências do `docs/rounds/round7-report.md` §7: verificação independente sobre a entrega, scorecards
+(Parte 1 e Parte 1+2), header de pedido em preflight, stderr com processo destacado e campo
+`Root cause of:`.
 
 ---
 

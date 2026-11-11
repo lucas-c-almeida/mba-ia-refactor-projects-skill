@@ -295,6 +295,13 @@ these signals is observable in the code:
   establishes do **not** make an identity model: no client depends on presenting anything, so the
   first row's reasoning ("every current client would be rejected") is exactly as true as with no
   login at all;
+- it **takes over or locks an existing account** — on an account selected by an identifier taken
+  from the request, in an application with no identity model, it changes the secret sign-in checks,
+  the identifier sign-in finds the account by, the account's role or permissions, or whether the
+  account may sign in at all. The reasoning is the deletion's: with no identity model there is no
+  "caller's own account", so the change cannot be anyone's self-service action. (An operation that
+  first makes the caller prove the current secret already verifies a credential, and is not this
+  signal. Where an identity model exists, this is the ownership check of the second row);
 - it exists for maintenance, diagnostics or operations: a path or name under an administrative,
   internal, debug, maintenance, reset or seed namespace, or a debug console;
 - it returns a **management aggregate** — revenue, sales or other financial figures, or activity
@@ -311,9 +318,20 @@ What does **not** make an operation privileged, however destructive or broad it 
 - a plain **listing or lookup** of records, including a listing of the accounts themselves. It may
   be a disclosure problem, but closing it rejects clients that read it today. The credential field in
   such a response is fixed by masking (catalog AP-08); the access question is proposed;
-- signing in, registering, checking out.
+- editing an account's ordinary profile fields: a display name, or contact data sign-in does not
+  use;
+- signing in, registering (a new account touches no existing one), checking out.
 
 Those stay under the first row.
+
+**One operation, both kinds of field.** Classification follows the effect, not the route. When one
+operation accepts both privileged fields and ordinary ones, split it by field: a request that would
+**change** a privileged field requires the operator credential, and the rest of the operation stays
+a business operation, open and proposed. To change means to set a value different from the stored
+one. Resending the stored value changes nothing and needs no credential; a secret kept as a one-way
+hash is compared by verifying the submitted value against it, as sign-in does. Reject before writing
+any field, so that a refused request leaves no partial change. Do not guard the whole operation:
+that would reject the ordinary edits legitimate clients send today.
 
 **Ambiguous classification is decided by the person, at the gate.** When the signals point both
 ways — a delete that could be a user's own action on their own records, a read of one principal's
@@ -329,7 +347,7 @@ How to fix a privileged operation, in order of preference:
 1. **Remove it from the public surface** when it is unsafe by construction — it runs
    caller-supplied code or queries, or it resets data. If the project documents an operational use,
    keep it as a maintenance script outside the request surface (a command, not a route).
-2. **Guard it** when it is a legitimate operator function (a management report, an account
+2. **Guard it** when it is a legitimate operator function (a management report, a change to an account's secret or role, an account
    removal): require an operator credential supplied by configuration (environment), compare it in
    constant time, and fail **closed** — with no credential configured, or with an empty value or
    the example file's placeholder (§2, Configuration), the operation answers `403` (or `404`). Never a literal in the source (catalog AP-01). This is a guard on one

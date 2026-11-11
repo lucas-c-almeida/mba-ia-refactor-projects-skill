@@ -1,72 +1,52 @@
-'use strict';
+// Use case: buy a course. Validated plain values in, plain values out; no HTTP here.
+const { NotFoundError, PaymentDeclinedError, DependencyError } = require('../models/errors');
+const { PAYMENT_STATUS, decidePayment } = require('../models/payment');
+const { hashPassword, generatePassword } = require('../models/password');
 
-const { decidePayment, maskCardNumber, PaymentStatus } = require('../models/payment');
-const { hashPassword, unusablePasswordHash } = require('../models/password');
-const {
-  NotFoundError, PaymentDeclinedError, PersistenceError,
-} = require('../models/errors');
-
-const COURSE_NOT_FOUND = 'Curso não encontrado';
-
-class CheckoutController {
-  constructor({ users, courses, enrollments, logger }) {
-    this.users = users;
-    this.courses = courses;
-    this.enrollments = enrollments;
-    this.logger = logger;
-  }
-
-  /**
-   * Buys a course: finds or creates the account by e-mail, decides the payment and records
-   * enrollment + payment + audit entry together. Returns the new enrollment id.
-   */
-  async checkout({ name, email, password, courseId, cardNumber }) {
-    const course = await this.findCourse(courseId);
-    const userId = await this.findOrCreateUser({ name, email, password });
-
-    this.logger.log(`Processando cartão ${maskCardNumber(cardNumber)}`);
-    const status = decidePayment(cardNumber);
-    if (status === PaymentStatus.DENIED) throw new PaymentDeclinedError();
-
-    return this.enrollments.createWithPayment({
-      userId,
-      courseId,
-      amountCents: course.priceCents,
-      status,
-      auditAction: `Checkout curso ${courseId} por ${userId}`,
-    });
-  }
-
-  async findCourse(courseId) {
-    let course;
+// Runs one persistence step; a driver failure becomes the error body the application has always
+// answered for that step.
+async function step(work, failureMessage) {
     try {
-      course = await this.courses.findActiveById(courseId);
+        return await work();
     } catch (err) {
-      // The original answered a failed course lookup like a missing course (404); that answer is
-      // kept, and the cause is logged instead of discarded.
-      this.logger.error('course lookup failed', err);
-      throw new NotFoundError(COURSE_NOT_FOUND);
+        if (err instanceof DependencyError) throw err;
+        throw new DependencyError(failureMessage, err);
     }
-    if (!course) throw new NotFoundError(COURSE_NOT_FOUND);
-    return course;
-  }
-
-  async findOrCreateUser({ name, email, password }) {
-    let userId;
-    try {
-      userId = await this.users.findIdByEmail(email);
-    } catch (err) {
-      throw new PersistenceError('Erro DB', err);
-    }
-    if (userId !== null) return userId;
-
-    const passwordHash = password ? await hashPassword(password) : unusablePasswordHash();
-    try {
-      return await this.users.create({ name, email, passwordHash });
-    } catch (err) {
-      throw new PersistenceError('Erro ao criar usuário', err);
-    }
-  }
 }
 
-module.exports = { CheckoutController };
+function createCheckoutController({ db, users, courses, enrollments, logger }) {
+    return {
+        async checkout({ name, email, password, courseId, cardNumber }) {
+            const course = await step(() => courses.findActiveById(courseId), 'Erro DB');
+            if (!course) throw new NotFoundError('Curso não encontrado');
+
+            // The payment is decided before anything is written: a declined card leaves no trace.
+            const status = decidePayment(cardNumber);
+            if (status === PAYMENT_STATUS.DENIED) throw new PaymentDeclinedError();
+
+            const existing = await step(() => users.findIdByEmail(email), 'Erro DB');
+            const passwordHash = existing ? null : await hashPassword(password || generatePassword());
+
+            logger.info(`Processando pagamento do curso ${course.id}`);
+
+            return db.transaction(async () => {
+                // Looked up again inside the transaction: another checkout may have created it.
+                const current = await step(() => users.findIdByEmail(email), 'Erro DB');
+                const userId = current
+                    ? current.id
+                    : await step(async () => users.create({
+                        name,
+                        email,
+                        passwordHash: passwordHash || await hashPassword(password || generatePassword()),
+                    }), 'Erro ao criar usuário');
+
+                const enrollmentId = await step(() => enrollments.create(userId, course.id), 'Erro Matrícula');
+                await step(() => enrollments.recordPayment(enrollmentId, course.priceCents, status), 'Erro Pagamento');
+                await step(() => enrollments.recordAudit(`Checkout curso ${course.id} por ${userId}`), 'Erro DB');
+                return { enrollmentId };
+            });
+        },
+    };
+}
+
+module.exports = { createCheckoutController };
