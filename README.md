@@ -44,7 +44,7 @@ mba-ia-refactor-projects-skill/
 │
 ├── README.md                              # esta documentação de entrega (A · B · C · D)
 ├── instructions.md                        # enunciado original, preservado intacto
-├── CLAUDE.md                              # especificação viva do projeto (D1–D28)
+├── CLAUDE.md                              # especificação viva do projeto (D1–D29)
 │
 ├── .claude/skills/refactor-arch/          # ← A SKILL (fonte única da verdade, D2)
 │   ├── SKILL.md                           #   orquestração das 3 fases
@@ -62,7 +62,7 @@ mba-ia-refactor-projects-skill/
 │       └── proc.mjs                       #   ciclo de vida de processos (D20) — Node, zero deps
 │
 ├── docs/                                  # artefatos de processo (nossos, fora do exigido)
-│   ├── decisions.md                       #   registro ADR das decisões D1–D28
+│   ├── decisions.md                       #   registro ADR das decisões D1–D29
 │   ├── gabarito.md                        #   análise manual (cópia na seção A)
 │   ├── rounds/                            #   relatório consolidado de cada rodada
 │   ├── runs/                              #   transcript de cada rodada (D3)
@@ -633,45 +633,46 @@ reportar finding que não foi observado; nunca afirmar que um check passou sem t
 
 ## C) Resultados
 
-> **Fonte desta seção: a rodada 7** (2026-11-04/05), com a skill **na versão entregue** (D1–D28, a
-> mesma copiada para os três projetos). A rodada 7 responde aos defeitos que a verificação independente
-> da rodada 6 achou na entrega (`docs/rounds/round6-skill-results.md`, G1–G10): entrada malformada que
-> ainda dava 500, faixa de inteiro e valor não finito introduzidos pela parametrização, segredo gravado
-> nos artefatos, verificação "à mão" contada como prova. A resposta é a D28, ver
-> [C.8](#c8--rodada-7-verificação-gerada-não-escrita-d28). Relatório da rodada:
-> [`round7-report.md`](docs/rounds/round7-report.md). As rodadas anteriores ficam em `docs/rounds/`.
+> **Fonte desta seção: a rodada 8** (2026-11-10/11), com a skill **na versão entregue** (D1–D29, a
+> mesma copiada para os três projetos). A rodada 8 responde ao comentário do avaliador sobre AP-04: a
+> D27 já fechava rotas administrativas e agregados, mas trocar a senha, o e-mail, o papel ou o estado
+> de uma conta qualquer continuava aberto, proposto por falta de modelo de identidade. A resposta é a
+> D29, ver [C.8](#c8--rodada-8-tomar-ou-bloquear-conta-é-operação-privilegiada-d29). Relatório da
+> rodada: [`round8-report.md`](docs/rounds/round8-report.md). As rodadas anteriores ficam em
+> `docs/rounds/`; a D28 (verificação gerada) está em [`round7-report.md`](docs/rounds/round7-report.md).
 >
 > **O gate foi respondido por uma pessoa nos três projetos.** Cada execução rodou num subagente novo,
 > sem nenhum contexto além da invocação da skill, a partir do código original (`7ef5932`) com a skill da
-> rodada 7. Cada uma parou no prompt `[y/n]`, e a sessão orquestradora repassou a pergunta ao autor
-> literalmente e a resposta dele de volta, sem responder por ele. P1 e P2: `y`. P3: `y D1=business
-> D2=privileged`, com uma condição que o autor acrescentou (ver C.4). Nenhuma execução usou `--yes`.
+> rodada 8. Cada uma parou no prompt `[y/n]`, e a sessão orquestradora repassou a pergunta ao autor
+> literalmente e a resposta dele de volta, sem responder por ele. P1: `y D1 = Business`. P2: `y`. P3:
+> `y, D1=Business`. Nenhuma execução usou `--yes`. Transcripts: [`p1-iter8`](docs/runs/p1-iter8.md),
+> [`p2-iter8`](docs/runs/p2-iter8.md), [`p3-iter10`](docs/runs/p3-iter10.md).
 >
 > **Como cada número foi obtido.**
 >
 > | Dado | Fonte | Conferência |
 > |---|---|---|
 > | Findings, severidades, estados da Fase 3 | `reports/audit-project-{1,2,3}.md` (= `<projeto>/reports/audit-latest.md`) | Contagens do `## Summary` batem com os findings listados |
-> | Replay, robustez, valores | Bloco `## Validation` de cada relatório, com `baseline.json` e o replay final em `<projeto>/reports/` | Números do próprio agente; **não reclassificados fora da sessão nesta rodada** |
-> | Segredos nos artefatos | `grep` nos `reports/` dos três projetos antes do commit | Só referências `{{env:NOME}}` e shapes; nenhuma senha ou token literal |
-> | Recall, falsos positivos, achados além do gabarito | Scorecards da rodada 5 em [`docs/evals/`](docs/evals/) | **Não remedidos na rodada 7** (ver C.6) |
-> | Verificação independente | [`docs/verification/`](docs/verification/) | **Não repetida na rodada 7**; o último relatório é o da entrega da rodada 6 |
+> | Replay, robustez, valores | Bloco `## Validation` de cada relatório, com `baseline.json` e o replay final em `<projeto>/reports/` | Números do próprio agente; no P2, a comparação da entrada de valor foi refeita fora da sessão (`HOLDS`) |
+> | Segredos nos artefatos | `grep` nos `reports/` dos três projetos antes do commit | Só referências `{{env:NOME}}` e shapes; a única senha literal é uma senha errada de propósito |
+> | Recall, falsos positivos, achados além do gabarito | Scorecards da rodada 5 em [`docs/evals/`](docs/evals/) | **Não remedidos nas rodadas 6 a 8** (ver C.6) |
+> | Verificação independente | [`docs/verification/`](docs/verification/) | **Não repetida desde a rodada 6** |
 
 ### C.1 — Resumo dos relatórios de auditoria
 
 | Projeto | Stack detectada | Arquivos | CRITICAL | HIGH | MEDIUM | LOW | Total | Relatório |
 |---|---|---|---|---|---|---|---|---|
-| 1 — `code-smells-project` | Python 3.13 · Flask 3.1.1 · flask-cors 5.0.1 · SQLite | 4 | 12 | 9 | 8 | 4 | **33** | [`reports/audit-project-1.md`](reports/audit-project-1.md) |
-| 2 — `ecommerce-api-legacy` | Node.js 24 · Express 4.22.1 · sqlite3 5.1.7 (memória) | 3 | 8 | 5 | 1 | 5 | **19** | [`reports/audit-project-2.md`](reports/audit-project-2.md) |
-| 3 — `task-manager-api` | Python 3.13 · Flask 3.0.0 · Flask-SQLAlchemy 3.1.1 · SQLite | 15 | 12 | 8 | 8 | 4 | **32** | [`reports/audit-project-3.md`](reports/audit-project-3.md) |
+| 1 — `code-smells-project` | Python 3.13 · Flask 3.1.1 · flask-cors 5.0.1 · SQLite | 4 | 12 | 10 | 8 | 4 | **34** | [`reports/audit-project-1.md`](reports/audit-project-1.md) |
+| 2 — `ecommerce-api-legacy` | Node.js 24 · Express 4.22.1 · sqlite3 5.1.7 (memória) | 3 | 9 | 5 | 2 | 5 | **21** | [`reports/audit-project-2.md`](reports/audit-project-2.md) |
+| 3 — `task-manager-api` | Python 3.13 · Flask 3.0.0 · Flask-SQLAlchemy 3.1.1 · SQLite | 15 | 10 | 6 | 10 | 5 | **31** | [`reports/audit-project-3.md`](reports/audit-project-3.md) |
 
 Modo de cada execução (D10 / D10.1):
 
 | Projeto | `Mode` | `Confirmation` | Escopo aplicado | `Isolation` | `Verification Coverage` (Fase 3) |
 |---|---|---|---|---|---|
-| 1 | full | `y` (human-confirmed, repassado) | todas as severidades | container (`python:3.13-slim`) | DEGRADED: hash da senha em repouso e e-mail fora do log sem entrada no harness; uma entrada de segurança `UNVERIFIED` (o payload era SQL válido no original) e substituída |
-| 2 | full | `y` (human-confirmed) | todas as severidades | container (`node:24.12.0`) | DEGRADED: o original caiu 6 vezes no baseline e foi reiniciado no mesmo container, e não numa cópia nova (desvio do §3.1); máscara do cartão no log e formato da senha sem entrada |
-| 3 | full | `y D1=business D2=privileged` (human-confirmed) | todas as severidades | container (`python:3.13-slim`) | Re-auditoria completa; DEGRADED em três efeitos sem entrada (header de rede privada, `PRAGMA foreign_keys`, rehash de MD5 legado), observados à parte e **não** contados como aprovados |
+| 1 | full | `y D1 = Business` (human-confirmed, repassado) | todas as severidades | container (`python:3.13-slim`) | Itens de array fora da matriz gerada (cobertos por entradas de segurança escritas); smoke check sobre banco do original e arredondamento de preço ao centavo `UNVERIFIED` pelo harness |
+| 2 | full | `y` (human-confirmed) | todas as severidades | container (`node:24.12.0`) | DEGRADED: log do cartão, hash da senha, rollback e constraints sem entrada; `revenue`/`paid` por curso `UNVERIFIED` (o probe não compara sem ordem) |
+| 3 | full | `y, D1=Business` (human-confirmed) | todas as severidades | container (`python:3.13-slim`) | Re-auditoria completa depois do `pip list --outdated` aprovado pelo autor; stderr do servidor HTTP lido por passada em processo; header de rede privada do `flask-cors` não observável pelo harness |
 
 ### C.2 — Projeto 1 — `code-smells-project` (Python / Flask)
 
@@ -692,11 +693,13 @@ code-smells-project/                 (depois)
 ├── app.py                composition root (create_app) + entry point
 ├── requirements.txt      flask 3.1.3, flask-cors 6.0.0
 ├── .gitignore · README.md
-├── config/               settings.py (único leitor do ambiente) · variables.example (lista para exportar)
-├── models/               database, erros, pedido, produto, relatorio, senha (scrypt), usuario
-├── controllers/          pedido_, produto_, relatorio_, sistema_, usuario_controller · notificador
-├── views/                a camada View: rotas por domínio + entrada.py (tipo e faixa de toda entrada)
-└── middlewares/          conexao (uma por requisição), operador (guarda), tratamento_de_erros
+├── config/               settings.py (único leitor do ambiente) · environment.example
+├── models/               database, errors, money (centavos), passwords (PBKDF2), catalog, order_status,
+│                         sales_report, repositórios de produto, usuário, pedido e estatística
+├── controllers/          product, user, order, report, health
+├── views/                a camada View: rotas por domínio, schemas (tipo e faixa de toda entrada), serializers
+├── middlewares/          error_handler, db_session (uma conexão por requisição), operator_guard
+└── adapters/             notifier
 ```
 
 `controllers.py`, `models.py` e `database.py` foram removidos (reescrita in-place, D9).
@@ -705,46 +708,47 @@ code-smells-project/                 (depois)
 
 ```
   ✓ Application boots without errors
-  ✓ Public surface replayed: 39 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 1 UNVERIFIED
-    Security entries: 12 FIXED, 0 NOT FIXED
+  ✓ Public surface replayed: 37 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+    Security entries: 18 FIXED, 0 NOT FIXED
   ✓ Malformed input: 242 ROBUST, 0 NOT ROBUST, 0 REGRESSION over 12 operations
-  ✓ Values: 6 HOLDS, 0 VIOLATED, 0 UNVERIFIED
-  ○ Findings resolved: 22/33  (10 proposed, 1 unresolved)
-  ○ Anti-patterns remaining: 9 proposed-not-applied, 1 unresolved  (re-audit: 10 findings)
-    Re-audit passes: 2; fixed after re-audit: 1 (1 of them missed-in-phase-2)
-  ✓ Processes: 12 started, 12 stopped through their handles, 0 left running, 0 incidents
+  ✓ Values: 9 HOLDS, 0 VIOLATED, 0 UNVERIFIED
+  ○ Findings resolved: 25/34  (9 proposed, 0 unresolved)
+  ○ Anti-patterns remaining: 6 proposed-not-applied, 1 unresolved  (re-audit: 7 findings)
+    Re-audit passes: 2; fixed after re-audit: 1 (0 of them missed-in-phase-2)
+  ✓ Processes: 7 started, 7 stopped through their handles, 0 left running, 0 incidents
     Isolation: container
   ✓ Commands: 0 directory changes, 0 chained commands
 ```
 
-- **O `UNVERIFIED`** é a entrada `sec-busca-aspas`: o payload `'` por acaso era SQL válido no
-  original, então o baseline já se comportava como a busca benigna. O agente a substituiu por
-  `sec-busca-aspas-parentese`, capturada contra o original num boot novo (500 → `FIXED`), e não a editou.
-- **O `unresolved`** é um AP-16 de nomenclatura (origem `failed`): duas funções de view mantêm nomes em
-  inglês entre nomes em português.
-- **Dois achados da re-auditoria escaparam da Fase 2** (`missed-in-phase-2`), ambos de AP-11 sobre
-  pedidos. A Fase 2 examinou só a criação.
-  - Atualizar o status de um pedido inexistente respondia 200 e não fazia nada. Foi corrigido para 404,
-    com entrada de segurança capturada antes contra o original.
-  - Transições de status livres, e cancelamento que não devolve estoque. Foi proposto, porque muda o
-    que um cliente legítimo observa.
+- **A linha `Anti-patterns remaining` está errada, e ficou como o agente a deixou.** O `1 unresolved` é o
+  limite do corpo e do tamanho de `itens` (AP-11, `missed-in-phase-2`), que o próprio relatório registra
+  em `Proposed, Not Applied`. Pela D14.1, a linha deveria ser `7 proposed-not-applied, 0 unresolved`,
+  como o bloco `Findings resolved` logo acima já diz. Ver [`round8-report.md`](docs/rounds/round8-report.md) §4.1.
+- **A re-auditoria achou um N+1 que sobrou** (origem `failed`): o `UPDATE` de estoque ainda rodava uma
+  vez por item. Virou um único lote, e o segundo replay completo saiu limpo.
+- **Duas classificações de contrato mudaram depois do gate:** o índice único de e-mail e a checagem de
+  existência do usuário ao criar pedido foram aplicados como seguros (RP-19). O relatório registra a
+  revisão, e o autor aceitou as duas depois de ver a explicação.
 
 **Operações privilegiadas (D27).** `POST /admin/query` e `POST /admin/reset-db` foram **removidas**
 (404, `FIXED`). `GET /relatorios/vendas` ficou atrás de `X-Operator-Token`, fechada por padrão
-(anônimo 403 `FIXED`; operador `PASS`, e os valores do relatório `HOLD`).
+(anônimo 403 `FIXED`; operador `PASS`, e os valores do relatório `HOLD`). O projeto não tem rota que
+edite conta, então a D29 não tem efeito aqui.
+
+**Decisão de classificação no gate.** D1, `GET /health`: o autor respondeu **business**. O endpoint
+continua aberto, com o segredo mascarado (campo e tipo mantidos); retirar `debug`, `ambiente` e `db_path`
+da resposta ficou proposto.
 
 **`PROPOSED, NOT APPLIED` (gate de contrato, D7):** 10.
 - **AP-04:** operações de negócio. Não existe modelo de identidade.
-- **AP-18 (`/health`):** o segredo foi mascarado. `db_path`, `debug` e `ambiente` fazem parte do shape.
-- **AP-01 e AP-08 (resíduo de operador, D28):** o código já não tem senha nenhuma e grava hash.
-  - Bancos semeados pelo código antigo ainda têm as contas com senha publicada.
-  - Linhas em texto puro de quem nunca loga continuam assim.
-  - O relatório descreve o passo operacional, com o SQL.
+- **AP-18 (`/health`):** os campos de configuração (D1 = business).
+- **AP-01 e AP-08 (resíduo de operador):** rotacionar a chave de assinatura, invalidar as contas
+  semeadas com senha publicada e resetar as senhas em texto puro de quem nunca loga, com o SQL de cada um.
 - **AP-18:** servidor WSGI de produção (dependência nova) e CORS restrito.
-- **AP-11:** limite de itens por pedido e grafo de transições de status (`missed-in-phase-2`).
-- **AP-20:** dinheiro. O cálculo já usa `Decimal` e centavos; a migração da coluna `REAL` fica proposta.
-  Também e-mail único e FKs.
+- **AP-20:** FKs e a regra de exclusão de produto com pedidos. O índice único de e-mail e o dinheiro em
+  centavos foram aplicados.
 - **AP-13:** paginação.
+- **AP-11:** limite do corpo e do número de itens por pedido (`missed-in-phase-2`).
 
 **Checklist de Validação**
 
@@ -758,23 +762,23 @@ code-smells-project/                 (depois)
 - [x] Número de arquivos analisados condiz com a realidade   (4 arquivos .py)
 
 ### Fase 2 — Auditoria
-- [x] Relatório segue o template definido nos arquivos de referência (abre com o bloco da Fase 1; livro de sinais)
+- [x] Relatório segue o template definido nos arquivos de referência (abre com o bloco da Fase 1; livro de sinais; decisão de classificação)
 - [x] Cada finding tem arquivo e linhas exatos
 - [x] Findings ordenados por severidade (CRITICAL → LOW)
-- [x] Mínimo de 5 findings identificados        (33)
+- [x] Mínimo de 5 findings identificados        (34)
 - [x] Detecção de APIs deprecated incluída      (camada 1 forçada: nenhum warning; OSV: advisories em flask 3.1.1 e flask-cors 5.0.1)
-- [x] Skill pausa e pede confirmação antes da Fase 3 (parou no [y/n]; respondido pelo autor: y)
+- [x] Skill pausa e pede confirmação antes da Fase 3 (parou no [y/n]; respondido pelo autor: y D1 = Business)
 
 ### Fase 3 — Refatoração
 - [x] Estrutura de diretórios segue padrão MVC  (models/, views/, controllers/)
-- [x] Configuração extraída para módulo de config (config/settings.py + variables.example)
+- [x] Configuração extraída para módulo de config (config/settings.py + environment.example)
 - [x] Models criados para abstrair dados
 - [x] Views/Routes separadas para visualização ou roteamento (views/)
 - [x] Controllers concentram o fluxo da aplicação
-- [x] Error handling centralizado               (middlewares/tratamento_de_erros.py)
+- [x] Error handling centralizado               (middlewares/error_handler.py)
 - [x] Entry point claro                         (app.py, create_app)
 - [x] Aplicação inicia sem erros
-- [x] Endpoints originais respondem corretamente (39 PASS, 0 REGRESSION; 242 ROBUST)
+- [x] Endpoints originais respondem corretamente (37 PASS, 0 REGRESSION; 242 ROBUST)
 ```
 
 ### C.3 — Projeto 2 — `ecommerce-api-legacy` (Node.js / Express)
@@ -798,12 +802,13 @@ ecommerce-api-legacy/                (depois)
 ├── package.json / package-lock.json  express ^4.22.3; sqlite3 mantido em 5.1.7
 └── src/
     ├── app.js                     composition root e entry point
-    ├── config/index.js            único leitor do ambiente, validado e congelado
-    ├── models/                    database (transações isoladas), schema (UNIQUE, NOT NULL, CHECK, centavos),
-    │                              errors, payment, password (scrypt), money, repositórios, financialReport
+    ├── config/index.js            único leitor do ambiente (PORT, OPERATOR_TOKEN, SEED_USER_PASSWORD)
+    ├── models/                    database (fila de escrita, transações), schema (constraints + seed), errors,
+    │                              payment (centavos), password (scrypt), repositórios de user, course,
+    │                              enrollment e report (uma consulta com JOIN)
     ├── controllers/               checkout, report, user
-    ├── views/                     routes.js (parse → call → render) · requestParsers.js (tipo e faixa)
-    └── middlewares/               requireOperator (guarda), errorHandler, asyncHandler
+    ├── routes/                    a camada View: index.js (as três rotas) · validators.js (tipo e faixa)
+    └── middlewares/               requireOperator (guarda), requestId, errorHandler
 ```
 
 `src/AppManager.js` e `src/utils.js` foram removidos.
@@ -812,40 +817,47 @@ ecommerce-api-legacy/                (depois)
 
 ```
   ✓ Application boots without errors
-  ✓ Public surface replayed: 11 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
-    Security entries: 4 FIXED, 0 NOT FIXED
-  ✓ Malformed input: 59 ROBUST, 0 NOT ROBUST, 0 REGRESSION over 3 operations
-  ✓ Values: 2 HOLDS, 0 VIOLATED, 0 UNVERIFIED
-  ○ Findings resolved: 15/19  (4 proposed, 0 unresolved)
-  ○ Anti-patterns remaining: 3 proposed-not-applied, 0 unresolved  (re-audit: 3 findings)
-    Re-audit passes: 2; fixed after re-audit: 2 (0 of them missed-in-phase-2)
-  ✓ Processes: 12 started, 12 stopped through their handles, 0 left running, 0 incidents
+  ✓ Public surface replayed: 8 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 1 UNVERIFIED
+    Security entries: 3 FIXED, 0 NOT FIXED
+  ✓ Malformed input: 57 ROBUST, 0 NOT ROBUST, 0 REGRESSION over 3 operations
+  ✓ Values: 1 HOLDS, 0 VIOLATED, 0 UNVERIFIED
+  ○ Findings resolved: 15/21  (6 proposed, 0 unresolved)
+  ○ Anti-patterns remaining: 7 proposed-not-applied, 0 unresolved  (re-audit: 7 findings)
+    Re-audit passes: 2; fixed after re-audit: 1 (0 of them missed-in-phase-2)
+  ✓ Processes: 22 started, 22 stopped through their handles, 0 left running, 0 incidents
     Isolation: container
   ✓ Commands: 0 directory changes, 0 chained commands
 ```
 
-- **No original, `card` com tipo errado derrubava o processo.** Foram cinco variantes da matriz mais a
-  entrada de segurança. Agora todas respondem 400.
-- **A re-auditoria achou dois defeitos que a própria refatoração tinha introduzido** (origem
-  `introduced`), e os dois foram corrigidos antes do segundo replay completo:
-  - uma transação na conexão compartilhada, em que um rollback podia descartar a escrita de outra
-    requisição;
-  - uma configuração e um método sem leitor.
-- **O upgrade do sqlite3 para 6.0.1 foi tentado e revertido** (D18): o binário pré-compilado exige
-  glibc 2.38, que a imagem não tem.
+- **O `UNVERIFIED`** é a entrada de segurança do JSON malformado (AP-18): o original já respondia 400,
+  então o harness não consegue mostrar a correção pelo status. O corpo mudou da página de stack trace do
+  framework para `Bad Request`.
+- **A entrada de valor do relatório financeiro foi trocada, por decisão do autor.** A primeira comparava
+  cursos e alunos por posição, mas o original monta o relatório com callbacks assíncronos e a ordem varia
+  a cada execução: a segunda captura do próprio original já dava `VIOLATED`. A entrada nova confere que
+  todo curso e todo aluno pertencem ao conjunto esperado, foi capturada contra o original e dá `HOLDS`. O
+  limite é que `revenue` e `paid` por curso ficaram `UNVERIFIED`, porque o probe não compara sem ordem.
+  Ver [`round8-report.md`](docs/rounds/round8-report.md) §4.3.
+- **A re-auditoria achou um defeito introduzido** (exports sem leitor e um comentário de linter que o
+  projeto não tem), corrigido antes do segundo replay, e um `missed-in-phase-2`: o repositório do
+  `sqlite3` está marcado como sem manutenção. Trocar o driver é dependência nova, então ficou proposto.
+- **Um cartão recusado não cria mais usuário.** O original criava a conta antes de saber se o pagamento
+  passava. O autor aceitou a mudança.
 
 **Operações privilegiadas (D27).** `GET /api/admin/financial-report` e `DELETE /api/users/:id` ficaram
-atrás de `X-Operator-Token`, fechadas por padrão: anônimo 403 (`FIXED`); operador `PASS`, e os
-valores do relatório financeiro `HOLD`.
+atrás de `X-Operator-Token`, fechadas por padrão: anônimo 403 (`FIXED`); operador `PASS`. O projeto não
+tem rota que edite conta, então a D29 não tem efeito aqui.
 
-**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** 4.
-- **AP-04:** o checkout associa compra a qualquer conta existente só pelo e-mail. A senha agora é scrypt
-  e poderia ser verificada, mas isso rejeitaria clientes atuais.
+**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** 7.
+- **AP-04:** o checkout associa compra a qualquer conta existente só pelo e-mail. Exigir credencial
+  rejeitaria todo cliente atual.
 - **AP-01 (resíduo de operador):** rotacionar a chave do gateway e a senha do banco que ficaram no
   histórico do git.
-- **AP-19:** cadeia de instalação do sqlite3. A saída é o upgrade major, que falhou por glibc.
-- **AP-20:** FKs e a regra de exclusão de usuário. `UNIQUE`, `NOT NULL`, `CHECK` e centavos foram
-  aplicados.
+- **AP-20:** a regra de exclusão de usuário com matrículas. `UNIQUE`, as outras FKs, `CHECK`, `NOT NULL` e
+  centavos foram aplicados.
+- **AP-10:** o N+1 saiu; o que sobra é o relatório inteiro numa resposta, e limitá-lo exige paginação.
+- **AP-14 e AP-19:** a cadeia de instalação do `sqlite3` (pacotes deprecated e advisories), que só sai
+  com o major 6 ou com outro driver, e o `sqlite3` sem manutenção (`missed-in-phase-2`).
 
 **Checklist de Validação**
 
@@ -862,20 +874,20 @@ valores do relatório financeiro `HOLD`.
 - [x] Relatório segue o template definido nos arquivos de referência (abre com o bloco da Fase 1; livro de sinais)
 - [x] Cada finding tem arquivo e linhas exatos
 - [x] Findings ordenados por severidade (CRITICAL → LOW)
-- [x] Mínimo de 5 findings identificados        (19)
-- [x] Detecção de APIs deprecated incluída      (--pending-deprecation: nenhuma; npm: pacotes deprecated e advisories na cadeia do sqlite3, advisories na do express)
+- [x] Mínimo de 5 findings identificados        (21)
+- [x] Detecção de APIs deprecated incluída      (--pending-deprecation: nenhuma; npm: pacotes deprecated na cadeia do sqlite3, advisories na do express)
 - [x] Skill pausa e pede confirmação antes da Fase 3 (parou no [y/n]; respondido pelo autor: y)
 
 ### Fase 3 — Refatoração
-- [x] Estrutura de diretórios segue padrão MVC  (src/models, src/views, src/controllers)
+- [x] Estrutura de diretórios segue padrão MVC  (src/models, src/routes, src/controllers)
 - [x] Configuração extraída para módulo de config (src/config/index.js; variáveis listadas no README)
 - [x] Models criados para abstrair dados        (repositórios por entidade)
-- [x] Views/Routes separadas para visualização ou roteamento (src/views)
+- [x] Views/Routes separadas para visualização ou roteamento (src/routes)
 - [x] Controllers concentram o fluxo da aplicação
 - [x] Error handling centralizado               (src/middlewares/errorHandler.js)
 - [x] Entry point claro                         (src/app.js)
-- [x] Aplicação inicia sem erros                (com sqlite3 5.x; o upgrade major ficou como proposta)
-- [x] Endpoints originais respondem corretamente (11 PASS, 0 REGRESSION; 59 ROBUST)
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente (8 PASS, 0 REGRESSION; 57 ROBUST)
 ```
 
 ### C.4 — Projeto 3 — `task-manager-api` (Python / Flask)
@@ -898,14 +910,16 @@ task-manager-api/                    (antes)
 ```
 task-manager-api/                    (depois)
 ├── app.py                composition root: create_app()
-├── database.py           handle do banco, get_by_id (Session.get), commit, foreign keys ligadas no SQLite
-├── seed.py               script de operador; senhas de SEED_*_PASSWORD (aleatórias se ausentes)
+├── database.py           handle do SQLAlchemy, foreign keys ligadas por conexão
+├── seed.py               dados de exemplo; senhas geradas por execução, impressas uma vez
 ├── requirements.txt      flask 3.1.3, flask-sqlalchemy 3.1.1, flask-cors 6.0.0, python-dotenv 1.2.2
-├── .env.example · .gitignore · README.md
-├── config/settings.py    lê o ambiente uma vez
-├── models/               category, clock (utc_now), errors, task, user (scrypt + upgrade de MD5 legado)
+├── .gitignore · README.md
+├── config/settings.py    único módulo que lê o ambiente
+├── models/               category, clock (successor de datetime.utcnow), errors, repositories (toda consulta),
+│                         task (constantes, regra de atraso, CHECK), user (KDF + verificação do digest legado)
 ├── controllers/          category, report, task, user (sem Flask)
-├── routes/               a camada View: rotas por domínio, presenters, validation (tipo de toda entrada)
+├── routes/               a camada View: rotas por domínio, converters (ids na faixa do driver),
+│                         serializers, validation, system_routes
 └── middlewares/          error_handler, operator_guard (fechada por padrão)
 ```
 
@@ -915,60 +929,59 @@ task-manager-api/                    (depois)
 
 ```
   ✓ Application boots without errors
-  ✓ Public surface replayed: 69 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
-    Security entries: 5 FIXED, 0 NOT FIXED
-  ✓ Malformed input: 401 ROBUST, 0 NOT ROBUST, 0 REGRESSION over 16 operations
-  ✓ Values: 13 HOLDS, 0 VIOLATED, 0 UNVERIFIED
-  ○ Findings resolved: 20/32  (12 proposed, 0 unresolved)
-  ○ Anti-patterns remaining: 12 proposed-not-applied, 0 unresolved  (re-audit: 12 findings)
-    Re-audit passes: 2; fixed after re-audit: 1 (0 of them missed-in-phase-2)
-  ✓ Processes: 20 started, 20 stopped through their handles, 0 left running, 0 incidents
+  ✓ Public surface replayed: 54 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+    Security entries: 6 FIXED, 0 NOT FIXED
+  ✓ Malformed input: 405 ROBUST, 0 NOT ROBUST, 0 REGRESSION over 16 operations
+  ✓ Values: 10 HOLDS, 0 VIOLATED, 0 UNVERIFIED
+  ○ Findings resolved: 22/31  (9 proposed, 0 unresolved)
+  ○ Anti-patterns remaining: 6 proposed-not-applied, 0 unresolved  (re-audit: 6 findings)
+    Re-audit passes: 1; fixed after re-audit: 0 (0 of them missed-in-phase-2)
+  ✓ Processes: 13 started, 13 stopped through their handles, 0 left running, 0 incidents
     Isolation: container
   ✓ Commands: 0 directory changes, 0 chained commands
 ```
 
-- **O baseline do original tinha 105 respostas 500.** O replay final não tem nenhuma.
 - **As duas APIs deprecated apareceram como warning forçado, com arquivo e linha:** `datetime.utcnow()` e
   `Query.get()`. As duas foram substituídas, e a re-auditoria com os detectores ligados não emitiu
   nenhum warning.
-- **A re-auditoria achou as chaves estrangeiras ainda não exigidas** (origem `failed`). Foram ligadas
-  por conexão, e o segundo replay completo saiu limpo.
+- **A re-auditoria não achou nada novo:** os 6 itens restantes já estavam em `Proposed, Not Applied`. Os 3
+  propostos a mais no bloco `Findings resolved` são resíduo de operador (segredos no histórico e bancos
+  antigos), que o código já não contém.
+- **A linha da re-auditoria só ficou `○` depois do `pip list --outdated`.** A Fase 2 não o tinha rodado, e
+  a linha dizia `⚠ Re-audit partial`. Com o Docker religado, o autor aprovou a verificação: três
+  atualizações de patch, nenhum finding.
 
-**As duas decisões de classificação que a Fase 2 levou ao gate (D28).** O relatório listou duas
-operações cuja classificação privilegiada/negócio é ambígua, com o critério de cada lado e o efeito de
-cada resposta. O autor decidiu:
+**A conta de qualquer usuário (D29).** `PUT /users/<id>` muda nome, e-mail, senha, papel e estado de uma
+conta escolhida pelo id, e o projeto não tem modelo de identidade. A skill dividiu a operação campo a
+campo, sem levar a questão ao gate:
 
-| Decisão | Operação | Resposta | O que a Fase 3 fez | Replay |
-|---|---|---|---|---|
-| D1 | `GET /reports/user/<id>` (rollup de um usuário) | **business** | proposta, junto com o modelo de identidade | `PASS` |
-| D2 | `PUT /users/<id>` (pode mudar `role` e `active`) | **privileged**, com condição | mudar `role` ou `active` exige `X-Operator-Token`; reenviar o valor guardado não exige | mudar sem credencial: 403 `FIXED` ×2; com credencial `PASS`; reenvio do valor guardado `PASS` e valor `HOLDS` |
+| Pedido | Replay |
+|---|---|
+| Anônimo mudando `email`, `password`, `role` ou `active` | 403, quatro entradas `FIXED` |
+| Anônimo mudando só `name` | `PASS` |
+| Anônimo reenviando os valores guardados de `email`, `role` e `active` | `PASS` |
+| Operador (`X-Operator-Token`) mudando `role` | `PASS` |
 
-A condição foi do autor, e não da skill: exigir credencial em todo `PUT` com `role` no corpo quebraria
-quem reenvia o objeto inteiro com o valor que já está lá. Na rodada 6, a mesma operação ficou
-proposta numa execução e guardada em outra. Agora a decisão fica registrada no cabeçalho do relatório.
+Na rodada 7, `role` e `active` já eram guardados por decisão do autor no gate, e `email` e `password`
+ficavam propostos. Agora os quatro são guardados pela regra.
 
-**Também privilegiadas (sem ambiguidade):** `GET /reports/summary` e `DELETE /users/<id>`, atrás de
-`X-Operator-Token` (anônimo 403 `FIXED`; operador `PASS`).
+**Também privilegiadas:** `GET /reports/summary` e `DELETE /users/<id>`, atrás de `X-Operator-Token`
+(anônimo 403 `FIXED`; operador `PASS`).
 
-**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** 12.
-- **AP-04:** não existe modelo de identidade. Isso inclui o relatório por usuário (D1) e a edição
-  anônima de senha e perfil de qualquer conta (a parte de D2 que não é `role`/`active`).
-- **AP-01 (resíduo de operador, três itens):** a chave de assinatura no histórico, as contas semeadas
-  com senha publicada e a senha SMTP do módulo apagado.
-- **AP-08 (resíduo de operador):** contas com MD5 legado migram para scrypt no próximo login. Quem nunca
-  loga precisa de reset forçado, e o relatório traz o SQL que lista essas contas.
-- **AP-18:** servidor WSGI de produção (dependência nova) e CORS restrito. A política já lê
-  `CORS_ORIGINS`, com o mesmo default de hoje.
-- **AP-11:** regras de produto (formato de cor, limites de tamanho). Tipo e faixa de toda entrada foram
-  aplicados.
-- **AP-20:** `CHECK` em `status`/`role`, que exige reconstruir a tabela. As FKs foram aplicadas.
+**Decisão de classificação no gate.** D1, `GET /reports/user/<id>` (rollup de um usuário): o autor
+respondeu **business**, e o controle de acesso ficou proposto junto com o modelo de identidade.
+
+**`PROPOSED, NOT APPLIED` (gate de contrato, D7):** 9.
+- **AP-04:** não existe modelo de identidade. Isso inclui o relatório por usuário (D1), o token de login
+  que nunca é verificado, o CRUD anônimo de tarefas e categorias e o papel escolhido no próprio cadastro.
+- **AP-01 (resíduo de operador, dois itens):** as contas semeadas com senha publicada e a senha SMTP do
+  módulo apagado.
+- **AP-08 (resíduo de operador):** contas com MD5 legado migram no próximo login. Quem nunca loga precisa
+  de reset forçado, e o relatório traz o SQL que lista essas contas.
+- **AP-18:** servidor WSGI de produção (dependência nova).
+- **AP-20:** `CHECK` em bancos existentes, que exige reconstruir a tabela. As FKs foram aplicadas a todos.
 - **AP-13:** paginação.
-
-**Um erro da Fase 2, registrado pelo próprio agente.** O finding AP-20 afirmava ter observado uma
-tarefa órfã ao apagar uma categoria. Isso nunca foi observado: o ORM zera o `category_id`. A
-re-auditoria checou contra o original e corrigiu a afirmação ao lado do finding, deixando o relatório
-do gate intacto. Para o scorecard (D8), conta como afirmação não observada, um erro de precisão e não
-de recall.
+- **AP-11:** limites de tamanho de string e formato de cor. Tipo e faixa de toda entrada foram aplicados.
 
 **Camadas existentes: reais ou nominais?** (teste de `04-architecture-guidelines.md` §5). **Nominais**,
 como a Fase 1 disse. A refatoração manteve `models/` e `routes/`, criou `controllers/`, `config/` e
@@ -986,23 +999,23 @@ como a Fase 1 disse. A refatoração manteve `models/` e `routes/`, criou `contr
 - [x] Número de arquivos analisados condiz com a realidade   (15 arquivos .py)
 
 ### Fase 2 — Auditoria
-- [x] Relatório segue o template definido nos arquivos de referência (bloco da Fase 1, livro de sinais, decisões de classificação)
+- [x] Relatório segue o template definido nos arquivos de referência (bloco da Fase 1, livro de sinais, decisão de classificação)
 - [x] Cada finding tem arquivo e linhas exatos
 - [x] Findings ordenados por severidade (CRITICAL → LOW)
-- [x] Mínimo de 5 findings identificados        (32)
+- [x] Mínimo de 5 findings identificados        (31)
 - [x] Detecção de APIs deprecated incluída      (Tier A, warnings forçados: datetime.utcnow → datetime.now(UTC); Query.get → Session.get)
-- [x] Skill pausa e pede confirmação antes da Fase 3 (parou no [y/n] com D1/D2; respondido pelo autor)
+- [x] Skill pausa e pede confirmação antes da Fase 3 (parou no [y/n] com D1; respondido pelo autor: y, D1=Business)
 
 ### Fase 3 — Refatoração
 - [x] Estrutura de diretórios segue padrão MVC  (models/, routes/, controllers/)
-- [x] Configuração extraída para módulo de config (config/settings.py + .env.example)
+- [x] Configuração extraída para módulo de config (config/settings.py)
 - [x] Models criados para abstrair dados
-- [x] Views/Routes separadas para visualização ou roteamento (routes/ + presenters + validation)
+- [x] Views/Routes separadas para visualização ou roteamento (routes/ + serializers + validation)
 - [x] Controllers concentram o fluxo da aplicação
 - [x] Error handling centralizado               (middlewares/error_handler.py)
 - [x] Entry point claro                         (app.py, create_app)
 - [x] Aplicação inicia sem erros
-- [x] Endpoints originais respondem corretamente (69 PASS, 0 REGRESSION; 401 ROBUST)
+- [x] Endpoints originais respondem corretamente (54 PASS, 0 REGRESSION; 405 ROBUST)
 ```
 
 ### C.5 — Critérios de aceite do enunciado (3/3 obrigatório)
@@ -1010,20 +1023,20 @@ como a Fase 1 disse. A refatoração manteve `models/` e `routes/`, criou `contr
 | Critério | Projeto 1 | Projeto 2 | Projeto 3 |
 |---|---|---|---|
 | Fase 1 detecta a stack corretamente | ✓ Python · Flask 3.1.1 · SQLite | ✓ Node · Express 4.22.1 · sqlite3 | ✓ Python · Flask 3.0.0 · SQLAlchemy · SQLite |
-| Fase 2 encontra ≥ 5 findings | ✓ 33 | ✓ 19 | ✓ 32 |
-| Fase 2 inclui ≥ 1 CRITICAL ou HIGH | ✓ 12 C · 9 H | ✓ 8 C · 5 H | ✓ 12 C · 8 H |
-| Fase 3 — aplicação funciona após a refatoração | ✓ 39 PASS, 0 REGRESSION | ✓ 11 PASS, 0 REGRESSION | ✓ 69 PASS, 0 REGRESSION |
+| Fase 2 encontra ≥ 5 findings | ✓ 34 | ✓ 21 | ✓ 31 |
+| Fase 2 inclui ≥ 1 CRITICAL ou HIGH | ✓ 12 C · 10 H | ✓ 9 C · 5 H | ✓ 10 C · 6 H |
+| Fase 3 — aplicação funciona após a refatoração | ✓ 37 PASS, 0 REGRESSION | ✓ 8 PASS, 0 REGRESSION | ✓ 54 PASS, 0 REGRESSION |
 
-**3/3 em todos os critérios**, nas quatro últimas rodadas (4 a 7). O enunciado pede ainda que a Fase 2
+**3/3 em todos os critérios**, nas cinco últimas rodadas (4 a 8). O enunciado pede ainda que a Fase 2
 reencontre ≥ 5 dos problemas da análise manual do projeto 1. Na rodada 5, a última com casamento
 medido, reencontrou **20** com casamento completo, mais 4 parciais, de 25 (C.6).
 
 ### C.6 — Métricas de generalização (D8)
 
-> **Estas métricas são da rodada 5 e não foram remedidas nas rodadas 6 e 7.** A Parte 2 do gabarito
+> **Estas métricas são da rodada 5 e não foram remedidas nas rodadas 6 a 8.** A Parte 2 do gabarito
 > (`docs/gabarito.md`) foi escrita depois da rodada 6 e definiu que, a partir da rodada 7, o recall é
-> reportado sobre a Parte 1 e sobre Parte 1 + 2, separados. **Esse casamento não foi feito para a rodada
-> 7.** O que existe da rodada 7, sem scorecard, está logo abaixo da tabela.
+> reportado sobre a Parte 1 e sobre Parte 1 + 2, separados. **Esse casamento não foi feito para as
+> rodadas 7 e 8.** O que existe da rodada 8, sem scorecard, está logo abaixo da tabela.
 
 Scorecards: [`run-p1-iter5`](docs/evals/run-p1-iter5.md), [`run-p2-iter5`](docs/evals/run-p2-iter5.md),
 [`run-p3-iter7`](docs/evals/run-p3-iter7.md). Rodada 4, para comparação:
@@ -1040,37 +1053,41 @@ Scorecards: [`run-p1-iter5`](docs/evals/run-p1-iter5.md), [`run-p2-iter5`](docs/
 | Regressões pós-refactor | Quantas entradas divergiram do baseline? | 0 | 0 | 0 |
 | Intervenções humanas | Quantas vezes precisei corrigir o rumo? | 0 | 0 | 0 |
 
-**O que a rodada 7 mostra, sem scorecard:**
-- **Regressões:** 0 nos três replays, e 0 `NOT ROBUST`/`REGRESSION` em 702 variantes de entrada
-  malformada (242 + 59 + 401).
-- **Precisão:** uma afirmação não observada no P3, o órfão do AP-20, corrigida pelo próprio agente.
-  Pela rubrica, é um finding com descrição falsa.
-- **Recall da Fase 2:** 2 `missed-in-phase-2` no P1, os dois em pedidos e no mesmo sinal do catálogo;
-  0 no P2 e no P3.
-- **Defeitos introduzidos pela refatoração:** 2 no P2, achados pela re-auditoria e corrigidos antes do
+**O que a rodada 8 mostra, sem scorecard:**
+- **Regressões:** 0 nos três replays, e 0 `NOT ROBUST`/`REGRESSION` em 704 variantes de entrada
+  malformada (242 + 57 + 405).
+- **Recall da Fase 2:** 1 `missed-in-phase-2` no P1 (limite do corpo do pedido) e 1 no P2 (`sqlite3` sem
+  manutenção, que só a consulta à documentação oficial mostrava); 0 no P3.
+- **Defeitos introduzidos pela refatoração:** 1 no P2, achado pela re-auditoria e corrigido antes do
   replay final.
-- **Contaminação:** o recall da rodada 7 está contaminado por construção, porque a lista de mudanças
-  foi escrita depois de ler o gabarito e a verificação independente
-  ([`round7-changes.md`](docs/rounds/round7-changes.md)). Um número de recall dela não mediria
-  generalização.
+- **Precisão do relatório:** a linha da re-auditoria do P1 contradiz o próprio bloco `Findings resolved`
+  (C.2).
+- **Intervenções humanas:** uma, no P2. A entrada de valor que dependia de ordem só foi trocada porque o
+  autor escolheu fazer isso depois da Fase 3 (C.3).
+- **Contaminação:** o recall das rodadas 7 e 8 está contaminado por construção, porque as listas de
+  mudanças foram escritas depois de ler o gabarito ([`round8-changes.md`](docs/rounds/round8-changes.md)).
+  Um número de recall delas não mediria generalização.
 
 ### C.7 — Comportamento em stacks diferentes
 
 - **A matriz de robustez não depende da stack.** O agente declara os campos de cada operação. O
   harness gera as variantes (omitido, `null`, tipo trocado, lista, objeto aninhado, zero, negativo,
   int64 no limite e acima dele, `1e999`, fração), e é o mesmo código para Flask e Express. O P2 tem
-  menos variantes porque declarou campos em só 3 operações.
+  menos variantes porque declarou campos em só 3 operações. No P1, campos dentro de um array (`itens`)
+  ficam fora da matriz gerada e foram cobertos por entradas de segurança escritas.
 - **Isolamento sem regra por stack.** Python rodou em `python:3.13-slim` e Node em `node:24.12.0`
   (glibc, por causa do addon nativo do `sqlite3`). Em container, o handle é o próprio container,
-  removido pelo nome exato, e o `proc` lê `/proc` na imagem slim. Isso está coberto pelo teste de
-  conformidade, e nenhuma execução repetiu a falha de `proc start` da rodada 6 (T3).
+  removido pelo nome exato. As interrupções por limite de taxa não deixaram container órfão: o único
+  encontrado vivo, no P2, não tinha recebido nenhuma requisição e foi removido pelo nome.
 - **O gate de dependência (D18) agiu igual nas duas stacks.**
   - **P1:** `flask-cors` 5 → 6 aplicado, com o replay cobrindo os headers `Access-Control-*`.
   - **P3:** `flask-cors` 4 → 6 aplicado, idem.
-  - **P2:** `sqlite3` 5 → 6 tentado e revertido: a aplicação não subiu (glibc 2.38), e o upgrade ficou
-    proposto.
+  - **P2:** `express` subiu dentro do major 4. O `sqlite3` 6 ficou proposto, porque as notas de versão não
+    descrevem as mudanças e o replay não cobriria o motor do banco.
 - **Deprecation: a evidência depende do caminho exercitado.** No P3, as duas APIs apareceram como
   warning na Fase 2. No P1 e no Node, as rotas exercitadas com os detectores ligados não emitiram nada.
+  No P2, o `sqlite3` sem manutenção só apareceu na documentação oficial (Tier C), consultada na
+  re-auditoria.
 - **Segredos por referência nas três execuções.** `surface.json` usa `{{env:NOME}}` para senha e token
   de operador, e o relatório lista as fixtures pelo nome.
 - **O teste "camada real ou nominal" produziu resultados diferentes conforme o ponto de partida.** Os
@@ -1078,50 +1095,50 @@ Scorecards: [`run-p1-iter5`](docs/evals/run-p1-iter5.md), [`run-p2-iter5`](docs/
   `routes/` e perdeu `services/` e `utils/`, que eram camadas só de nome.
 - **Comandos:** a linha `Commands:` ficou em 0 / 0 nas três execuções.
 
-### C.8 — Rodada 7: verificação gerada, não escrita (D28)
+### C.8 — Rodada 8: tomar ou bloquear conta é operação privilegiada (D29)
 
-**A devolução.** A verificação independente da entrega da rodada 6 rodou a aplicação refatorada com
-entradas que o agente não tinha escrito, e achou o que o replay não via (G1–G10 em
-[`round6-skill-results.md`](docs/rounds/round6-skill-results.md)):
-- tipo errado ainda dava 500 em campos que a refatoração tinha tocado;
-- a parametrização do SQL introduziu 500 para inteiro fora da faixa e aceitou `1e999`;
-- `surface.json` gravava senhas do seed;
-- "verificado à mão" aparecia no relatório como se fosse prova.
+**A devolução.** O avaliador apontou que AP-04 aparecia como CRITICAL nos relatórios, mas a Fase 3 só o
+propunha, e pediu que rotas administrativas e destrutivas sem uso anônimo legítimo fossem protegidas ou
+removidas. A D27 (rodada 6) já fazia isso com consulta arbitrária, reset de dados, relatórios de gestão e
+exclusão de conta. Ficou aberta uma operação com o mesmo raciocínio: trocar a senha, o e-mail, o papel ou
+o estado de uma conta qualquer, escolhida pelo id da requisição.
 
-**A falha de raciocínio.** O replay só exercitava as entradas que o agente pensou em escrever. Um
-defeito que o agente não imagina também não vira entrada, então o replay confirma a imaginação do
-agente, e não o comportamento da aplicação.
+**A falha de raciocínio.** A regra da D15 pergunta *quem recebe a nova rejeição?*. Para edição de conta, a
+resposta parecia ser "todo cliente atual", e por isso a correção virava proposta. Mas sem modelo de
+identidade não existe "a conta do próprio chamador": quem troca a senha de uma conta escolhida pelo id
+não está fazendo autoatendimento, está tomando a conta. O único chamador legítimo dessa mudança é um
+operador, o mesmo argumento da exclusão de conta.
 
-**A regra (D28):**
+**A regra (D29):**
 
-| Mudança | O que faz | Estados |
-|---|---|---|
-| `kind: "robustness"` | O agente declara os campos e tipos de cada operação; o **harness gera** a matriz de entrada malformada e compara só a classe de status | `ROBUST` · `NOT ROBUST` (falhava antes e depois: `unresolved`) · `REGRESSION` |
-| `kind: "value"` | Asserções sobre caminhos do JSON (`equals`, `matches`, `absent`, `sameAsBaseline`) para o que a transformação mexe em valor: dinheiro, ordenação, campo mascarado | `HOLDS` · `VIOLATED` · `UNVERIFIED` |
-| `{{env:NOME}}` | Segredo por referência; o harness resolve por `--env` e falha com exit 2 se faltar | — |
-| Livro de sinais | Uma linha por sinal do catálogo: onde procurou, quantas ocorrências, para qual finding foi ou por que foi descartado | — |
-| Decisões de classificação | Privilegiada/negócio ambígua vai ao gate, e a pessoa decide | — |
-| Resíduo de operador | O que só uma ação de operador resolve (rotacionar segredo, resetar senha legada) é `proposed`, com o passo descrito | — |
+| Ponto | Regra |
+|---|---|
+| Sinal novo | Mudar o segredo, o identificador de login, o papel ou o estado (ativo/bloqueado) de uma conta existente, escolhida por id vindo da requisição, sem modelo de identidade |
+| Classificação por efeito | Uma operação com campos dos dois tipos é dividida campo a campo |
+| O que é "mudar" | Diferir do valor guardado; reenviar o valor que já está lá não exige credencial (segredo com hash é comparado por verificação) |
+| Quando recusa | Antes de qualquer escrita |
+| O que continua negócio | Edição comum de perfil, cadastro (não toca conta existente), registros de domínio |
 
-**O que mudou nas execuções:**
-- **Robustez e valores:** os três replays têm as linhas `Malformed input` e `Values` e nenhum `NOT
-  ROBUST`, `REGRESSION` ou `VIOLATED`.
-- **Efeitos sem entrada:** tudo o que o harness não alcança, como log, formato de hash em repouso e
-  header que o baseline não enviou, aparece como `UNVERIFIED by the harness` no bloco DEGRADED, e não
-  como prova.
-- **Classificação no gate:** o P3 levou D1/D2 ao gate em vez de decidir sozinho.
+**Alternativas descartadas:** proteger a operação inteira (quebraria a edição de perfil, que clientes
+legítimos fazem hoje); fechar todo DELETE de domínio (exige decidir quem são os principais); manter a
+questão no gate caso a caso (a correção dependeria da resposta de cada execução, e o `--yes` cairia em
+`proposed`).
+
+**Custo aceito.** Num alvo sem modelo de identidade, um usuário deixa de poder trocar a própria senha
+sem o operador. É o mesmo custo já aceito para a exclusão de conta, e o relatório nomeia a variável que
+habilita o caminho (`OPERATOR_TOKEN`).
+
+**O que mudou nas execuções:** só o P3 tem uma operação no sinal novo, e ela foi guardada campo a campo
+(C.4). P1 e P2 rodaram de novo porque o avaliador pediu os três projetos, e a skill copiada em cada um
+precisa ser a mesma que gerou o relatório dele.
 
 **Limites desta evidência:**
-- **O verificador independente não rodou de novo.** Zero 5xx no verificador independente é critério de
-  saída da rodada 7 ([`round7-changes.md`](docs/rounds/round7-changes.md)) e continua não demonstrado.
-  O que existe é a matriz do próprio harness, que é gerada, mas roda dentro da sessão do agente.
-- **Uma mudança de header no P3 que o replay não cobre.** Com o `flask-cors` 6, o preflight de rede
-  privada passou a responder `Access-Control-Allow-Private-Network: false` (o original respondia
-  `true`). O baseline não enviava o header de pedido, então o replay não viu. O agente observou à parte
-  e declarou `UNVERIFIED`. Para um cliente de navegador numa rede privada, é mudança de comportamento.
-- **O desvio do P2:** o original caiu seis vezes no baseline e foi reiniciado dentro do mesmo
-  container. O protocolo pede uma cópia nova. O banco é em memória e nada foi escrito em disco, então o
-  efeito é provavelmente nulo, mas é um desvio, e está declarado.
+- **Nenhuma entrada do replay manda um pedido misto** (campo comum + campo privilegiado). A recusa antes
+  de qualquer escrita é afirmada pelo relatório, não demonstrada pelo harness.
+- **O verificador independente não rodou de novo** desde a rodada 6.
+- **Defeitos de processo registrados:** contagem errada na linha da re-auditoria (P1 e P2), classificação
+  de contrato revista depois do gate (P1) e entrada de valor dependente de ordem (P2). Detalhes e
+  candidatos em [`round8-report.md`](docs/rounds/round8-report.md) §4.
 - **A resposta do gate foi repassada.** Ela veio do autor, mas passou pela sessão orquestradora, e não
   foi digitada no prompt da própria execução.
 
@@ -1335,24 +1352,27 @@ verificados um contra o outro quanto à compatibilidade de saída.
 **6. A comparação de shape ignora comprimento e ordem de arrays de propósito** (D6.5). Uma regressão
 que se manifeste apenas como "a coleção voltou vazia" ou "a ordenação mudou" **não é detectada**. Foi
 uma escolha explícita contra ruído — uma validação ruidosa é ignorada em dois dias — mas é uma
-lacuna real, e quem depende de ordenação precisa asseverá-la numa entrada dedicada do inventário.
+lacuna real, e quem depende de ordenação precisa asseverá-la numa entrada dedicada do inventário. O
+inverso também falta: as asserções de valor comparam por posição, e o probe não tem comparação por
+chave nem de conjunto. Quando o original não garante ordem, os números de cada elemento ficam
+`UNVERIFIED` (rodada 8, projeto 2).
 
 **7. O baseline pressupõe estado de datastore comparável entre as duas execuções.** A comparação de
 forma absorve a maior parte da variação de dados, mas uma coleção vazia numa execução e populada na
 outra muda o descritor do array. Use o mesmo estado nas duas, ou declare a diferença.
 
 **8. A evidência da seção C é medida pelo próprio autor.** O gate da Fase 2 foi respondido por uma
-pessoa nas três execuções (rodadas 5, 6 e 7), mas essa pessoa é o autor da skill, e nas rodadas 6 e 7 a
+pessoa nas três execuções (rodadas 5 a 8), mas essa pessoa é o autor da skill, e nas rodadas 6 a 8 a
 resposta foi repassada por uma sessão orquestradora a subagentes. O recall e os achados além do
 gabarito (C.6, da rodada 5) comparam a skill com a análise manual do mesmo autor, e o casamento ✓/◐/✗
 é julgamento. Por isso cada linha está exposta nos scorecards da rodada 5 em `docs/evals/`, para ser
-contestada, em vez de resumida num número só. **Não há scorecards das rodadas 6 e 7.**
+contestada, em vez de resumida num número só. **Não há scorecards das rodadas 6 a 8.**
 
 **9. A matriz de robustez é gerada, mas não é um verificador independente.** As variantes de entrada
 malformada (D28) saem do harness, e não da imaginação do agente. Mas os campos de cada operação são
 declarados pelo agente, e um campo que ele não declara não entra na matriz. A verificação independente
-da rodada 6 (`docs/verification/`) achou defeitos que o replay não via; ela **não foi repetida** sobre a
-entrega da rodada 7.
+da rodada 6 (`docs/verification/`) achou defeitos que o replay não via; ela **não foi repetida** sobre as
+entregas das rodadas 7 e 8.
 
 ---
 
@@ -1361,6 +1381,6 @@ entrega da rodada 7.
 | Documento | O que é |
 |---|---|
 | [`instructions.md`](instructions.md) | O enunciado original do desafio, **preservado sem alterações** (era o `README.md` do repositório base). É a fonte da verdade sobre o que foi pedido. |
-| [`docs/decisions.md`](docs/decisions.md) | Registro ADR completo de D1–D28: contexto, alternativas rejeitadas, custos aceitos e as duas reversões (D6 e D13), com o caminho que levou a cada forma final. |
+| [`docs/decisions.md`](docs/decisions.md) | Registro ADR completo de D1–D29: contexto, alternativas rejeitadas, custos aceitos e as duas reversões (D6 e D13), com o caminho que levou a cada forma final. |
 | [`CLAUDE.md`](CLAUDE.md) | Especificação viva do projeto: requisitos extraídos do enunciado, escala de severidade canônica, contratos de saída das fases e o resumo das decisões. |
 | [`.claude/skills/refactor-arch/`](.claude/skills/refactor-arch/) | A skill em si — o entregável. |

@@ -3,19 +3,19 @@
 ================================
 PHASE 1: PROJECT ANALYSIS
 ================================
-Target:        .worktrees/r7-p1/code-smells-project
-Language:      Python (100% of authored source; no runtime version declared — host has 3.13.2)
-Framework:     Flask ==3.1.1 (pinned in requirements.txt; no lockfile, no installed metadata in tree)
-Dependencies:  flask==3.1.1, flask-cors==5.0.1 (runtime; no dev deps; no lockfile)
-Domain:        E-commerce store API — products (produtos), users (usuarios), orders (pedidos/itens_pedido), sales report
-App type:      HTTP service (JSON REST API, 20 routes)
-Architecture:  None/nominal — flat modules named controllers/models, but app.py also holds persistence (admin routes) and controllers.py runs SQL; models.py mixes SQL with business rules
-Source files:  4 files analyzed (*.py; excluded: .claude/, reports/, __pycache__, VCS, non-source docs/manifests)
-DB tables:     produtos, usuarios, pedidos, itens_pedido (SQLite file loja.db, DDL + seed in database.py at first get_db())
-Boot:          ["python", "app.py"] (cwd = run copy; from README "python app.py" and the __main__ block)
-Port:          5000 — fixed in source (app.run(host="0.0.0.0", port=5000, debug=True)); no override read
-Runtime env:   Python 3.13 (python:3.13-slim), deps from requirements.txt installed inside the container
-Isolation:     container (docker 28.5.2, image python:3.13-slim); container commands carried by PowerShell (host-native; Git Bash is MINGW and rewrites POSIX paths)
+Target:        D:/Study/MBA FullCycle/mba-ia-refactor-projects-skill/.worktrees/r8-p1/code-smells-project
+Language:      Python (runtime version not declared by the project; host interpreter 3.13.2)
+Framework:     Flask 3.1.1 (exact pin in requirements.txt; no lockfile)
+Dependencies:  flask==3.1.1, flask-cors==5.0.1
+Domain:        E-commerce store API — products (produtos), users (usuarios), orders (pedidos) with line items, and a sales report
+App type:      HTTP service
+Architecture:  Nominal — four flat modules (app.py routing+admin SQL, controllers.py handlers, models.py raw-SQL data access, database.py connection+schema+seed); layering not respected
+Source files:  4 files analyzed (authored .py; excluded: .claude/, reports/, VCS dir, README.md, manifest)
+DB tables:     produtos, usuarios, pedidos, itens_pedido (SQLite, created in database.py)
+Boot:          python app.py  (cwd = run copy)
+Port:          5000, fixed in source (app.py:88, host 0.0.0.0, debug=True)
+Runtime env:   Python 3.13 from official image; flask/flask-cors installed from requirements.txt inside the container
+Isolation:     container (docker 28.5.2, image python:3.13-slim); container commands sent from PowerShell (native shell)
 ================================
 ```
 
@@ -23,463 +23,469 @@ Isolation:     container (docker 28.5.2, image python:3.13-slim); container comm
 ARCHITECTURE AUDIT REPORT
 ================================
 Project: code-smells-project
-Stack:   Python 3.13 + Flask 3.1.1 (flask-cors 5.0.1)
+Stack:   Python 3.13 + Flask 3.1.1
 Files:   4 analyzed | ~780 lines of code
-Date:    2026-11-05 01:30 (UTC, from the run id)
+Date:    2026-11-10 22:58
 Mode:    full
-Confirmation: human-confirmed: y (answer relayed to the agent by the coordinating session; no classification decisions were pending). Scope applied: all findings, with the contract gate.
-Tree:    clean at 8b4fdef
-Runtime: installed the declared dependencies from requirements.txt into the run container (python:3.13-slim, container site-packages; resolved flask 3.1.1, flask-cors 5.0.1, werkzeug 3.1.9, jinja2 3.1.6, markupsafe 3.0.4, itsdangerous 2.2.0, click 8.5.0, blinker 1.9.0)
+Confirmation: human-confirmed: y; D1=business (the human's answer, relayed verbatim by the coordinating agent: "y D1 = Business")
+Tree:    clean at 4fe1ad7
+Runtime: installed the declared dependencies from requirements.txt into the run container (run-1 copy, outside the target)
 Isolation: container (docker 28.5.2, image python:3.13-slim)
-Scratch: environment scratch directory (C:/Users/lucas/AppData/Local/Temp/claude/b247d7bb4f414394/805dbf78-3ef5-40ce-9aab-ca850a1feaef/scratchpad/refactor-arch-code-smells-project-202611050130-70bad0b4)  (protocol §1.1)
-Run id:  202611050130-70bad0b4
+Scratch: environment scratch directory — C:/Users/lucas/AppData/Local/Temp/claude/b247d7bb4f414394/ba923cae-119c-41c1-b0ad-d78f9f1be3ab/scratchpad/refactor-arch-code-smells-project-202611110153-a5f3d99b  (protocol §1.1)
+Run id:  202611110153-a5f3d99b
 
 ## Summary
-CRITICAL: 12 | HIGH: 9 | MEDIUM: 8 | LOW: 4
+CRITICAL: 12 | HIGH: 10 | MEDIUM: 8 | LOW: 4
 
 ## Findings
 
 ### [CRITICAL] Hardcoded Secrets and Credentials   (AP-01)
 File: app.py:7-7
-Description: The framework's session/signing key is set to a string literal (`app.config["SECRET_KEY"] = "minha-chave-super-secreta-123"`); the same literal is repeated in the `/health` response body (controllers.py:289). Aggravating: it is a signing key, so anything Flask signs with it is forgeable.
-Impact: Anyone who reads the repository (or calls `/health`) holds the signing key; rotating it requires a code change and a deploy, and the value stays in git history forever.
-Recommendation: Read the key from the environment in a single configuration module, fail closed when it is empty or a placeholder, and stop echoing it (see RP-01; the `/health` leak is its own AP-18 finding).
+Description: The framework's signing key is set to a string literal (`app.config["SECRET_KEY"] = "minha-chave-super-secreta-123"`). The same literal is duplicated at controllers.py:289, where it is returned to callers (see the AP-18 finding on the health endpoint).
+Impact: Anyone with the repository holds the signing key; any session or signed value the application issues can be forged, and rotating the key needs a code change and a deploy.
+Recommendation: Read the key from the environment through a single configuration module; empty by default, never a plausible placeholder (see RP-01).
 Contract: safe
 
-### [CRITICAL] Insecure Runtime Configuration — debug mode with interactive debugger   (AP-18)
-File: app.py:8-8
-Description: `app.config["DEBUG"] = True` and `app.run(host="0.0.0.0", port=5000, debug=True)` (line 88) start the Werkzeug debugger on every interface. Observed in the run: an unhandled error (`POST /admin/query` with body `null`) answered 500 with the "Werkzeug Debugger" HTML page, 18 006 bytes, with the evaluation console enabled (`EVALEX = true`) and the source path `/app/app.py`. Escalated to CRITICAL: interactive code evaluation reachable from the network.
-Impact: Remote code execution by design for anyone who can reach the port and obtain the PIN, and full tracebacks for everyone.
-Recommendation: Read debug from configuration, default off; register a centralized JSON error handler so the framework default page is never served (see RP-17, RP-09).
-Contract: safe (the framework's default error page is not contract; status 500 is kept)
-
-### [CRITICAL] Missing or Bypassable Authorization — anonymous business operations   (AP-04)
+### [CRITICAL] Missing or Bypassable Authorization — business operations with no identity model   (AP-04)
 File: app.py:11-26
-Description: Every business route — product create/update/delete, user listing and lookup, order creation, per-user order listing, order status change — is registered with no authentication. The application has no identity model: `/login` returns the user record but issues nothing that any operation verifies; order creation and per-user listing trust a `usuario_id` from the body or path.
-Impact: Any caller reads any user's orders and personal data, creates orders on behalf of any user, and changes any order's status.
-Recommendation: Introduce an identity model (issued and verified tokens or sessions), scope order and user operations to the verified principal, and define roles for catalog writes (see RP-04). This needs a product decision.
-Contract: contract-changing: every current client is anonymous and would start receiving 401/403 on these routes.
+Description: Every product, user and order route is registered with no authentication or ownership check. No operation verifies a presented credential: `/login` (controllers.py:167-186) returns the user record but issues nothing that any route later checks. `GET /usuarios/<id>` and `GET /pedidos/usuario/<usuario_id>` fetch by the input id alone (models.py:92, models.py:174). Escalation noted: the exposed data is personal (names, e-mails, passwords — see AP-08).
+Impact: Any caller reads every user's profile and order history, creates orders on behalf of any user id, and changes any order's status; nothing distinguishes this from legitimate use.
+Recommendation: Introduce an identity model (sign-in that issues a verified token, per-request principal, ownership scoping of user/order lookups) — see RP-04. Requires a product decision on principals and policy.
+Contract: contract-changing: every current client is anonymous and would receive a new 401 on these routes.
 
-### [CRITICAL] Missing or Bypassable Authorization — privileged admin routes   (AP-04)
-File: app.py:47-78
-Description: `POST /admin/reset-db` (47-57) deletes every row of all four tables, and `POST /admin/query` (59-78) executes any SQL string sent in the body and commits it — both reachable anonymously with no operator credential. Maximum urgency: destructive, and it hands the caller the whole database (also AP-02; persistence inside route handlers is AP-05, absorbed here).
-Impact: One anonymous request wipes the store or reads every user's plaintext password.
-Recommendation: Remove both routes from the HTTP surface — unsafe by construction (caller-supplied SQL; bulk reset). Nothing in the project documents an operational use, so no maintenance command is added (see RP-04).
-Contract: safe (privileged operation: only non-operators observe the removal)
+### [CRITICAL] Missing or Bypassable Authorization — bulk data reset open to anyone   (AP-04)
+File: app.py:47-57
+Description: `POST /admin/reset-db` deletes every row of all four tables with no guard of any kind (observed in a run copy: answers 200 `{"mensagem": "Banco de dados resetado", "sucesso": true}`). Privileged operation (bulk reset, administrative namespace). Flagged maximum urgency: destructive. The handler also issues raw SQL itself (AP-05 overlap).
+Impact: One anonymous request destroys the whole store's data.
+Recommendation: Remove the route from the request surface; if an operational reset is needed, keep it as a maintenance command outside the HTTP surface (see RP-04).
+Contract: safe
+
+### [CRITICAL] Missing or Bypassable Authorization — arbitrary SQL execution endpoint   (AP-04)
+File: app.py:59-78
+Description: `POST /admin/query` executes the `sql` field of the request body verbatim (`cursor.execute(query)`) and commits non-SELECT statements; no guard. Observed in a run copy: `SELECT COUNT(*) AS n FROM usuarios` answered 200 with rows. Privileged operation (caller chooses what runs). Maximum urgency: unauthenticated, read and write. Also AP-02 by construction, and the handler returns `str(e)` on failure (AP-09).
+Impact: Full read/write/delete access to the database for any anonymous caller, including every stored password.
+Recommendation: Remove the route from the surface — unsafe by construction (see RP-04).
+Contract: safe
+
+### [CRITICAL] Insecure Runtime Configuration — interactive debugger on all interfaces   (AP-18)
+File: app.py:80-88
+Description: The entry point starts the server with `app.run(host="0.0.0.0", port=5000, debug=True)`, and `app.config["DEBUG"] = True` at app.py:8; no environment gate. Observed in a run copy: boot log prints "Debugger is active!" with a Debugger PIN, and an unhandled exception (`POST /admin/query` with body `null`) answered 500 with the Werkzeug Debugger HTML page. Escalated from HIGH: interactive console reachable from outside the host.
+Impact: Remote code execution by design for anyone who can reach the port and obtain/guess the PIN; tracebacks with source lines are served to any caller.
+Recommendation: Read debug, host and port from configuration, debug off by default (see RP-17).
+Contract: safe (the framework's default error page is not contract; statuses are kept)
 
 ### [CRITICAL] God Module / God Class   (AP-03)
 File: controllers.py:1-292
-Description: One module holds the handlers for five unrelated concepts — products (5-126), users (128-165), authentication (167-186), orders (188-255), reports and health (257-292) — and mixes delivery (request parsing and status selection everywhere), business rules (the category allow-list 52-54, product invariants 43-50, order-status set 242, post-order and status-change notification side effects 208-210 and 247-250), and persistence (`health_check` runs SQL directly, 266-274). Escalated by containing the AP-18 configuration leak (276-290). This absorbs the AP-05 signals for this module (precedence rule).
-Impact: No rule can be tested without a Flask request context; every change touches the module every route passes through.
-Recommendation: Split into per-concept route modules (views) that parse → call one controller → render, controllers holding use cases, and models/repositories holding SQL (see RP-03, RP-05).
+Description: One module holds the handlers for five unrelated concepts — products (5-126), users and sign-in (128-186), orders (188-255), sales report (257-262), health (264-292). It mixes delivery (request parsing, status selection throughout), business rules (product validation and the category allow-list 24-62, notification rules on status change 247-250, order notification side effects 208-210) and persistence (direct SQL in `health_check`, 266-274). The mixed handlers are reported here, not as separate AP-05 findings (precedence rule).
+Impact: No rule can be tested without the web layer; every change to any domain touches the same file; validation copies have already diverged (see AP-12).
+Recommendation: Split into per-resource controllers over services and repositories; move rules to services (see RP-03, RP-05).
 Contract: safe
 
-### [CRITICAL] Missing or Bypassable Authorization — unguarded financial aggregate   (AP-04)
+### [CRITICAL] Missing or Bypassable Authorization — financial management report open to anyone   (AP-04)
 File: controllers.py:257-262
-Description: `GET /relatorios/vendas` (registered at app.py:28) returns gross revenue, discount, net revenue and average ticket across all orders with no operator credential — a management aggregate with financial figures (privileged per guidelines §6).
+Description: `GET /relatorios/vendas` (registered at app.py:28) returns gross revenue, applicable discount, net revenue and average ticket (computed in models.py:235-273) with no guard. Privileged operation: a management aggregate carrying financial figures. Escalated to maximum urgency: exposes financial data.
 Impact: Any anonymous caller reads the store's revenue figures.
-Recommendation: Guard the route with an operator credential read from the environment, compared in constant time, closed by default (403 when unset/empty/placeholder) (see RP-04).
-Contract: safe (privileged operation: only non-operators are rejected)
+Recommendation: Guard the operation with an operator credential read from configuration, compared in constant time, closed by default (403 when unset) (see RP-04).
+Contract: safe
 
-### [CRITICAL] Insecure Runtime Configuration — health endpoint exposes secret and configuration   (AP-18)
-File: controllers.py:276-290
-Description: `GET /health` returns `"secret_key": "minha-chave-super-secreta-123"`, `"db_path"`, `"debug": true` and `"ambiente": "producao"` as literals to anonymous callers (observed in the run). Escalated to CRITICAL: the output exposes a credential and configuration.
-Impact: The signing key is one unauthenticated GET away.
-Recommendation: Mask `secret_key` (keep the field, string type), and report `debug` from the actual configuration (see RP-17).
+### [CRITICAL] Insecure Runtime Configuration — health endpoint discloses secret and configuration   (AP-18)
+File: controllers.py:264-292
+Description: `GET /health` returns `"secret_key": "minha-chave-super-secreta-123"`, `"debug": true`, `"db_path": "loja.db"` and a hard-coded `"ambiente": "producao"` (observed in a run copy). Escalated from HIGH: the output exposes a credential and configuration. The literal secret is also AP-01 (app.py:7). Whether the endpoint itself is diagnostics-only is Classification Decision D1.
+Impact: The signing key is one unauthenticated GET away; the response also tells an attacker the app runs in debug mode.
+Recommendation: Mask the secret's value keeping the field and its string type; read the other fields from configuration (see RP-01, RP-17).
 Contract: safe (field kept, value masked)
 
 ### [CRITICAL] Hardcoded Secrets and Credentials — seeded accounts with known passwords   (AP-01)
 File: database.py:75-83
-Description: The boot-time seed (run by `get_db()` on the first connection of every environment) inserts three accounts with literal passwords, including an `admin`-typed account `admin@loja.com` / `admin123`. In scope because the seed writes into the runtime datastore, not a test fixture.
-Impact: Every deployment ships an administrator account and two user accounts whose passwords are published in the source; anyone can sign in as them.
-Recommendation: Take seed passwords from configuration (environment); when unset, seed the accounts with no usable password (fail closed). Rotating the accounts already seeded into existing databases is an operator step (see RP-01).
-Contract: safe
+Description: The bootstrap in `get_db()` inserts three accounts into the runtime database with literal passwords (`"admin123"` for the admin account, `"123456"`, `"senha123"`). This runs at every first boot, so every environment gets an admin account with a known password. Observed: `POST /login` accepts these.
+Impact: A predictable administrator credential exists in every deployment that ran the seed.
+Recommendation: Take seed passwords from configuration; with none configured, create the seed accounts with no usable password (see RP-01). Existing databases need an operator rotation.
+Contract: safe (operator residue: rotating credentials in already-seeded databases)
 
 ### [CRITICAL] God Module / God Class   (AP-03)
 File: models.py:1-314
-Description: One module holds persistence for four unrelated concepts — products (4-70, 285-314), users (72-131), orders (133-233, 275-283) and the sales report (235-273) — plus business rules (stock sufficiency and order total 139-146, stock decrement 163-166, revenue discount tiers 256-262) and response serialization (hand-written row→dict mappings in 12-21, 31-40, 79-86, 95-102, 114-119, 178-199, 211-231, 304-313). Escalated: it also contains the AP-02 injection sites listed below.
-Impact: Any domain change risks every query; the business rules cannot be exercised without a live SQLite connection.
-Recommendation: One repository per concept holding parameterized SQL, domain rules in model/service functions with no driver, serialization in one mapper per entity (see RP-03).
+Description: One module holds persistence for products (4-70, 285-314), users and sign-in (72-131), orders (133-233, 275-283) and the sales report (235-273). It mixes persistence (raw SQL throughout), business rules (stock sufficiency and order total 139-146, discount tiers 256-262, ticket average 272) and serialization (hand-written row-to-dict mapping in every function). Escalation noted: it also contains the injection (AP-02) and plaintext credential handling (AP-08).
+Impact: Data access cannot be reused or tested apart from the pricing and reporting rules; the module is the single place every request passes through.
+Recommendation: Split into per-entity repositories (persistence only), services (rules) and serializers (see RP-03).
 Contract: safe
-
-### [CRITICAL] Unsafe Handling of Credentials — password returned in responses   (AP-08)
-File: models.py:72-103
-Description: `get_todos_usuarios` and `get_usuario_por_id` serialize the whole `usuarios` row, including `senha` (lines 83 and 99), and `GET /usuarios` and `GET /usuarios/<id>` return it to anonymous callers (observed in the run: the field is present). Escalated to CRITICAL: plaintext passwords are served to anyone.
-Impact: One request discloses every account's password.
-Recommendation: Mask the `senha` value in user responses, keeping the field and its string type (see RP-08); removing the field is a contract change and would be proposed separately.
-Contract: safe (masking keeps the field and its type; removing it would be contract-changing)
 
 ### [CRITICAL] Injection-Prone Dynamic Query or Command Construction   (AP-02)
-File: models.py:109-111
-Description: The sign-in query is built by concatenating the request's `email` and `senha` into the SQL string passed to `cursor.execute`. Escalated to maximum urgency: it is in the authentication path, the endpoints are unauthenticated, and the same construction is systemic — every statement in models.py concatenates values: 28, 47-50 (INSERT from request strings), 57-61, 68, 92, 126-129 (INSERT from request strings), 140, 149-151, 155, 157-161, 163-166 (`produto_id`/`quantidade` from the request body, untyped), 174, 188, 192, 220, 224, 279-281, and 289-297 (search builds `LIKE '%<q>%'` and `categoria = '<categoria>'` from the query string).
-Impact: `' OR '1'='1` as the password signs in as the first user (the seeded admin); the search and create/update endpoints allow reading or modifying any table.
-Recommendation: Parameterize every statement with `?` placeholders and a parameter tuple; keep the `WHERE 1=1` builder but append placeholders, never values (see RP-02).
+File: models.py:105-120
+Description: The sign-in query is built by concatenating `email` and `senha` from the request into SQL. Observed in a run copy: `{"email": "' OR '1'='1' --", "senha": "x"}` signed in as the Admin account (200). The same construction is systemic: models.py:28, 47-50, 57-61, 68, 92, 126-129, 140, 149-151, 155-166, 174, 188, 192, 220, 224, 279-281 and 291-297 (search term and category from the query string). Maximum urgency: authentication path, unauthenticated, writes included, systemic habit.
+Impact: Authentication bypass, data disclosure and modification through any text field.
+Recommendation: Parameterize every statement with driver placeholders and a separate parameter tuple (see RP-02).
 Contract: safe
 
-### [CRITICAL] Unsafe Handling of Credentials — plaintext password storage   (AP-08)
+### [CRITICAL] Unsafe Handling of Credentials and Sensitive Data — plaintext passwords   (AP-08)
 File: models.py:122-131
-Description: `criar_usuario` stores the password exactly as received in `usuarios.senha` (TEXT, database.py:31), and `login_usuario` compares it with SQL equality (models.py:109-111); the seed stores plaintext too (database.py:76-78). Escalated to CRITICAL: passwords are stored recoverably.
-Impact: Any read of the database file — or of the user listing — yields every user's password, reusable on other systems.
-Recommendation: Hash with a purpose-built KDF from the standard library (`hashlib.scrypt` or `pbkdf2_hmac` with a per-user random salt), verify with `hmac.compare_digest`, and upgrade legacy plaintext rows on successful sign-in (see RP-08).
-Contract: safe
+Description: `criar_usuario` stores `senha` exactly as given (column `senha TEXT`, database.py:31), and sign-in compares it in SQL by plain equality (models.py:109-111). Escalated from HIGH: passwords stored recoverably.
+Impact: One database read (trivial via the open SQL endpoint) yields every user's password, reusable on other systems.
+Recommendation: Hash with a password KDF available in the standard library, verify in constant time, never compare in SQL (see RP-08). Existing plaintext rows need an operator migration.
+Contract: safe (operator residue: migrating stored plaintext passwords)
 
 ### [HIGH] Insecure Runtime Configuration — development server as production server   (AP-18)
-File: app.py:80-88
-Description: The entry point starts Flask's built-in development server (`app.run(...)`), and no production server is declared anywhere (no process file, container command or documented alternative); the server itself prints "This is a development server. Do not use it in a production deployment" (observed in the run log).
-Impact: Single-process development server with no hardening in front of real traffic.
-Recommendation: Serve the WSGI app with a production server (see RP-17).
-Contract: contract-changing: needs a runtime dependency the application does not have today (a WSGI server) — whoever deploys must install it.
+File: app.py:88-88
+Description: The only start path is the framework's built-in server (`app.run(...)`); no process file, container command or production server is declared anywhere. The boot log itself warns "This is a development server".
+Impact: The built-in server is not hardened for production traffic or concurrency.
+Recommendation: Serve through a production WSGI server declared in the manifest (see RP-17).
+Contract: contract-changing: needs a runtime dependency the application does not have today.
 
 ### [HIGH] Swallowed or Uncentralized Error Handling   (AP-09)
 File: controllers.py:5-12
-Description: Every handler (5-12, 14-22, 24-62, 64-96, 98-109, 111-126, 128-134, 136-144, 146-165, 167-186, 188-220, 222-227, 229-235, 237-255, 257-262, 264-292) repeats the same `try`/`except Exception` returning `{"erro": str(e)}` with 500, so internal exception text reaches the client (observed: `POST /login` with body `null` → 500 `{"erro": "'NoneType' object has no attribute 'get'"}`). There is no centralized handler, so routes outside these blocks fall through to the framework default (the debugger page, AP-18). Errors are also signalled by return convention (`{"erro": ...}` dict from models.py:143,145), and `criar_pedido` performs several writes (models.py:148-168) with no rollback on failure on a shared connection.
-Impact: Clients see internals; failures are indistinguishable from bugs; a failed order can leave partial rows that a later commit persists.
-Recommendation: One error boundary (Flask error handlers) mapping a small domain error taxonomy to the existing status codes and `{"erro": <string>}` body; generic message for unexpected errors; explicit transaction with rollback for order creation (see RP-09).
-Contract: safe (status codes and the `{"erro": string}` shape are kept; only the message text of unexpected errors changes)
+Description: Every handler wraps its whole body in `except Exception as e: return jsonify({"erro": str(e)}), 500` (16 copies, e.g. 5-12, 21-22, 60-62, 95-96, 125-126). Internal exception text reaches the caller — observed: `could not convert string to float: 'abc'`, `'<' not supported between instances of 'str' and 'int'`, `'quantidade'`. No central handler is registered: an exception outside these blocks (app.py:61) served the framework's debugger page. `criar_pedido` (models.py:133-169) performs several writes on a shared connection with no rollback on failure, so a mid-way exception leaves uncommitted writes that the next commit on that connection persists.
+Impact: Internals leak to callers; bad input is reported as a server fault; partial orders can be persisted.
+Recommendation: One error handler mapping domain errors to the existing status and `{"erro": ...}` shape, generic message for unexpected errors, transaction around order creation (see RP-09).
+Contract: safe (status codes and body shape preserved; the message text of unexpected errors becomes generic)
 
-### [HIGH] Duplicated Logic — diverged validation   (AP-12)
+### [HIGH] Duplicated Logic — diverged product validation   (AP-12)
 File: controllers.py:24-96
-Description: `criar_produto` (28-54) and `atualizar_produto` (72-90) duplicate the product validation, and the copies have diverged: update omits the name-length checks (47-50) and the category allow-list (52-54), so a product can be updated into a state create refuses. Escalated to HIGH: the copies already behave differently.
-Impact: Invariants hold only for the door the caller chose; invalid categories enter the catalog through updates.
-Recommendation: One product validator used by both use cases (see RP-12).
-Contract: safe (rejects only values the domain already declares invalid at creation)
+Description: `criar_produto` (24-62) and `atualizar_produto` (64-96) repeat the same presence and sign checks, but the update copy lacks the name-length (47-50) and category allow-list (52-54) checks. Escalated from MEDIUM: the copies have diverged — a name or category refused on create is accepted on update.
+Impact: Invalid products enter the catalog through the update door.
+Recommendation: One product validator used by both operations (see RP-12, RP-11).
+Contract: safe (the update now refuses values the domain already declares invalid on create)
 
-### [HIGH] Missing Boundary Validation   (AP-11)
-File: controllers.py:188-216
-Description: Order creation reads `usuario_id` and `itens` with only presence checks: each item's `produto_id` and `quantidade` are never type- or range-checked, so `quantidade: -5` passes the stock check (models.py:144), produces a negative total and *increases* stock (models.py:163-166); the user is never verified to exist. Other sites: `login` and `atualizar_status_pedido` dereference `dados` without a None check (170, 240 → 500); `criar_produto`/`atualizar_produto` compare `preco`/`estoque` without type checks (43-46, 87-90 → 500 on a string); `buscar_produtos` calls `float()` with no failure path (118-121 → 500); no bound on the `itens` array. Escalated to HIGH: invalid values reach the datastore and corrupt stock and order totals.
-Impact: Malformed requests answer 500 instead of 400, and legitimate-looking requests persist corrupt stock and revenue.
-Recommendation: Validate type and range of every request input at the boundary (positive integer quantities, existing ids, finite non-negative prices, parseable numeric filters, a JSON object body) and answer the application's existing 400 shape (see RP-11).
-Contract: safe (only values invalid on their face are rejected)
+### [HIGH] Missing Boundary Validation — order items   (AP-11)
+File: controllers.py:188-220
+Description: `criar_pedido` checks only that `usuario_id` and `itens` are present. Item fields are used unchecked in models.py:139-166: a missing `quantidade` answered 500 (observed); a negative or zero quantity passes the stock check, produces a negative total and **increases** stock (`estoque - <negative>`); the existence of `usuario_id` is never verified. Escalated from MEDIUM: persistently corrupt domain state (negative totals, inflated stock).
+Impact: Corrupt orders and stock levels, discovered later in reports.
+Recommendation: Validate item shape, integer type and positive quantity at the boundary (see RP-11); the user-existence check is a relationship rule to propose with AP-20.
+Contract: safe (type/range/invariant checks); the usuario_id existence check is contract-changing and would be proposed.
 
 ### [HIGH] Mutable Global State   (AP-07)
 File: database.py:4-11
-Description: A module-level `db_connection` is created once with `check_same_thread=False` and shared by every request thread of the threaded development server, with no lock; its transactions are therefore shared — an uncommitted write left by one request is committed by the next request that calls `commit()`.
-Impact: Concurrent requests interleave statements on one connection; partial writes of a failed request can be committed by another request.
-Recommendation: Open a connection per request (or per unit of work) through an injected factory, closed at teardown; no module-level mutable connection (see RP-07).
+Description: A module-level `db_connection` is created lazily and shared by every request with `check_same_thread=False`; there is no lock and no lifecycle. Stock check and decrement in `criar_pedido` are separate statements on this shared connection, so concurrent orders can oversell.
+Impact: Interleaved transactions across threads; one request's failure leaves state committed by another's `commit()`.
+Recommendation: A connection per request (application context), closed at teardown, created through a factory (see RP-07).
 Contract: safe
 
 ### [HIGH] Missing Schema-Level Integrity Constraints — money in binary floating point   (AP-20)
-File: database.py:14-24
-Description: Prices and totals are stored as `REAL` (`produtos.preco` 19, `pedidos.total` 41, `itens_pedido.preco_unitario` 51) and the order total is accumulated in float arithmetic (`total + preco * quantidade`, models.py:146); the report sums them in SQL (`SUM(total)`, models.py:242). Escalated to HIGH: revenue drifts by fractions of a cent.
-Impact: Stored order totals and the revenue report do not add up exactly.
-Recommendation: Compute money in integer cents (or `Decimal`) and store exact 2-decimal amounts; migrate the column types to integer cents through a schema migration (see RP-19).
-Contract: safe for the computation (responses keep JSON numbers with the same values); the column-type migration of existing databases is an operator step, proposed.
+File: database.py:14-25
+Description: `preco` is `REAL` (line 19), as are `pedidos.total` (line 41) and `itens_pedido.preco_unitario` (line 51); the order total is summed in float (models.py:146). Escalated from MEDIUM: money drifts.
+Impact: Totals and revenue figures carry floating-point error.
+Recommendation: Store integer cents; convert at the boundary so responses keep their JSON number type (see RP-19).
+Contract: safe (response values verified by value entries); existing databases need an operator migration.
 
 ### [HIGH] Missing Schema-Level Integrity Constraints — identity and references   (AP-20)
-File: database.py:26-35
-Description: `usuarios.email` is used as the sign-in identity (`login_usuario` takes the first matching row, models.py:109-112) but has no UNIQUE constraint; `pedidos.usuario_id`, `itens_pedido.pedido_id` and `itens_pedido.produto_id` (39, 48-49) reference other tables with no FOREIGN KEY, so deleting a product leaves orphan order lines (the code papers over it with "Desconhecido", models.py:196); `pedidos.status` (40) is free text with no CHECK. Escalated to HIGH: two accounts can answer to one email, and the first-inserted wins the sign-in.
-Impact: Duplicate registrations silently create a second account that can never sign in (or hijack the first if passwords match); order history points at nothing.
-Recommendation: Add UNIQUE(email), FOREIGN KEYs with declared delete behaviour (with `PRAGMA foreign_keys=ON`), and a CHECK on status (see RP-19).
-Contract: contract-changing: duplicate-email registration and deleting a product that has order lines are accepted today and would be rejected; existing databases need a migration.
+File: database.py:26-53
+Description: `usuarios.email` has no UNIQUE constraint while sign-in takes the first matching row (models.py:109-113); `pedidos.usuario_id`, `itens_pedido.pedido_id` and `itens_pedido.produto_id` have no foreign keys; `DELETE /produtos/<id>` leaves order items pointing at nothing (the listing code already falls back to "Desconhecido", models.py:196). Escalated from MEDIUM: two accounts can answer to one sign-in e-mail.
+Impact: Ambiguous sign-in, orphaned order lines.
+Recommendation: Unique e-mail, foreign keys with a declared delete rule (see RP-19).
+Contract: contract-changing: duplicate-e-mail registration and deletion of an ordered product would start failing.
 
 ### [HIGH] Hard-Wired Dependencies / No Composition Root   (AP-06)
-File: models.py:1-6
-Description: Every model function constructs its own collaborator by calling the module-level `get_db()` singleton (lines 5, 25, 44, 55, 66, 73, 90, 106, 123, 134, 172, 204, 236, 276, 286), and controllers.py:266 does the same; the database path is a literal resolved against the process working directory (database.py:5), and schema creation and seeding run lazily inside the connection getter.
-Impact: No unit can be tested without the real SQLite file; starting the app from another directory silently creates a new empty store.
-Recommendation: Build the connection factory in a composition root from configuration (path resolved against the project root) and inject it into repositories (see RP-06).
+File: models.py:1-7
+Description: Every data function obtains its collaborator by calling the module-level `get_db()` singleton internally (models.py:5, 25, 44, … 286; controllers.py:266); configuration (secret, debug, db path `"loja.db"` at database.py:5) is literal at the point of use; there is no place where the object graph is assembled.
+Impact: Nothing can run against a test database or a double; swapping storage means editing every function.
+Recommendation: Application factory as composition root; repositories receive their connection (see RP-06).
 Contract: safe
 
-### [HIGH] N+1 and Query-Inside-Loop Access — caller-controlled loop   (AP-10)
-File: models.py:139-166
-Description: `criar_pedido` issues one SELECT per item to validate (140), then per item another SELECT (155), an INSERT (157-161) and an UPDATE (163-166). Escalated to HIGH: the loop bound is the length of the request's `itens` array, unbounded.
-Impact: One request with a large `itens` list issues an arbitrary number of round trips on the single shared connection, stalling every other request.
-Recommendation: Fetch all referenced products in one `IN (...)` query, reuse the result for the second pass, batch the inserts with `executemany` inside one transaction, and bound the item count at the boundary (see RP-10, RP-11).
+### [HIGH] Unsafe Handling of Credentials and Sensitive Data — passwords in responses   (AP-08)
+File: models.py:72-103
+Description: `get_todos_usuarios` and `get_usuario_por_id` serialize the `senha` column into the response. Observed: `GET /usuarios` returned every user's password, including `"admin123"`.
+Impact: Every password is readable by any caller.
+Recommendation: Mask the value keeping the field and its string type (see RP-08); restricting the listing itself belongs to the identity-model proposal (AP-04).
+Contract: safe (field kept, value masked)
+
+### [HIGH] N+1 and Query-Inside-Loop Access — order creation   (AP-10)
+File: models.py:133-169
+Description: For each item the code runs a SELECT (line 140), then again a SELECT, an INSERT and an UPDATE (155-166). Escalated from MEDIUM: the loop bound is the caller's `itens` array, unbounded.
+Impact: One request can issue an arbitrary number of round trips while holding the shared connection.
+Recommendation: One `IN` query for all products, batched inserts, one transaction (see RP-10).
 Contract: safe
 
 ### [MEDIUM] Insecure Runtime Configuration — cross-origin policy reflects any origin   (AP-18)
 File: app.py:9-9
-Description: `CORS(app)` applies the default policy to every route; observed in the run: a request with `Origin: http://evil.example` receives `Access-Control-Allow-Origin: http://evil.example`. De-escalated to MEDIUM: no credentials or cookies are involved (no identity model), but state-changing routes are covered, so not LOW.
-Impact: Any web page can drive the API's write routes from a visitor's browser and read the responses.
-Recommendation: Restrict allowed origins to a configured list (see RP-17).
-Contract: contract-changing: browser clients served from origins outside a configured list would lose cross-origin access they have today.
+Description: `CORS(app)` with defaults; observed: a request with `Origin: http://evil.example` got `Access-Control-Allow-Origin: http://evil.example`. De-escalated from HIGH: no credentials are allowed and the app uses no cookies, but the data it fronts is not public read-only.
+Impact: Any web page can read this API's responses through a visitor's browser, including from networks the attacker cannot reach directly.
+Recommendation: Allowed origins from configuration (see RP-17).
+Contract: contract-changing: browser front-ends on origins not in the list would lose access.
 
-### [MEDIUM] Unsafe Handling of Credentials — personal data in logs   (AP-08)
-File: controllers.py:161-161
-Description: User email addresses are printed to stdout on registration (161) and on every successful and failed sign-in (179, 182). De-escalated to MEDIUM: email addresses only, written to the process's local stdout.
-Impact: Personal data — and a record of failed sign-in attempts per address — lands in whatever collects stdout.
-Recommendation: Log through the logging module with the user id, not the email (see RP-08).
+### [MEDIUM] Missing Boundary Validation — wrong-typed input answers 500   (AP-11)
+File: controllers.py:111-126
+Description: `buscar_produtos` converts `preco_min`/`preco_max` with bare `float()` — observed 500 on `preco_min=abc`. Same pattern elsewhere: `preco`/`estoque` compared without type checks (controllers.py:43-46, observed 500 on a string price), `request.get_json()` dereferenced when the body is `null` (169-170, 239-240; observed 500), `atualizar_status_pedido` reads `dados.get` with no body check.
+Impact: Malformed requests become server errors instead of client errors.
+Recommendation: Type and range checks at the boundary for every input (see RP-11).
 Contract: safe
 
-### [MEDIUM] Magic Values — order status strings across modules   (AP-15)
-File: controllers.py:242-250
-Description: Order statuses are bare strings repeated across three modules that must agree: the allow-list here (242) and the branches (247, 249), the INSERT default `'pendente'` (models.py:150) and report filters (models.py:247-253), and the schema default (database.py:40). Escalated to MEDIUM: several modules must agree.
-Impact: A typo silently creates a new status that no report counts.
-Recommendation: One status enumeration in the domain, used by validation, persistence and reports (see RP-15).
+### [MEDIUM] Unsafe Handling of Credentials and Sensitive Data — personal data in logs   (AP-08)
+File: controllers.py:160-183
+Description: User e-mails are printed on account creation and on every sign-in success and failure (lines 161, 179, 182). De-escalated from HIGH: stdout of a local process, not shipped off-host in this project.
+Impact: Personal data accumulates in whatever collects stdout.
+Recommendation: Log events without personal data (see RP-08).
 Contract: safe
 
-### [MEDIUM] Duplicated Logic — hand-written row mappings and order loader   (AP-12)
-File: models.py:4-41
-Description: The product row→dict mapping is written three times (12-21, 31-40, 304-313), the user mapping twice (79-86, 95-102), and the whole order-with-items loader twice (171-201 and 203-233, identical except for the WHERE clause).
-Impact: A field added to one copy is forgotten in another; responses for the same entity drift.
-Recommendation: One mapper per entity and one order loader parameterized by filter (see RP-12).
+### [MEDIUM] Unbounded Resources and Leaked Handles — unbounded listings   (AP-13)
+File: models.py:4-22
+Description: `GET /produtos` reads the whole table into memory with no limit; the same for `GET /usuarios` (models.py:72-87) and `GET /pedidos` (203-233).
+Impact: Response size and memory grow with the store.
+Recommendation: Pagination with a bounded page size (see RP-13).
+Contract: contract-changing: a default page size changes what an existing client receives.
+
+### [MEDIUM] Duplicated Logic — row mapping   (AP-12)
+File: models.py:24-41
+Description: The product row-to-dict mapping is written three times (12-21, 31-40, 304-313), the user mapping twice (79-86, 95-102) and the order listing twice in full (171-201 and 203-233 differ only in the WHERE clause).
+Impact: A field added to one copy is forgotten in the others.
+Recommendation: One serializer per entity; one order-listing query with an optional filter (see RP-12).
 Contract: safe
 
-### [MEDIUM] Unbounded Resources — unpaginated listings   (AP-13)
-File: models.py:4-8
-Description: `GET /produtos`, `GET /usuarios` and `GET /pedidos` load the whole table with `fetchall()` and no limit (models.py:7-8, 75-76, 206-207), building the full response in memory.
-Impact: Response size and memory grow with the data, without bound.
-Recommendation: Add pagination (limit/offset or cursor) with a default page size (see RP-13).
-Contract: contract-changing: a default page size changes what clients that read the full list observe today.
-
-### [MEDIUM] N+1 and Query-Inside-Loop Access   (AP-10)
-File: models.py:203-233
-Description: `get_todos_pedidos` issues one query per order for its items (220) and one per item for the product name (224); `get_pedidos_usuario` repeats the same nested pattern (171-201, queries at 188 and 192).
-Impact: `GET /pedidos` costs 1 + orders + items round trips; latency grows with history.
-Recommendation: Load orders, their items and product names with one JOIN (or two set-based queries) and group in memory (see RP-10).
+### [MEDIUM] N+1 and Query-Inside-Loop Access — order listings   (AP-10)
+File: models.py:171-233
+Description: Both order listings run one query per order for its items (188, 220) and one per item for the product name (192, 224).
+Impact: Listing latency grows with orders × items.
+Recommendation: One join over orders, items and products (see RP-10).
 Contract: safe
 
 ### [MEDIUM] Magic Values — discount tiers   (AP-15)
 File: models.py:256-262
-Description: The revenue discount rule is encoded as bare literals: thresholds 10000/5000/1000 and rates 0.1/0.05/0.02. Escalated to MEDIUM: a commercial rule owned by the business, not the engineer.
-Impact: Nobody can tell what the tiers mean or change them safely.
-Recommendation: Named constants (an ordered tier table) in the domain layer (see RP-15).
+Description: Revenue thresholds 10000/5000/1000 and rates 0.1/0.05/0.02 inline in the report. Escalated from LOW: a commercial rule owned by the business.
+Impact: Nobody can tell whether changing a tier is safe or where else it applies.
+Recommendation: Named constants in the reporting service (see RP-15).
 Contract: safe
 
-### [MEDIUM] Known-Vulnerable Dependency — flask-cors 5.0.1   (AP-19)
+### [MEDIUM] Known-Vulnerable Dependency — flask-cors   (AP-19)
 File: requirements.txt:2-2
-Description: OSV.dev (queried 2026-11-05) lists three MODERATE advisories for flask-cors 5.0.1: GHSA-43qf-4rqw-9q2g (CVE-2024-6866, case-insensitive path matching), GHSA-7rxf-gvfg-47g4 (CVE-2024-6839, regex path priority), GHSA-8vgw-p6qm-5gr7 (CVE-2024-6844, `+` path normalization); all fixed in 6.0.0. Reachability: all three concern matching request paths against per-resource patterns; the app configures one default `/*` pattern, so the affected matching is not exercised. Kept at MEDIUM (moderate advisories), below the HIGH default.
-Impact: Today low; any future per-route CORS configuration would inherit mis-matching.
-Recommendation: Upgrade to flask-cors 6.0.x (latest 6.0.5 per `pip list --outdated`). Cross-major: the 6.0.0 release notes (github.com/corydolphin/flask-cors/releases/tag/6.0.0, fetched 2026-11-05) announce one breaking change, path-specificity ordering, which only matters with several resource patterns; the replay must include an `Origin` request and an `OPTIONS` preflight so CORS headers are compared (see RP-18).
-Contract: safe, provided the replay covers the CORS headers (guidelines §6, dependency upgrades)
+Description: OSV.dev (queried 2026-11-10) returns three MODERATE advisories for flask-cors 5.0.1: GHSA-43qf-4rqw-9q2g (CVE-2024-6866, case-insensitive path matching), GHSA-7rxf-gvfg-47g4 (CVE-2024-6839, regex priority), GHSA-8vgw-p6qm-5gr7 (CVE-2024-6844, '+' path normalization); all fixed in 6.0.0. Reachability: the app uses one application-wide policy, so per-path mismatches have little effect; severity stays at MEDIUM (moderate).
+Impact: Wrong CORS policy applied to paths if per-path policies are ever introduced.
+Recommendation: Upgrade to flask-cors 6.0.0 (major upgrade) (see RP-18).
+Contract: safe if the replay's Origin and preflight entries show unchanged Access-Control-* headers; otherwise proposed.
 
-### [LOW] Magic Values — environment literals and limits   (AP-15)
-File: app.py:85-88
-Description: Port 5000 and bind address are inline (85, 88), the database path `"loja.db"` is inline (database.py:5, echoed at controllers.py:287), name-length limits 2/200 are bare (controllers.py:47-50), the category list is a local literal (controllers.py:52), and the version string `"1.0.0"` is duplicated (app.py:36, controllers.py:285).
-Impact: Environment changes need code edits; duplicated literals drift.
-Recommendation: Port/host/db path to configuration; limits, categories and version to named constants (see RP-15).
+### [LOW] Magic Values — order status literals   (AP-15)
+File: controllers.py:242-250
+Description: Order statuses are bare strings repeated across files: controllers.py:242, 247, 249; models.py:150, 247, 250, 253; database.py:40.
+Impact: A typo silently creates a new status.
+Recommendation: One status enumeration (see RP-15).
 Contract: safe
 
-### [LOW] Misleading Names and Inconsistent Structure   (AP-16)
-File: controllers.py:285-288
-Description: The health response hardcodes `"ambiente": "producao"` and `"debug": True` regardless of the actual configuration — values that state something the code does not check. Identifiers mix English and Portuguese within names (`get_todos_produtos`, `get_produto_por_id`, `login_usuario`, `health_check`), `buscar_produto` (lookup by id) and `buscar_produtos` (search) differ by one letter, and parameters named `id` shadow the builtin throughout.
-Impact: Operators read a health report that is not measured; readers confuse lookup and search.
-Recommendation: Report configuration from the configuration object; adopt one naming language per layer for new internal names; keep public names (see RP-16).
+### [LOW] Dead Code — unused imports   (AP-17)
+File: database.py:2-2
+Description: `import os` is never used; `import sqlite3` in models.py:2 is never used.
+Impact: Noise; misleads about dependencies.
+Recommendation: Delete (see RP-16).
 Contract: safe
 
-### [LOW] Dead Code and Commented-Out Code   (AP-17)
-File: models.py:2-2
-Description: `import sqlite3` in models.py is never used; `import os` in database.py:2 is never used.
-Impact: Noise that suggests dependencies that do not exist.
-Recommendation: Delete the unused imports (see RP-16).
+### [LOW] Misleading Names — a getter that creates schema and seeds data   (AP-16)
+File: database.py:7-86
+Description: `get_db()` reads like an accessor but creates tables and inserts seed data on first call. Also `buscar_produto` (lookup by id) vs `buscar_produtos` (search) differ by one letter, and handlers shadow the built-in `id`.
+Impact: Readers do not expect a getter to write.
+Recommendation: Separate connection factory and explicit schema/seed bootstrap (see RP-16).
 Contract: safe
 
-### [LOW] Known-Vulnerable Dependency — Flask 3.1.1   (AP-19)
+### [LOW] Known-Vulnerable Dependency — Flask   (AP-19)
 File: requirements.txt:1-1
-Description: OSV.dev (queried 2026-11-05) lists GHSA-68rp-wp8r-4726 (CVE-2026-27205, rated LOW by its source): the session does not add `Vary: Cookie` on some access forms; fixed in 3.1.3. The app never touches `session`, so the affected path is unused. LOW below the HIGH default: low-rated advisory.
-Impact: None today; becomes relevant once sessions are introduced.
-Recommendation: Upgrade to Flask 3.1.3 — patch within the same major (see RP-18).
+Description: OSV.dev (queried 2026-11-10) returns GHSA-68rp-wp8r-4726 (CVE-2026-27205, LOW: missing `Vary: Cookie` on some session accesses) for Flask 3.1.1, fixed in 3.1.3. The application never accesses `session`, so the vulnerable path is not reached.
+Impact: None today; becomes relevant if sessions are introduced behind a caching proxy.
+Recommendation: Upgrade to Flask 3.1.3, same major (see RP-18).
 Contract: safe
 
 ## Signal Ledger
 
 | Entry | Signal | Examined | Occurrences | Outcome |
 |---|---|---|---|---|
-| AP-01 | Literal assigned to secret-named identifier | all source files | 1 — app.py:7 (also echoed controllers.py:289) | finding: AP-01 app.py:7-7 |
-| AP-01 | Credential literals in runtime data (seed/fixtures) | database.py seed, README | 3 rows — database.py:76-78 | finding: AP-01 database.py:75-83 |
-| AP-01 | URL with inline credentials | all source files | 0 | none |
-| AP-01 | High-entropy / prefixed literal | all source files | 0 | none |
-| AP-01 | Framework signing key set to literal | app.py | 1 — app.py:7 | finding: AP-01 app.py:7-7 (same site) |
-| AP-01 | Credential-bearing file committed | target tree (incl. hidden) | 0 | none |
-| AP-01 | Config read with a real-secret fallback | all source files | 0 (no environment reads at all) | none |
-| AP-02 | External value concatenated into driver call | models.py, controllers.py, app.py | 21 sites in models.py (28 … 297) | finding: AP-02 models.py:109-111 |
-| AP-02 | Interpolation markers inside statement strings | all source files | same sites (`+` concatenation) | finding: AP-02 (same) |
+| AP-01 | Literal assigned to secret-named identifier | all source files | 2 — app.py:7, controllers.py:289 | finding: AP-01 app.py:7-7 (289 named there and in AP-18 health) |
+| AP-01 | Credential literals in runtime seed/bootstrap data | database.py seed, all .py | 1 — database.py:75-83 | finding: AP-01 database.py:75-83 |
+| AP-01 | Connection URL with inline credentials | all source files, requirements.txt | 0 | none |
+| AP-01 | High-entropy / prefixed credential literal | all source files | 0 | none |
+| AP-01 | Framework signing key set to a literal | app.py | 1 — app.py:7 | finding: AP-01 app.py:7-7 |
+| AP-01 | Credential-bearing file committed | target tree listing (incl. hidden) | 0 | none |
+| AP-01 | Config read with a real secret as fallback | all source files | 0 (no environment reads at all) | none |
+| AP-02 | External value concatenated into a driver call | models.py, app.py, controllers.py | 20+ — models.py:28, 47-50, 110 … | finding: AP-02 models.py:105-120 |
+| AP-02 | Interpolation markers inside statements | models.py | same sites (`+` concatenation) | finding: AP-02 models.py:105-120 |
 | AP-02 | ORM escape hatch with built string | all source files | 0 (no ORM) | none |
-| AP-02 | Dynamic identifiers from input | models.py:289-297 | 0 (values only, no identifiers) | none |
+| AP-02 | Dynamic identifiers from input | models.py | 0 (column/table names are constants) | none |
 | AP-02 | Shell/process execution with input | all source files | 0 | none |
 | AP-02 | Unsafe deserialization / template from input | all source files | 0 | none |
-| AP-02 | Path traversal from input | all source files | 0 (no file paths from input) | none |
-| AP-02 | Caller SQL executed verbatim | app.py:59-78 | 1 | finding: AP-04 app.py:47-78 (privileged, dominant impact) |
-| AP-03 | ≥3 responsibility categories in one module | all 4 modules | controllers.py, models.py; app.py (config+delivery+persistence, one admin concept) | findings: AP-03 controllers.py, AP-03 models.py; app.py → AP-04 app.py:47-78 (admin persistence absorbed) |
-| AP-03 | >300-400 lines with ≥2 categories | line counts 88/292/86/314 | models.py (314) | finding: AP-03 models.py |
-| AP-03 | Unit >50 lines / deep nesting / >5 params | all functions | `atualizar_produto(id, nome, descricao, preco, estoque, categoria)` 6 params (models.py:54); `criar_produto` handler 39 lines; `relatorio_vendas` 39 lines | absorbed in AP-03 models.py/controllers.py |
-| AP-03 | Several unrelated domain concepts in one file | all modules | controllers.py (5), models.py (4) | findings: AP-03 ×2 |
-| AP-03 | Low-cohesion class | all modules | 0 (no classes) | none |
-| AP-03 | Grab-bag utils/manager module | all modules | 0 | none |
-| AP-03 | Very high afferent coupling | import graph | database.py imported by app/controllers/models | discarded: a small connection module imported by all is expected; its real defects are AP-06/AP-07 |
-| AP-04 | Principal-owned resource with no auth | app.py routes | 11 business routes | finding: AP-04 app.py:11-26 |
-| AP-04 | Lookup by input id not scoped to principal | controllers.py, models.py | /usuarios/<id>, /pedidos/usuario/<id>, /pedidos/<id>/status | finding: AP-04 app.py:11-26 (same) |
-| AP-04 | Auth only on one door | all routes | 0 (no auth anywhere) | none |
-| AP-04 | Role/tenant taken from request | controllers.py | `usuario_id` from body (195) trusted as owner | finding: AP-04 app.py:11-26 (same) |
-| AP-04 | Token decoded not verified | all source files | 0 (no tokens) | none |
-| AP-04 | Check written but unreachable | all source files | 0 | none |
-| AP-04 | Disabled/commented guard | all source files | 0 | none |
-| AP-04 | Privileged operation without guard | app.py, controllers.py | /admin/query, /admin/reset-db, /relatorios/vendas | findings: AP-04 app.py:47-78; AP-04 controllers.py:257-262. /health: discarded as privileged (public health surface by design; its leak is AP-18 controllers.py:276-290) |
-| AP-05 | Domain decisions in handlers | controllers.py, app.py | category list, invariants, status set, notifications | absorbed in AP-03 controllers.py (precedence rule) |
-| AP-05 | Persistence inside handler | controllers.py:266-274, app.py:49-76 | 2 | absorbed: AP-03 controllers.py; AP-04 app.py:47-78 |
-| AP-05 | Handler >30 lines not just mapping | controllers.py | criar_produto (39), atualizar_produto (33), criar_pedido (33) | absorbed in AP-03 controllers.py |
-| AP-05 | Request object deep in call stack | models.py | 0 (models never see `request`) | none |
+| AP-02 | Input-derived filesystem path | all source files | 0 | none |
+| AP-02 | (caller-supplied statement) | app.py:59-78 | 1 | finding: AP-04 app.py:59-78 (dominant impact) |
+| AP-03 | Module with ≥3 responsibility categories | all 4 modules | 3 — controllers.py, models.py, app.py | findings: AP-03 controllers.py, AP-03 models.py; app.py discarded: small, its mixed handlers are the admin routes filed under AP-04 |
+| AP-03 | >300–400 lines with ≥2 categories | all 4 modules | 1 — models.py (314) | finding: AP-03 models.py |
+| AP-03 | Unit >50 lines / deep nesting / >5 params | all functions | 2 — models.criar_pedido 37 lines, atualizar_produto 6 params (models.py:54) | discarded: below 50 lines; 6 params is a flat record write, folded into AP-03 models.py |
+| AP-03 | One file, several unrelated domain concepts | all 4 modules | 2 — controllers.py, models.py | findings: AP-03 ×2 |
+| AP-03 | Low-cohesion class | all files | 0 (no classes) | none |
+| AP-03 | Leftover utilities/manager module | file names | 0 | none |
+| AP-03 | Very high afferent coupling | import graph | database.py imported by 3 | discarded: a connection provider is expected to be shared |
+| AP-04 | Principal-scoped entry without auth/ownership | app.py routes | 14 routes | finding: AP-04 app.py:11-26 |
+| AP-04 | Lookup filtered only by input id (IDOR) | models.py | 3 — models.py:92, 174, 280 | finding: AP-04 app.py:11-26 |
+| AP-04 | Authorization only on one door | all | 0 (no authorization anywhere) | none |
+| AP-04 | Role/admin flag taken from request | controllers.py | 0 (criar_usuario ignores `tipo`) | none |
+| AP-04 | Token decoded but not verified | all | 0 (no tokens) | none |
+| AP-04 | Check written but never reached | all | 0 | none |
+| AP-04 | Commented-out/disabled guard | all | 0 | none |
+| AP-04 | Privileged operation with no guard | app.py, controllers.py | 3 (+1 ambiguous) — app.py:47, app.py:59, controllers.py:257; /health → D1 | findings: AP-04 ×3; D1 under Classification Decisions |
+| AP-05 | Domain decisions in handlers | controllers.py, app.py | controllers.py:43-54, 208-210, 247-250 | folded into AP-03 controllers.py (precedence rule) |
+| AP-05 | Persistence inside handlers | controllers.py, app.py | controllers.py:266-274; app.py:49-55, 66-76 | AP-03 controllers.py; app.py sites folded into AP-04 findings |
+| AP-05 | Handler >30 lines not just mapping | controllers.py | criar_produto 39 lines | folded into AP-03 controllers.py |
+| AP-05 | Request objects deep in the stack | models.py | 0 (models never import request) | none |
 | AP-05 | Same rule in two handlers | controllers.py | product validation ×2 | finding: AP-12 controllers.py:24-96 |
-| AP-05 | Pass-through service layer | all | 0 (no service layer) | none |
-| AP-06 | Unit constructs own collaborators | models.py, controllers.py | 15 `get_db()` calls in models, 1 in controllers | finding: AP-06 models.py:1-6 |
-| AP-06 | Import-time side effects | all modules | app.py:6-30 builds the app at import (no external I/O); DB is lazy | discarded: no external effect at import |
-| AP-06 | No composition root | app.py | wiring split across app.py and database.py | finding: AP-06 (same) |
-| AP-06 | Test needs real DB/clock | models.py | all functions | finding: AP-06 (same) |
-| AP-06 | Domain imports concrete driver | models.py:2 | `import sqlite3` (unused) | finding: AP-17 models.py:2-2 |
-| AP-06 | Configuration read at point of use | database.py:5, app.py:7-8 | literals, not env reads | findings: AP-06 (db path), AP-01 app.py:7-7, AP-18 app.py:8-8 |
-| AP-07 | Module-level variable reassigned | database.py:4,8-10 | 1 | finding: AP-07 database.py:4-11 |
+| AP-05 | Pass-through service layer | — | 0 (no service layer) | none |
+| AP-06 | Unit constructs its own collaborators | models.py, controllers.py | every model function calls get_db() | finding: AP-06 models.py:1-7 |
+| AP-06 | Import-time side effects | all modules | 0 (app.py top level builds the app; no I/O until first request) | none |
+| AP-06 | No composition root | app.py | 1 | finding: AP-06 models.py:1-7 |
+| AP-06 | No seam for doubles (clock/random/fs in rules) | all | 0 beyond the DB singleton | none |
+| AP-06 | Domain imports concrete driver | models.py | sqlite3 rows used directly | folded into AP-06 |
+| AP-06 | Configuration read at point of use | app.py:7-8, database.py:5, controllers.py:285-289 | 4 | folded into AP-06 / AP-18 |
+| AP-07 | Module-level variable reassigned | database.py | 1 — database.py:4, 10 | finding: AP-07 database.py:4-11 |
 | AP-07 | Request-scoped data stored globally | all | 0 | none |
-| AP-07 | In-memory store of record | all | 0 | none |
-| AP-07 | Mutable default / shared class attr | all | 0 | none |
-| AP-07 | Cache/pool with no lifecycle | database.py | shared connection never closed | finding: AP-07 (same) |
+| AP-07 | In-memory collection as store of record | all | 0 | none |
+| AP-07 | Mutable default / shared mutable attribute | all | 0 | none |
+| AP-07 | Connection/cache with no lifecycle | database.py | 1 — never closed | finding: AP-07 database.py:4-11 |
 | AP-07 | Monkey-patched built-in | all | 0 | none |
-| AP-07 | In-process id counter | all | 0 (AUTOINCREMENT in DB) | none |
-| AP-08 | Password persisted reversibly | models.py:126-129, database.py:31,76-78 | 2 write paths | finding: AP-08 models.py:122-131 |
-| AP-08 | Fast digest for passwords | all | 0 (no hashing at all) | none (covered by the plaintext finding) |
-| AP-08 | Shared/missing salt | all | n/a — no hashing | none |
-| AP-08 | Credential compared with plain equality | models.py:110 | 1 (SQL equality) | finding: AP-08 models.py:122-131 (named) |
-| AP-08 | Sensitive values in logs | controllers.py | emails at 161, 179, 182 | finding: AP-08 controllers.py:161-161 |
-| AP-08 | Whole record serialized to client | models.py:79-86, 95-102 | `senha` returned | finding: AP-08 models.py:72-103 |
-| AP-08 | Transport without protection / cert verify off | all | 0 outbound calls | none |
-| AP-08 | No token expiry/rotation | all | 0 tokens issued | none |
-| AP-09 | Empty/log-and-continue catch | controllers.py | 0 empty; all return 500 | finding: AP-09 controllers.py:5-12 |
-| AP-09 | Over-broad catch | controllers.py | 16 `except Exception` | finding: AP-09 (same) |
-| AP-09 | Error mapping repeated per handler | controllers.py | 16 | finding: AP-09 (same) |
-| AP-09 | No centralized handler — default observed | app.py | default = Werkzeug debugger (observed) | findings: AP-09 (same), AP-18 app.py:8-8 |
-| AP-09 | Internal message in response body | controllers.py | `str(e)` ×17; observed on /login with `null` | finding: AP-09 (same) |
-| AP-09 | Errors by return convention | models.py:143,145 | 2 | finding: AP-09 (same) |
-| AP-09 | Multi-write without transaction/compensation | models.py:148-168 | 1 | finding: AP-09 (same) |
-| AP-09 | Exceptions for expected control flow | all | 0 | none |
-| AP-10 | Driver call inside loop | models.py | 139-166, 187-193, 219-225 | findings: AP-10 models.py:139-166; AP-10 models.py:203-233 |
-| AP-10 | Per-element FK fetch | models.py | same | same findings |
+| AP-07 | In-process id counter | all | 0 (ids from SQLite) | none |
+| AP-08 | Password persisted reversibly | models.py, database.py | 1 — models.py:126-129, database.py:31 | finding: AP-08 models.py:122-131 |
+| AP-08 | Fast digest for passwords | all | 0 (no hashing at all) | none |
+| AP-08 | Constant/missing salt | all | 0 (no hashing) | none |
+| AP-08 | Credential compared with plain equality | models.py | 1 — models.py:110 (SQL equality) | folded into AP-08 models.py:122-131 |
+| AP-08 | Sensitive values in logs | controllers.py | 3 — 161, 179, 182 | finding: AP-08 controllers.py:160-183 |
+| AP-08 | Whole record serialized with sensitive fields | models.py | 2 — 79-86, 95-102 | finding: AP-08 models.py:72-103 |
+| AP-08 | Transport unprotected / cert verification off | all | 0 (no outbound calls) | none |
+| AP-08 | No token expiry/rotation | all | 0 (no tokens issued) | none |
+| AP-09 | Catch that swallows or returns success | controllers.py | 0 (all return 500) | none |
+| AP-09 | Over-broad catch around whole body | controllers.py | 16 | finding: AP-09 controllers.py:5-12 |
+| AP-09 | Same error mapping repeated per handler | controllers.py | 16 | finding: AP-09 controllers.py:5-12 |
+| AP-09 | No centralized handler (observed default) | app.py; run copy | 1 — debugger page observed on POST /admin/query body `null` | finding: AP-09 controllers.py:5-12 and AP-18 app.py:80-88 |
+| AP-09 | Internal exception text in response | controllers.py, app.py:78 | 17 | finding: AP-09 controllers.py:5-12 |
+| AP-09 | Inconsistent sentinel error convention | models.py:143-145 vs controllers | 1 — `{"erro": ...}` dict returned from model | folded into AP-09 (description) |
+| AP-09 | Multi-write with no transaction/compensation | models.py:133-169 | 1 | finding: AP-09 controllers.py:5-12 (description) |
+| AP-09 | Exceptions for ordinary control flow | all | 0 | none |
+| AP-10 | Driver call inside loop | models.py | 3 loops — 139-146, 154-166, 177-200/209-232 | findings: AP-10 models.py:133-169, AP-10 models.py:171-233 |
+| AP-10 | Per-element FK fetch | models.py | 2 listings | finding: AP-10 models.py:171-233 |
 | AP-10 | Lazy relation in iteration | all | 0 (no ORM) | none |
-| AP-10 | Same read repeated with different args | models.py:140,155 | product read twice per item | finding: AP-10 models.py:139-166 |
+| AP-10 | Same read repeated with different args | models.py:140 & 155 | 1 — product read twice per item | finding: AP-10 models.py:133-169 |
 | AP-10 | Remote call in loop | all | 0 | none |
-| AP-10 | Whole table filtered in app code | models.py | 0 (report uses SQL aggregates) | none |
-| AP-10 | Write loop one round trip per element | models.py:157-166 | 1 | finding: AP-10 models.py:139-166 |
-| AP-11 | Input used with no type/range check | controllers.py | 43-46, 87-90, 118-121, 195-196 | finding: AP-11 controllers.py:188-216 |
-| AP-11 | Optional input dereferenced without null check | controllers.py:170, 240; app.py:62 | 3 (observed 500 on /login and /admin/query with `null`) | finding: AP-11 (same); app.py:62 absorbed by the AP-04 app.py:47-78 removal |
-| AP-11 | Unconstrained limit/pagination param | all | 0 (no such params) | none |
-| AP-11 | Numeric parsing with no failure path | controllers.py:118-121 | 2 | finding: AP-11 (same) |
-| AP-11 | Validation on one entry point but not another | controllers.py:24-96 | create vs update | finding: AP-12 controllers.py:24-96 |
-| AP-11 | Validation after use | all | 0 | none |
-| AP-11 | Domain invariant enforced nowhere | models.py:144, controllers.py:195 | negative quantity; user existence | finding: AP-11 (same) |
-| AP-11 | No upper bound on array length | controllers.py:196 | `itens` unbounded | finding: AP-11 (same) |
-| AP-11 | Ad-hoc scattered validation | controllers.py | per-handler conditionals | findings: AP-11, AP-12 controllers.py:24-96 |
-| AP-12 | ≥10-line structurally identical blocks | models.py | 171-201 vs 203-233 | finding: AP-12 models.py:4-41 |
-| AP-12 | Same business rule in several places | controllers.py | product validation | finding: AP-12 controllers.py:24-96 |
-| AP-12 | Same validation / error mapping / serialization repeated | controllers.py, models.py | error mapping ×16; mappings ×5 | findings: AP-09 controllers.py:5-12; AP-12 models.py:4-41 |
-| AP-12 | Hand mapping in several places | models.py | product ×3, user ×2 | finding: AP-12 models.py:4-41 |
-| AP-12 | Copy-and-modify with divergence | controllers.py | create vs update | finding: AP-12 controllers.py:24-96 |
-| AP-12 | Same constant repeated across files | all | status strings, "1.0.0", secret | findings: AP-15 controllers.py:242-250, AP-15 app.py:85-88, AP-01 app.py:7-7 |
-| AP-12 | Condition repeated at many call sites | all | `if not dados` ×4 | absorbed in AP-11 boundary validation |
-| AP-13 | Paired acquire/release without scope | models.py | cursors never closed (shared connection) | absorbed in AP-07 (connection lifecycle) |
-| AP-13 | Handle with no release on failure | database.py | 1 connection | absorbed in AP-07 |
-| AP-13 | Connection per call / unbounded pool | database.py | 0 (single shared) | none |
-| AP-13 | Outbound call without timeout | all | 0 outbound calls | none |
+| AP-10 | Whole table read to filter in app | models.py | 0 (filters are in SQL) | none |
+| AP-10 | Write loop one round trip per element | models.py:154-166 | 1 | finding: AP-10 models.py:133-169 |
+| AP-11 | Input used with no type/range check | controllers.py | 6 — 43-46, 119-121, 195-203, 240 … | findings: AP-11 controllers.py:111-126, AP-11 controllers.py:188-220 |
+| AP-11 | Optional input dereferenced without check | controllers.py | 3 — 169-170, 239-240, app.py:61-62 | finding: AP-11 controllers.py:111-126 (app.py site removed with AP-04) |
+| AP-11 | Unconstrained pagination/limit | all | 0 (no pagination params) | none (see AP-13) |
+| AP-11 | Numeric parsing with no failure path | controllers.py:118-121 | 1 | finding: AP-11 controllers.py:111-126 |
+| AP-11 | Validation on one entry, not the other | controllers.py create/update | 1 | finding: AP-12 controllers.py:24-96 |
+| AP-11 | Validation after use/side effect | all | 0 | none |
+| AP-11 | Domain invariants enforced nowhere | models.py:139-166 | quantity sign, user existence | finding: AP-11 controllers.py:188-220 |
+| AP-11 | No bound on body/array length | controllers.py:196 | 1 — `itens` | folded into AP-10 models.py:133-169 |
+| AP-11 | Ad-hoc scattered validation | controllers.py | 1 | folded into AP-12 / AP-11 |
+| AP-12 | ≥10-line structurally identical blocks | models.py, controllers.py | models.py:171-201 vs 203-233; product mapping ×3 | finding: AP-12 models.py:24-41 |
+| AP-12 | Same business rule in several places | controllers.py | product validation ×2 | finding: AP-12 controllers.py:24-96 |
+| AP-12 | Same validation/error mapping/serialization per handler | controllers.py, models.py | error mapping ×16; serializers ×5 | AP-09 finding; AP-12 models.py:24-41 |
+| AP-12 | Hand-written mapping in several places | models.py | 5 | finding: AP-12 models.py:24-41 |
+| AP-12 | Copy-and-modify with divergence | controllers.py:24-96 | 1 | finding: AP-12 controllers.py:24-96 |
+| AP-12 | Same constant repeated across files | status literals | 8 sites | finding: AP-15 controllers.py:242-250 |
+| AP-12 | Condition repeated at many call sites | controllers.py | `if not dados` ×4 | folded into AP-11 controllers.py:111-126 |
+| AP-13 | Paired acquire/release without scope | database.py, models.py | 0 (cursors never explicitly released; connection global) | folded into AP-07 |
+| AP-13 | Handle with no release on failure | database.py | 1 — global connection never closed | folded into AP-07 database.py:4-11 |
+| AP-13 | Connection per call / unbounded pool | all | 0 | none |
+| AP-13 | Outbound call with no timeout | all | 0 (no outbound calls) | none |
 | AP-13 | Retry without bound | all | 0 | none |
-| AP-13 | Unbounded read | models.py:7, 75, 206 | 3 | finding: AP-13 models.py:4-8 |
-| AP-13 | Unbounded in-memory accumulator | all | 0 | none |
-| AP-13 | Background task without shutdown | all | 0 | none |
+| AP-13 | Unbounded read | models.py | 3 — 7, 75, 206 | finding: AP-13 models.py:4-22 |
+| AP-13 | Unbounded accumulator/cache/queue | all | 0 | none |
+| AP-13 | Background task with no shutdown | all | 0 | none |
 | AP-13 | Unbounded recursion | all | 0 | none |
-| AP-14 | Layer 1 — runtime warnings forced on | boot (`python -X dev app.py`, PYTHONWARNINGS=always::DeprecationWarning), seed (runs inside boot), all 20 routes + error paths (23 requests) | 0 DeprecationWarning lines | none |
+| AP-14 | Layer 1: boot with detectors forced | run-1 container, `python -X dev`, PYTHONDEVMODE=1, PYTHONWARNINGS=always::DeprecationWarning | 0 warnings | none |
+| AP-14 | Layer 1: seed/bootstrap exercised | seed runs inside get_db() at first boot (run-1) | 0 warnings | none |
+| AP-14 | Layer 1: surface exercised | all 20 routes incl. destructive reset, plus 7 failure probes | 0 warnings | none |
 | AP-14 | Dependency flagged deprecated in manifest/metadata | requirements.txt, installed metadata | 0 | none |
-| AP-14 | Version marked unsupported by the manifest | requirements.txt | 0 | none |
-| AP-14 | Structurally superseded constructs | all source files | 0 observed | none |
-| AP-14 | Layer 2 — registry yanked/deprecated | PyPI JSON for flask 3.1.1, flask-cors 5.0.1 (2026-11-05) | 0 (yanked: false) | none |
-| AP-14 | Layer 2 — native tooling distance | `pip list --outdated` in container (2026-11-05) | Flask 3.1.1→3.1.3, flask-cors 5.0.1→6.0.5 | discarded as deprecation: version distance only, no deprecation signal; the upgrades are carried by the AP-19 findings |
-| AP-15 | Unexplained numeric literal in rule | models.py:256-262, controllers.py:47-50 | 2 sites | findings: AP-15 models.py:256-262; AP-15 app.py:85-88 |
-| AP-15 | Bare duration/size without unit | all | 0 | none |
-| AP-15 | String enum repeated across files | controllers/models/database | status strings | finding: AP-15 controllers.py:242-250 |
-| AP-15 | Literal repeated in several places | app.py:36, controllers.py:285 | version string | finding: AP-15 app.py:85-88 |
+| AP-14 | Structurally superseded constructs | all source files | 0 | none |
+| AP-14 | Layer 2: registry (PyPI yanked) | flask 3.1.1, flask-cors 5.0.1 (2026-11-10) | 0 — yanked: false | none |
+| AP-14 | Layer 2: native tooling (outdated) | — | not run | UNVERIFIED — `pip list --outdated` not run; distance from latest release not measured |
+| AP-14 | Layer 2: official docs/changelog | — | no Tier-D suspicion to check | none |
+| AP-15 | Unexplained numeric literal in a decision | models.py, controllers.py | models.py:257-262; controllers.py:47-49 (2/200) | finding: AP-15 models.py:256-262; 2/200 discarded: local, meaning clear from the error messages |
+| AP-15 | Duration/size without unit | all | 0 | none |
+| AP-15 | String literal as enumerated value repeated | all | status ×8; category list controllers.py:52 | finding: AP-15 controllers.py:242-250; category list folded into AP-12 controllers.py:24-96 |
+| AP-15 | Literal repeated in several places | controllers.py:285, app.py:36 "1.0.0" | 2 | discarded: version string, informational |
 | AP-15 | Numeric code compared directly | all | 0 | none |
-| AP-15 | Unnamed index into tuple | controllers.py:270-274, models.py:240-254 | `fetchone()[0]` for COUNT/SUM | discarded: single-column aggregate, position unambiguous |
-| AP-15 | Environment literal inline | app.py:88, database.py:5 | port, host, db path | finding: AP-15 app.py:85-88 |
-| AP-16 | Name contradicts behaviour | controllers.py:286-288 | hardcoded ambiente/debug | finding: AP-16 controllers.py:285-288 |
-| AP-16 | Non-descriptive identifiers | models.py, controllers.py | `dados`, `cursor2`/`cursor3`, `prod` | discarded: local scope, meaning clear |
-| AP-16 | Several names for one concept | controllers.py | `buscar_produto` vs `buscar_produtos` | finding: AP-16 (same) |
+| AP-15 | Unnamed tuple/row index | database.py:57, controllers.py:270-274, models.py:240-254 | `fetchone()[0]` | discarded: single-column aggregate results, meaning explicit in the query |
+| AP-15 | Environment-specific literal inline | app.py:85, 88; database.py:5 | 3 | folded into AP-06 / AP-18 app.py:80-88 |
+| AP-16 | Name contradicting behaviour | database.py:7 | 1 — get_db writes | finding: AP-16 database.py:7-86 |
+| AP-16 | Non-descriptive identifiers | all | `dados`, `row`, `e` | discarded: idiomatic in tiny scopes |
+| AP-16 | Several names for one concept | controllers.py | buscar_produto / buscar_produtos | folded into AP-16 database.py:7-86 |
 | AP-16 | Name describes how not what | all | 0 | none |
 | AP-16 | Mixed naming conventions | all | 0 (snake_case throughout) | none |
-| AP-16 | Mixed human languages in identifiers | all | `get_todos_produtos`, `health_check`, … | finding: AP-16 (same) |
-| AP-16 | Inconsistent file placement | all | app.py holds admin persistence | absorbed in AP-04 app.py:47-78 |
-| AP-16 | Comment contradicts code | all | 0 comments | none |
-| AP-16 | Boolean params at call sites | all | 0 | none |
+| AP-16 | Mixed human languages | all | Portuguese domain + English framework | discarded: consistent choice (domain in Portuguese) |
+| AP-16 | Files where their name says they don't belong | controllers.py, models.py | names nominal | folded into AP-03 findings |
+| AP-16 | Comment contradicting code | all | 0 comments | none |
+| AP-16 | Boolean parameters at call sites | database.py:10 `check_same_thread=False` | 1 | discarded: keyword argument, readable |
 | AP-17 | Commented-out code | all | 0 | none |
 | AP-17 | Unreachable branch | all | 0 | none |
-| AP-17 | Unit never referenced | all | 0 (every controller is registered) | none |
-| AP-17 | Unused import / declared dep never imported | all + requirements.txt | models.py:2, database.py:2; both deps imported | finding: AP-17 models.py:2-2 |
-| AP-17 | Parameter accepted never read | models.py:122 | `tipo` default — read in the INSERT | none |
+| AP-17 | Defined but never referenced unit | all | 0 (every function registered or called) | none |
+| AP-17 | Unused import / undeclared or unused dependency | all | 2 — database.py:2, models.py:2 | finding: AP-17 database.py:2-2 |
+| AP-17 | Parameter never read / value never used | models.py:122 `tipo` default | 0 (it is used) | none |
 | AP-17 | Constant feature flag | all | 0 | none |
-| AP-17 | Endpoint not reachable | app.py | 0 | none |
-| AP-17 | Old copy kept in tree | target tree | 0 | none |
-| AP-18 | Debug mode by literal | app.py:8, 88 | 2 (debugger observed) | finding: AP-18 app.py:8-8 |
-| AP-18 | Dev server as production server | app.py:88 | 1 (warning observed in log) | finding: AP-18 app.py:80-88 |
-| AP-18 | Bind-all + debug | app.py:88 | 1 | finding: AP-18 app.py:8-8 (named) |
-| AP-18 | Error output exposes internals | observed run | debugger page; `str(e)` bodies; /health config | findings: AP-18 app.py:8-8; AP-09 controllers.py:5-12; AP-18 controllers.py:276-290 |
-| AP-18 | Permissive CORS | app.py:9 | 1 (origin reflected, observed) | finding: AP-18 app.py:9-9 |
-| AP-18 | Unrestricted diagnostic/admin surface | app.py, controllers.py | /admin/*, /health | findings: AP-04 app.py:47-78; AP-18 controllers.py:276-290 |
-| AP-18 | Protective defaults switched off | all | 0 (no cookies/forms) | none |
-| AP-19 | OSV advisory for direct dep | flask 3.1.1, flask-cors 5.0.1 (OSV querybatch 2026-11-05) | flask: 1 (LOW); flask-cors: 3 (MODERATE) | findings: AP-19 requirements.txt:1-1; AP-19 requirements.txt:2-2 |
-| AP-19 | Advisory on transitive dep | werkzeug 3.1.9, jinja2 3.1.6, markupsafe 3.0.4, itsdangerous 2.2.0, click 8.5.0, blinker 1.9.0 (installed 2026-11-05) | 0 | none (holds for this installation date) |
-| AP-19 | Lockfile pins vulnerable while range allows fix | n/a | no lockfile | none |
+| AP-17 | Endpoint unreachable from registration | all | 0 | none |
+| AP-17 | Old copy of a file kept | tree listing | 0 | none |
+| AP-18 | Debug mode by literal on start path | app.py:8, 88 | 2 | finding: AP-18 app.py:80-88 |
+| AP-18 | Development server as production server | app.py:88; no Procfile/Dockerfile | 1 | finding: AP-18 app.py:88-88 |
+| AP-18 | Any-address bind with debug | app.py:88 | 1 | finding: AP-18 app.py:80-88 |
+| AP-18 | Error output exposing internals | run copy observation | debugger page; `str(e)` bodies | AP-18 app.py:80-88; AP-09 controllers.py:5-12 |
+| AP-18 | Permissive / reflecting CORS | app.py:9; run copy | 1 — Origin reflected | finding: AP-18 app.py:9-9 |
+| AP-18 | Unrestricted diagnostic/admin surfaces | app.py, controllers.py | /health config leak; /admin/* | finding: AP-18 controllers.py:264-292; /admin/* under AP-04 |
+| AP-18 | Protective defaults switched off | all | 0 | none |
+| AP-19 | OSV advisory for direct dependency | flask 3.1.1, flask-cors 5.0.1 (2026-11-10) | 4 | findings: AP-19 requirements.txt:2-2, AP-19 requirements.txt:1-1 |
+| AP-19 | OSV advisory for transitive dependency | werkzeug 3.1.9, jinja2 3.1.6, markupsafe 3.0.4, itsdangerous 2.2.0, click 8.5.1, blinker 1.9.0 (installed, 2026-11-10) | 0 | none (holds for this installation date) |
+| AP-19 | Lockfile pins vulnerable while range would fix | — | 0 (no lockfile) | none |
 | AP-19 | No lockfile with ranges | requirements.txt | 0 (exact pins) | none |
-| AP-19 | No lockfile, exact pins | requirements.txt | 2 exact pins | queried as above; not itself a finding |
-| AP-20 | Identity column without UNIQUE | database.py:30 | `email` | finding: AP-20 database.py:26-35 |
-| AP-20 | Reference column without FK | database.py:39, 48-49 | 3 | finding: AP-20 database.py:26-35 |
-| AP-20 | Parent delete with no child rule | models.py:65-70 | delete product leaves itens_pedido | finding: AP-20 database.py:26-35 |
-| AP-20 | Money in binary float | database.py:19, 41, 51; models.py:146 | 3 columns + arithmetic | finding: AP-20 database.py:14-24 |
-| AP-20 | Required column nullable / closed set as free text | database.py | status free text; all columns nullable | finding: AP-20 database.py:26-35 (status named) |
+| AP-19 | No lockfile, exact pins | requirements.txt | 1 | discarded: exact pins act as the lock for direct deps; transitive versions read from installed metadata |
+| AP-20 | Identity column without uniqueness | database.py:30 | 1 — usuarios.email | finding: AP-20 database.py:26-53 |
+| AP-20 | Reference column without FK | database.py:39, 48-49 | 3 | finding: AP-20 database.py:26-53 |
+| AP-20 | Parent delete with no child rule | models.py:65-70 | 1 | finding: AP-20 database.py:26-53 |
+| AP-20 | Money in binary floating point | database.py:19, 41, 51; models.py:146 | 4 | finding: AP-20 database.py:14-25 |
+| AP-20 | Required column nullable / closed set as free text | database.py | all columns nullable; status/categoria free text | folded into AP-20 database.py:26-53 and AP-15 |
 
 ## Classification Decisions
-none — every privileged operation matched an explicit signal of guidelines §6 (caller-supplied SQL, bulk reset, financial aggregate); every other operation is an ordinary business operation (domain records, account listing/lookup, sign-in, registration, checkout).
+D1. GET /health — returns DB connectivity, record counts per table and runtime configuration (debug flag, environment, db path, signing key).
+  Privileged because: it exists for diagnostics/operations and exposes configuration only an operator needs (debug flag, db path, environment, secret key).
+  Business because:   the catalog treats a health endpoint as public by design; load balancers and uptime monitors call it anonymously, and its counts are plain counts of records (a read, not a management aggregate).
+  If privileged: guard the whole endpoint with an operator credential from configuration, closed by default (anonymous calls answer 403); the secret field is masked in either case (AP-18 controllers.py:264-292).
+  If business:   the endpoint stays open with the secret masked and configuration read from config; restricting its configuration fields is recorded under PROPOSED, NOT APPLIED.
 
 ## Dependency and Deprecated API Verification
 
 | Item | Version in use | Check | Evidence tier | Source | Looked up | Result |
 |---|---|---|---|---|---|---|
-| Python runtime + all code paths | 3.13 (python:3.13-slim) | deprecation (forced warnings) | A (none emitted) | `python -X dev`, PYTHONWARNINGS=always::DeprecationWarning, boot + 23 requests | n/a — local | no issue found |
-| flask | 3.1.1 | deprecation / yanked | B | https://pypi.org/pypi/flask/3.1.1/json (`yanked: false`) | 2026-11-05 | no issue found |
-| flask-cors | 5.0.1 | deprecation / yanked | B | https://pypi.org/pypi/flask-cors/5.0.1/json (`yanked: false`) | 2026-11-05 | no issue found |
-| flask | 3.1.1 | advisory | B | OSV GHSA-68rp-wp8r-4726 / CVE-2026-27205 (LOW), fixed 3.1.3 | 2026-11-05 | AP-19 requirements.txt:1-1 |
-| flask-cors | 5.0.1 | advisory | B | OSV GHSA-43qf-4rqw-9q2g, GHSA-7rxf-gvfg-47g4, GHSA-8vgw-p6qm-5gr7 (MODERATE), fixed 6.0.0 | 2026-11-05 | AP-19 requirements.txt:2-2 |
-| flask-cors | 6.0.0 | breaking-change notes | C | https://github.com/corydolphin/flask-cors/releases/tag/6.0.0 | 2026-11-05 | path-specificity ordering only (input to the AP-19 contract) |
-| werkzeug, jinja2, markupsafe, itsdangerous, click, blinker | 3.1.9, 3.1.6, 3.0.4, 2.2.0, 8.5.0, 1.9.0 (installed) | advisory | B | OSV querybatch | 2026-11-05 | no issue found (for this installation) |
+| Runtime deprecation warnings (boot, seed, 20 routes, 7 failure probes) | Python 3.13 / Flask 3.1.1 | deprecation | A (none emitted) | `python -X dev`, PYTHONDEVMODE=1, PYTHONWARNINGS=always::DeprecationWarning | n/a — local | no issue found |
+| flask | 3.1.1 | advisory | B | OSV.dev GHSA-68rp-wp8r-4726 (CVE-2026-27205, LOW) | 2026-11-10 | AP-19 requirements.txt:1-1 |
+| flask | 3.1.1 | deprecation (yanked) | B | pypi.org/pypi/flask/3.1.1/json | 2026-11-10 | no issue found |
+| flask-cors | 5.0.1 | advisory | B | OSV.dev GHSA-43qf-4rqw-9q2g, GHSA-7rxf-gvfg-47g4, GHSA-8vgw-p6qm-5gr7 (MODERATE) | 2026-11-10 | AP-19 requirements.txt:2-2 |
+| flask-cors | 5.0.1 | deprecation (yanked) | B | pypi.org/pypi/flask-cors/5.0.1/json | 2026-11-10 | no issue found |
+| werkzeug, jinja2, markupsafe, itsdangerous, click, blinker | 3.1.9, 3.1.6, 3.0.4, 2.2.0, 8.5.1, 1.9.0 (installed) | advisory | B | OSV.dev querybatch | 2026-11-10 | no issue found (holds for this installation) |
+| all packages | — | outdated distance | — | `pip list --outdated` | not run | UNVERIFIED |
 
 ## Execution Log
 
 | # | Phase | Action | Mode | Handle | Command | Result |
 |---|---|---|---|---|---|---|
-| 1 | 2 | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-1 | `docker run -d … python:3.13-slim sleep infinity` (run-1 mounted at /app) | running |
-| 2 | 2 | install | container | same | `docker exec … pip install -r requirements.txt` | installed 8 packages |
-| 3 | 2 | start (app) | container | same | `docker exec … python -X dev app.py` (foreground exec held by the agent's background task, so stderr warnings are captured) | ready on port 5000 (`proc wait`, 0.0 s) |
-| 4 | 2 | stop | container | same | `docker rm -f refactor-arch-code-smells-project-202611050130-70bad0b4-1` | removed (app exec ended with 137) |
-| 5 | 3a | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-2 | run-2 (original); `pip install -r requirements.txt`; `exec -d python app.py` | ready on 5000; full baseline capture (296 entries) |
-| 6 | 3a | stop | container | same | `docker rm -f …-2` | removed |
-| 7 | 3a | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-3 | run-3 (original), fresh boot | ready; `delete-produto` captured alone |
-| 8 | 3a | stop | container | same | `docker rm -f …-3` | removed |
-| 9 | 3a | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-4 | run-4 (original), fresh boot | ready; late entry `sec-busca-aspas-parentese` captured (§4.3) |
-| 10 | 3a | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-5 | run-5 (original), fresh boot | ready; `sec-admin-reset` captured alone |
-| 11 | 3a | stop | container | …-4 | `docker rm -f …-4` | removed |
-| 12 | 3a | stop | container | …-5 | `docker rm -f …-5` | removed |
-| 13 | 3c | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-6 | refactored-1; install from refactored manifest; `exec -d -e SEED_JOAO_PASSWORD -e OPERATOR_TOKEN python app.py` | ready; full replay pass 1 |
-| 14 | 3c | stop | container | same | `docker rm -f …-6` | removed |
-| 15 | 3c | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-7 | refactored-2, fresh boot | ready; `delete-produto` replayed alone |
-| 16 | 3c | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-8 | refactored-3, fresh boot | ready; `sec-admin-reset` replayed alone |
-| 17 | 3c | stop | container | …-7 | `docker rm -f …-7` | removed |
-| 18 | 3c | stop | container | …-8 | `docker rm -f …-8` | removed |
-| 19 | 3d | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-9 | run-6 (original), fresh boot | ready; late entry `sec-status-pedido-inexistente` captured (§4.3) |
-| 20 | 3d | stop | container | same | `docker rm -f …-9` | removed |
-| 21 | 3d | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-10 | refactored-4; `exec python -X dev app.py` with PYTHONWARNINGS=always::DeprecationWarning (foreground exec held by a background task, stderr captured) | ready; full replay pass 2 + re-audit Layer 1 |
-| 22 | 3d | stop | container | same | `docker rm -f …-10` | removed (app exec ended with 137) |
-| 23 | 3d | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-11 | refactored-5, fresh boot | ready; `delete-produto` replayed alone |
-| 24 | 3d | start | container | refactor-arch-code-smells-project-202611050130-70bad0b4-12 | refactored-6, fresh boot | ready; `sec-admin-reset` replayed alone |
-| 25 | 3d | stop | container | …-11 | `docker rm -f …-11` | removed |
-| 26 | 3d | stop | container | …-12 | `docker rm -f …-12` | removed |
-| 27 | 3d | check | container | label refactor-arch.run=202611050130-70bad0b4 | `docker ps -a --filter label=…` | empty — nothing of this run left |
+| 1 | 2 | start | container | refactor-arch-code-smells-project-202611110153-a5f3d99b-1 | `docker run -d ... python:3.13-slim sleep infinity` (run-1 mounted at /app) | running |
+| 2 | 2 | install | container | same | `docker exec ... pip install -r /app/requirements.txt` | installed |
+| 3 | 2 | start app | container | same | `docker exec -d -e PYTHONDEVMODE=1 ... python -X dev /work/boot_logged.py` (runs app.py as `__main__`, log to scratch) | ready on port 5000 (`proc wait`, 0.0 s) |
+| 4 | 2 | stop | container | same | `docker rm -f refactor-arch-code-smells-project-202611110153-a5f3d99b-1` | removed |
+| 5 | 3a | start | container | refactor-arch-code-smells-project-202611110153-a5f3d99b-2 | `run ... sleep infinity` (run-2), `exec pip install -r requirements.txt`, `exec -d python app.py` (original, native config) | ready on port 5000; baseline captured (305 entries) |
+| 6 | 3a | stop | container | same | `docker rm -f ...-2` | removed |
+| 7 | 3a | start | container | refactor-arch-code-smells-project-202611110153-a5f3d99b-3 | same steps on a fresh run-3 copy | ready on port 5000; destructive `sec-admin-reset` captured alone |
+| 8 | 3a | stop | container | same | `docker rm -f ...-3` | removed |
+| 9 | 3c | start | container | refactor-arch-code-smells-project-202611110153-a5f3d99b-4 | refactored-1 copy; refactored manifest installed; `exec -d -e OPERATOR_TOKEN=... python app.py` | ready on port 5000; replay pass 1 |
+| 10 | 3c | stop | container | same | `docker rm -f ...-4` | removed |
+| 11 | 3c/3d | start | container | refactor-arch-code-smells-project-202611110153-a5f3d99b-5 | refactored-2 copy; `python -X dev` with PYTHONDEVMODE/PYTHONWARNINGS (port 5000); second process `python app.py` with APP_PORT=5001 on a database the original created | both ready; destructive entry replayed alone; Layer-1 run; legacy-database smoke check |
+| 12 | 3c/3d | stop | container | same | `docker rm -f ...-5` (both processes inside it) | removed |
+| 13 | 3d | start | container | refactor-arch-code-smells-project-202611110153-a5f3d99b-6 | refactored-3 copy (after the re-audit fix) | ready on port 5000; full replay pass 2 |
+| 14 | 3d | stop | container | same | `docker rm -f ...-6` | removed |
+| 15 | 3d | start | container | refactor-arch-code-smells-project-202611110153-a5f3d99b-7 | refactored-4 copy | ready on port 5000; destructive entry replayed alone |
+| 16 | 3d | stop | container | same | `docker rm -f ...-7` | removed; label listing for run 202611110153-a5f3d99b empty |
 
 ## Verification Coverage
-Full — all planned checks executed (Layer 1 forced warnings over boot, seed and every route; Layer 2 OSV + PyPI + native tooling + release notes; default error page observed).
-Note — the Layer-1 boot used a foreground `docker exec` held by a background task instead of `exec -d`, so the application's stderr could be read; the container remained the handle and was removed by its exact name.
-Scratch root: the environment's scratch directory (protocol §1.1, option 1). Excluded from every copy: .git, .hg, .svn, .venv, venv, __pycache__ (none present in the target).
+DEGRADED — the following checks did not run, and the findings above do not cover them:
+  - Native outdated-version check (`pip list --outdated`): not run → distance of each dependency from its latest release is unverified.
+Scratch root: the environment's scratch directory (protocol §1.1, option 1).
+Snapshot: pristine/ and run-1/ under the scratch root; excluded from copies: .venv, __pycache__ (and VCS dirs). Snapshot kept for Phase 3.
+Layer-1 boot ran under the native configuration (debug on, port 5000, host 0.0.0.0) inside the container; no port override was used.
 
 ================================
-Total: 33 findings
+Total: 34 findings
 ================================
 
 Phase 2 complete. Proceed with refactoring (Phase 3)? [y/n]
   y = apply all findings (contract-changing items will be proposed, not applied)
   n = stop here; the report is saved and nothing else was touched
   c = apply CRITICAL and HIGH only
-> y
+  For each classification decision, answer privileged or business (e.g. "y D1=privileged D2=business"). An unanswered decision is treated as business (proposed).
+>
+Answer: y D1 = Business   (human, relayed verbatim by the coordinating agent)
 
 ================================
 PHASE 3: REFACTORING COMPLETE
@@ -487,167 +493,147 @@ PHASE 3: REFACTORING COMPLETE
 ## New Project Structure
 ```
 code-smells-project/
-├── app.py                         composition root: create_app(), entry point
+├── app.py                         composition root: settings, object graph, routes, error boundary, start
+├── requirements.txt               flask==3.1.3, flask-cors==6.0.0
+├── README.md                      run instructions + variables to export
+├── .gitignore                     database files, caches, venv, .env
 ├── config/
 │   ├── __init__.py
-│   ├── settings.py                environment read once → frozen Settings
-│   └── variables.example          list of variables to export (not loaded by the app)
-├── models/                        domain rules + persistence (repositories live here)
+│   ├── settings.py                the only reader of the environment; immutable Settings
+│   └── environment.example        list of variables to export (secrets empty)
+├── models/                        domain, rules and persistence (repositories live in the model layer)
 │   ├── __init__.py
-│   ├── database.py                connection factory, schema, first-boot seed
-│   ├── erros.py                   domain error taxonomy
-│   ├── pedido.py                  StatusPedido, total computation, PedidoRepository
-│   ├── produto.py                 product invariants, ProdutoRepository
-│   ├── relatorio.py               discount tiers, RelatorioRepository
-│   ├── senha.py                   scrypt password hashing / verification
-│   └── usuario.py                 UsuarioRepository (password masked on output)
+│   ├── errors.py                  domain error taxonomy
+│   ├── database.py                connection factory, explicit transactions, schema/migration/seed bootstrap
+│   ├── money.py                   integer cents <-> API decimal numbers
+│   ├── passwords.py               PBKDF2 hashing, constant-time verify, legacy upgrade-on-login
+│   ├── catalog.py                 product invariants (one definition for create and update)
+│   ├── order_status.py            closed set of order statuses
+│   ├── sales_report.py            discount tiers and report computation (pure)
+│   ├── product_repository.py
+│   ├── user_repository.py
+│   ├── order_repository.py        set-based listing, all-or-nothing order creation
+│   └── store_stats_repository.py
 ├── controllers/                   use cases, plain values in and out
 │   ├── __init__.py
-│   ├── notificador.py             notification adapter (log)
-│   ├── pedido_controller.py
-│   ├── produto_controller.py
-│   ├── relatorio_controller.py
-│   ├── sistema_controller.py      health
-│   └── usuario_controller.py
-├── views/                         routes: parse → call one controller → render
-│   ├── __init__.py                registrar_rotas
-│   ├── entrada.py                 boundary type/range parsing for every request input
-│   ├── pedido_routes.py
-│   ├── produto_routes.py
-│   ├── relatorio_routes.py
-│   ├── sistema_routes.py
-│   └── usuario_routes.py
+│   ├── product_controller.py
+│   ├── user_controller.py
+│   ├── order_controller.py
+│   ├── report_controller.py
+│   └── health_controller.py
+├── views/                         HTTP routes: parse -> call -> render
+│   ├── __init__.py
+│   ├── schemas.py                 boundary parsing: type and range of every request input
+│   ├── serializers.py             response shapes; credential fields masked
+│   ├── products.py
+│   ├── users.py
+│   ├── orders.py
+│   ├── reports.py                 operator-guarded management report
+│   └── system.py                  index and health
 ├── middlewares/
 │   ├── __init__.py
-│   ├── conexao.py                 one DB connection per request, closed at teardown
-│   ├── operador.py                operator guard (OPERATOR_TOKEN, constant-time, closed by default)
-│   └── tratamento_de_erros.py     centralized error boundary
-├── reports/                       audit output (surface.json, baseline.json, replay.json, audits)
-├── .gitignore                     new: loja.db, .env, __pycache__, venvs
-├── README.md                      run instructions: export variables
-└── requirements.txt               flask==3.1.3, flask-cors==6.0.0
+│   ├── error_handler.py           central error boundary
+│   ├── db_session.py              one connection per request, closed at teardown
+│   └── operator_guard.py          operator credential, constant-time, closed by default
+├── adapters/
+│   ├── __init__.py
+│   └── notifier.py                console notifications (unchanged messages, one place)
+└── reports/                       audit-20261110-2258.md, audit-latest.md, surface.json, baseline.json, replay.json
 ```
-Removed (rewritten in place): `controllers.py`, `models.py`, `database.py`.
-Layout decisions: MVC at the project root (no `src/`); repositories kept inside `models/` (guidelines §2), one module per domain concept. Naming: Portuguese for domain and application identifiers, with the pattern-role suffixes `Repository`/`Controller`; the configuration module keeps English names (`Settings`, `load_settings`).
+Removed (in-place rewrite): `controllers.py`, `models.py`, `database.py`. Removed from the surface: `POST /admin/reset-db`, `POST /admin/query` (AP-04; unsafe by construction, no documented operational use). Layout: MVC with repositories inside `models/`.
 
 ## Validation
   ✓ Application boots without errors
-  ✓ Public surface replayed: 39 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 1 UNVERIFIED
-    Security entries: 12 FIXED, 0 NOT FIXED
+  ✓ Public surface replayed: 37 PASS, 0 REGRESSION, 0 PRE-EXISTING FAILURE, 0 UNVERIFIED
+    Security entries: 18 FIXED, 0 NOT FIXED
   ✓ Malformed input: 242 ROBUST, 0 NOT ROBUST, 0 REGRESSION over 12 operations
-  ✓ Values: 6 HOLDS, 0 VIOLATED, 0 UNVERIFIED
-  ○ Findings resolved: 22/33  (10 proposed, 1 unresolved)
-  ○ Anti-patterns remaining: 9 proposed-not-applied, 1 unresolved  (re-audit: 10 findings)
-    Re-audit passes: 2; fixed after re-audit: 1 (1 of them missed-in-phase-2)
-  ✓ Processes: 12 started, 12 stopped through their handles, 0 left running, 0 incidents
+  ✓ Values: 9 HOLDS, 0 VIOLATED, 0 UNVERIFIED
+  ○ Findings resolved: 25/34  (9 proposed, 0 unresolved)
+  ○ Anti-patterns remaining: 6 proposed-not-applied, 1 unresolved  (re-audit: 7 findings)
+    Re-audit passes: 2; fixed after re-audit: 1 (0 of them missed-in-phase-2)
+  ✓ Processes: 7 started, 7 stopped through their handles, 0 left running, 0 incidents
     Isolation: container
   ✓ Commands: 0 directory changes, 0 chained commands
 
-### Findings by bucket (Phase 2 total stays 33)
-Resolved (22):
-- [CRITICAL] AP-01 app.py:7-7 — signing key from `SECRET_KEY`; unset → random per-process key, never a known value.
-- [CRITICAL] AP-18 app.py:8-8 — debug off by default (`APP_DEBUG` opt-in); unexpected errors answer the JSON boundary, not the debugger (status 500 kept).
-- [CRITICAL] AP-04 app.py:47-78 — `/admin/query` and `/admin/reset-db` removed from the surface (replay: 404, `sec-admin-query` and `sec-admin-reset` FIXED).
-- [CRITICAL] AP-03 controllers.py:1-292 — split into views/ (5 route modules), controllers/ (5 use-case modules), models/.
-- [CRITICAL] AP-04 controllers.py:257-262 — `/relatorios/vendas` guarded by `OPERATOR_TOKEN` via `X-Operator-Token`, constant-time, 403 when unset (replay: anonymous FIXED, operator path PASS + value entry HOLDS).
-- [CRITICAL] AP-03 models.py:1-314 — one module per concept, rules separated from SQL, one mapper per entity.
-- [CRITICAL] AP-08 models.py:72-103 — `senha` masked `********`, field and type kept (value entries HOLD).
-- [CRITICAL] AP-02 models.py:109-111 — every statement parameterized (replay: `sec-login-sqli` 200→401, `sec-busca-aspas-parentese` 500→like sibling, `sec-create-produto-aspas` 500→201 like sibling).
-- [HIGH] AP-09 controllers.py:5-12 — one error boundary; generic 500 body `{"erro": string}`; order creation in one transaction.
-- [HIGH] AP-12 controllers.py:24-96 — one validator (`views/entrada.ler_produto` + `models/produto.validar_invariantes`) for create and update; the create copy was chosen as correct (FIXED: invalid category and short name on update now 400).
-- [HIGH] AP-07 database.py:4-11 — no module-level connection; one per request, closed at teardown.
-- [HIGH] AP-06 models.py:1-6 — composition root in `app.create_app`; repositories receive a connection provider; DB path resolved against the project root.
-- [HIGH] AP-10 models.py:139-166 — products fetched in batched `IN` queries, lines and stock updates by `executemany` in one transaction.
-- [MEDIUM] AP-08 controllers.py:161-161 — logs carry the user id, never the email.
-- [MEDIUM] AP-15 controllers.py:242-250 — `StatusPedido` used by validation, persistence, report and notifications.
-- [MEDIUM] AP-12 models.py:4-41 — one mapper per entity; one order loader with a filter.
-- [MEDIUM] AP-10 models.py:203-233 — orders and their lines in two queries (JOIN), any number of orders.
-- [MEDIUM] AP-15 models.py:256-262 — `FAIXAS_DE_DESCONTO` tier table (value entry: report values HOLD).
-- [MEDIUM] AP-19 requirements.txt:2-2 — flask-cors 5.0.1 → 6.0.0 (lowest fixed; cross-major, changed behaviour is path ordering; replay covered CORS: `list-produtos-cors` and `preflight-produtos` PASS with identical `Access-Control-*` headers). OSV 2026-11-05: no advisory for 6.0.0.
-- [LOW] AP-15 app.py:85-88 — host/port/db file in configuration; name limits, categories, API version as named constants.
-- [LOW] AP-17 models.py:2-2 — unused imports gone with the rewrite.
-- [LOW] AP-19 requirements.txt:1-1 — Flask 3.1.1 → 3.1.3 (patch). OSV 2026-11-05: no advisory for 3.1.3.
+## Findings by bucket (Phase 2 total: 34)
+resolved (25): AP-04 reset route removed (app.py:47-57); AP-04 SQL route removed (app.py:59-78); AP-18 debugger off by default (app.py:80-88); AP-03 controllers.py split; AP-04 sales report guarded by OPERATOR_TOKEN (controllers.py:257-262); AP-03 models.py split; AP-02 every statement parameterized; AP-09 central error boundary + transaction around order creation; AP-12 one product validator; AP-11 order items (shape, integer type, positive quantity, user existence); AP-07 per-request connection; AP-20 money in integer cents; AP-06 composition root; AP-08 passwords masked in responses; AP-10 order creation set-based (fixed after re-audit, origin failed); AP-11 wrong-typed input -> 400; AP-08 no personal data in logs; AP-12 one serializer per entity; AP-10 order listings joined; AP-15 discount tiers named; AP-19 flask-cors 6.0.0; AP-15 status enumeration; AP-17 unused imports gone; AP-16 explicit bootstrap, no writing getter; AP-19 Flask 3.1.3.
+proposed (9): AP-01 signing key (operator: rotate); AP-04 business operations (identity model); AP-18 health configuration fields (D1 = business); AP-01 seeded known passwords (operator: rotate in existing databases); AP-08 plaintext passwords (operator: reset window); AP-18 development server; AP-20 foreign keys / delete rule; AP-18 cross-origin allow-list; AP-13 pagination.
+unresolved (0).
 
-Proposed (10) — see `## Proposed, Not Applied`:
-- [CRITICAL] AP-04 app.py:11-26 (identity model) · [CRITICAL] AP-18 controllers.py:276-290 (secret masked — resolved part; non-secret config fields kept by contract) · [CRITICAL] AP-01 database.py:75-83 (code done; operator residue) · [CRITICAL] AP-08 models.py:122-131 (code done; operator residue) · [HIGH] AP-18 app.py:80-88 · [HIGH] AP-11 controllers.py:188-216 (all type/range checks applied; item-count bound needs a product decision) · [HIGH] AP-20 database.py:14-24 (computation in Decimal/cents applied; column migration proposed) · [HIGH] AP-20 database.py:26-35 · [MEDIUM] AP-18 app.py:9-9 · [MEDIUM] AP-13 models.py:4-8
+Contract classifications revised in Phase 3 (the playbook decides them; recorded here so the change is visible):
+- AP-20 identity and references (database.py:26-53): the unique e-mail index and the order's user-existence check were applied as safe (RP-19: a uniqueness constraint on a column already used as an identity, and rejecting a reference to a row that does not exist). Only the foreign keys and their delete rule are proposed.
+- AP-11 order items (controllers.py:188-220): the user-existence check, marked "would be proposed" at the gate, was applied under the same RP-19 rule.
+- AP-19 flask-cors (requirements.txt:2-2): major upgrade applied; the replay's Origin and preflight entries (`list-products-cors`, `preflight-products-cors`) PASS with identical Access-Control-* headers.
 
-Unresolved (1):
-- [LOW] AP-16 controllers.py:285-288 — origin `failed`. Fixed: health values now come from configuration; the lookup/search pair renamed (`obter_produto` / `pesquisar_produtos`); `id` no longer shadows the builtin. Not fixed: the view functions `index` and `health_check` (views/sistema_routes.py:7, 21) keep English names among Portuguese ones. Found by re-audit pass 2; no third pass.
-
-### Re-audit
-Pass 1 (after the mandatory full replay): 11 findings — 8 matching `PROPOSED, NOT APPLIED` items; unresolved: AP-16 (`failed`: `buscar_produto`/`buscar_produtos` view pair and `id` parameters), AP-11 status update of a non-existent order answers 200 and does nothing (`missed-in-phase-2`; Phase 2 ledger row AP-11 "Domain invariant enforced nowhere" examined only order creation), AP-11 free order-status transitions and cancellation that does not restore stock (`missed-in-phase-2`, same ledger row; contract-changing → proposed with its tag).
-Fixes between passes: view renames; `PUT /pedidos/<id>/status` on a non-existent order → 404 `{"erro": "Pedido não encontrado"}` (security entry `sec-status-pedido-inexistente`, captured against the original first: 200 → 404, FIXED). Then the full replay again (pass-2 numbers above).
-Pass 2 (final): 10 findings — 9 proposed-not-applied (the 8 above + the status-transition item), 1 unresolved (AP-16 `failed`, listed above).
-Re-audit AP-14/AP-19: Layer 1 on the refactored app with `-X dev` and PYTHONWARNINGS=always::DeprecationWarning over boot + the whole surface: 0 warnings, 0 unhandled errors. Layer 2 (2026-11-05): OSV querybatch for flask 3.1.3, flask-cors 6.0.0, werkzeug 3.1.9, jinja2 3.1.6, markupsafe 3.0.4, itsdangerous 2.2.0, click 8.5.0, blinker 1.9.0 → no advisories; PyPI: flask 3.1.3 and flask-cors 6.0.0 not yanked.
-Discarded in the re-audit (with reason): `PedidoRepository.listar` holds two similar query pairs (all orders / one user's) — kept apart on purpose so no SQL is assembled from fragments (AP-12, de-escalated); class names `ProdutoRepository`/`…Controller` mix a pattern-role suffix with a domain noun — pattern vocabulary, not mixed-language naming (AP-16); `SistemaController` catches `ErroDeBanco` (an alias of the driver error) — narrow and deliberate, it produces the health endpoint's own error contract (AP-09).
+## Re-audit
+Pass 1 (after the first full replay), over the refactored tree with the same catalog, OSV/PyPI re-checked (2026-11-11, no advisories for flask 3.1.3, flask-cors 6.0.0 or the transitive set), Layer-1 detectors on (boot, 20 routes, failure probes, 0 warnings): 8 findings — 6 matching items already under PROPOSED, NOT APPLIED, plus:
+  - [HIGH] AP-10 per-line stock UPDATE still issued in a loop over the caller's items (models/order_repository.py, order creation) — origin `failed` (part of Phase 2 finding models.py:133-169). Fixed: aggregated per product and sent as one `executemany` batch, rowcount checked, inside the transaction. Counted as fixed-after-re-audit.
+  - [MEDIUM] AP-11 no upper bound on the request body or on the length of `itens` (views/schemas.py `parse_order`; no MAX_CONTENT_LENGTH in app.py) — origin `missed-in-phase-2` (Phase 2 ledger row "AP-11 No bound on body/array length" folded it into AP-10 instead of filing it). Choosing the bound is a product decision: recorded under PROPOSED, NOT APPLIED, still counted as unresolved here.
+Pass 2 (after the fix and a second full replay): 7 findings — 6 proposed-not-applied, 1 unresolved (the AP-11 bound above, `missed-in-phase-2`, proposed). No `introduced` findings.
 
 ## Proposed, Not Applied
-### [CRITICAL] Missing or Bypassable Authorization — anonymous business operations   (AP-04)
-File: app.py:11-26 (now views/*_routes.py)
-Reason not applied: the application has no identity model (sign-in issues nothing any operation verifies), so every current client is anonymous and would start receiving 401/403.
-Proposed change: decide principals and policy; issue a token or session at `/login`, verify it on order and user routes, scope `/pedidos/usuario/<id>`, order creation and status changes to the verified principal, restrict catalog writes and the account listing to an admin role.
+### [CRITICAL] Hardcoded Secrets and Credentials   (AP-01)
+File: app.py:7-7
+Reason not applied: operator residue. The code now reads SECRET_KEY from the environment (empty by default), but the old key is in version-control history forever.
+Proposed change: at the next deploy, export a new random SECRET_KEY (e.g. 32+ random bytes); treat anything signed with the old key as compromised.
+
+### [CRITICAL] Missing or Bypassable Authorization — business operations with no identity model   (AP-04)
+File: app.py:11-26
+Reason not applied: every current client is anonymous; authentication would answer 401 to all of them.
+Proposed change: a sign-in that issues a verified token, a per-request principal, ownership-scoped user and order lookups, and a policy for who may change order status and products. Needs a product decision on principals and roles.
 
 ### [CRITICAL] Insecure Runtime Configuration — health endpoint configuration fields   (AP-18)
-File: controllers.py:276-290 (now controllers/sistema_controller.py:21-41)
-Reason not applied: the secret is masked (applied). The remaining fields `db_path`, `debug` and `ambiente` are part of the response shape clients read; removing them changes the contract.
-Proposed change: drop `secret_key`, `db_path`, `debug` and `ambiente` from `/health` (or move them behind the operator guard), in a coordinated release.
+File: controllers.py:264-292 (now views/system.py)
+Decided at the gate: D1 = business. Applied: `secret_key` masked (field and string type kept), other fields read from configuration, debug now false by default.
+Reason not applied: the endpoint stays open; removing `debug`, `ambiente` and `db_path` would change the body shape clients receive.
+Proposed change: drop those three fields from the public response (or move them to an operator-guarded diagnostics route); keep `status`, `database`, `counts`.
 
-### [CRITICAL] Hardcoded Secrets — seeded accounts (operator residue)   (AP-01)
-File: database.py:75-83 (now models/database.py)
-Reason not applied: the code no longer contains any password; seed passwords come from `SEED_*_PASSWORD` and are hashed, unset → no usable password. Databases already seeded by the old code still hold `admin@loja.com`, `joao@email.com`, `maria@email.com` with the published passwords, and the old literals stay in git history.
-Proposed change: in every environment that ran the old code, before the next deployment: set new passwords for the three seeded accounts (or delete them), e.g. `UPDATE usuarios SET senha='!' WHERE email IN ('admin@loja.com','joao@email.com','maria@email.com')` and re-provision them; treat `minha-chave-super-secreta-123` as compromised and never reuse it as `SECRET_KEY`.
+### [CRITICAL] Hardcoded Secrets and Credentials — seeded accounts with known passwords   (AP-01)
+File: database.py:75-83 (now models/database.py, seed reads SEED_ADMIN_PASSWORD / SEED_CUSTOMER_PASSWORD; empty = unusable password)
+Reason not applied: operator residue. Databases already seeded by the old code still hold the known passwords.
+Proposed change: on each existing database, now: `UPDATE usuarios SET senha = '!' WHERE email IN ('admin@loja.com', 'joao@email.com', 'maria@email.com') AND senha NOT LIKE 'pbkdf2_sha256$%';` then set new passwords through a reset procedure.
 
-### [CRITICAL] Unsafe Handling of Credentials — legacy plaintext rows (operator residue)   (AP-08)
-File: models.py:122-131 (now models/senha.py, controllers/usuario_controller.py)
-Reason not applied: new and seeded passwords are stored as scrypt hashes; legacy plaintext rows are verified and re-hashed on the next successful sign-in. Rows of users who never sign in stay plaintext until an operator acts.
-Proposed change: announce a reset window (e.g. 30 days); at its end, run `UPDATE usuarios SET senha='!' WHERE senha NOT LIKE 'scrypt$%' AND senha <> '!'` and require a password reset for those accounts.
+### [CRITICAL] Unsafe Handling of Credentials and Sensitive Data — plaintext passwords   (AP-08)
+File: models.py:122-131 (now models/passwords.py, models/user_repository.py)
+Reason not applied: operator residue. New passwords are hashed; legacy plaintext rows are verified in constant time and re-hashed on their next successful sign-in (smoke-checked on a database the original created), but rows of users who never sign in stay plaintext.
+Proposed change: announce a reset window (e.g. 30 days); after it, run `UPDATE usuarios SET senha = '!' WHERE senha NOT LIKE 'pbkdf2_sha256$%';` and require a password reset for those accounts.
 
-### [HIGH] Insecure Runtime Configuration — development server   (AP-18)
-File: app.py:80-88 (now app.py:57-62)
-Reason not applied: a production WSGI server is a runtime dependency the application does not have today.
-Proposed change: add e.g. `gunicorn` to the manifest and run `gunicorn -w 4 -b 0.0.0.0:5000 "app:create_app()"`; keep `python app.py` for development.
-
-### [HIGH] Missing Boundary Validation — item-count bound   (AP-11)
-File: controllers.py:188-216 (now views/entrada.py:121-140)
-Reason not applied: every request input now has type and range checks (242 robustness variants ROBUST; negative quantities, unknown users and malformed bodies FIXED). The remaining part, a maximum number of items per order, is a business limit that legitimate clients might exceed.
-Proposed change: decide the maximum (e.g. 100 lines) and reject larger orders with 400 at `ler_pedido`.
-
-### [HIGH] Missing Schema-Level Integrity Constraints — money column type   (AP-20)
-File: database.py:14-24 (now models/database.py)
-Reason not applied: order totals are now computed in `Decimal` and the report sums whole cents (value entries HOLD). The columns are still `REAL`, and changing the stored type needs a migration of existing databases.
-Proposed change: migration adding `preco_centavos`, `total_centavos`, `preco_unitario_centavos INTEGER` filled with `CAST(ROUND(x*100) AS INTEGER)`, switching reads and writes, then dropping the REAL columns by table rebuild; responses keep JSON numbers.
+### [HIGH] Insecure Runtime Configuration — development server as production server   (AP-18)
+File: app.py:88-88 (now app.py `main()`)
+Reason not applied: needs a runtime dependency the application does not have today.
+Proposed change: add a production WSGI server to the manifest and start with e.g. `gunicorn --bind 0.0.0.0:5000 "app:create_app()"`; keep `python app.py` for development.
 
 ### [HIGH] Missing Schema-Level Integrity Constraints — identity and references   (AP-20)
-File: database.py:26-35 (now models/database.py)
-Reason not applied: registering a duplicate email and deleting a product that has order lines are accepted today and would be rejected; existing data may already violate the constraints.
-Proposed change: first count violations (`SELECT email, COUNT(*) FROM usuarios GROUP BY email HAVING COUNT(*) > 1`; `SELECT i.id FROM itens_pedido i LEFT JOIN produtos p ON p.id = i.produto_id WHERE p.id IS NULL`); then `CREATE UNIQUE INDEX usuarios_email_key ON usuarios(email)`, rebuild `pedidos`/`itens_pedido` with FOREIGN KEYs and a decided ON DELETE rule, `PRAGMA foreign_keys=ON` per connection, CHECK on `pedidos.status`.
+File: database.py:26-53 (now models/database.py)
+Applied: unique index `usuarios_email_unico` (created only when no duplicates exist; on a database the original created during this run, 1 duplicated e-mail was found and the index was skipped with a warning), duplicate-registration check (400), user-existence check on order creation (400).
+Reason not applied: foreign keys with a delete rule change what `DELETE /produtos/<id>` does for a product that has orders (refuse, cascade or detach) — a product decision; and an existing database with duplicated e-mails needs a decision on which account wins.
+Proposed change: choose the delete rule, rebuild `pedidos`/`itens_pedido` with foreign keys inside a transaction, enable `PRAGMA foreign_keys = ON` per connection. Count the rows each would reject first: `SELECT email, COUNT(*) FROM usuarios GROUP BY email HAVING COUNT(*) > 1;` and `SELECT i.id FROM itens_pedido i LEFT JOIN produtos p ON p.id = i.produto_id WHERE p.id IS NULL;`.
 
-### [HIGH] Missing Boundary Validation — order status transitions   (AP-11)   — missed-in-phase-2
-File: views/pedido_routes.py:19-23, controllers/pedido_controller.py:38-43
-Reason not applied: any status can move to any other (e.g. `entregue` → `pendente`), and cancelling logs "Devolver estoque" without returning stock. Restricting transitions or restoring stock changes what legitimate clients observe today, and needs a product decision.
-Proposed change: define the allowed transition graph in `models/pedido.py`, reject others with 400, and restore stock on cancellation inside the same transaction.
+### [MEDIUM] Insecure Runtime Configuration — cross-origin policy reflects any origin   (AP-18)
+File: app.py:9-9 (now CORS_ORIGINS in config/settings.py, default "*", current behaviour)
+Reason not applied: narrowing the list cuts off browser front-ends on unlisted origins.
+Proposed change: the team supplies its front-end origins and exports `CORS_ORIGINS=https://<front-end>,...`.
 
-### [MEDIUM] Insecure Runtime Configuration — cross-origin policy   (AP-18)
-File: app.py:9-9 (now app.py:34-34)
-Reason not applied: restricting origins removes cross-origin access that browser clients may have today.
-Proposed change: `CORS(app, origins=settings.allowed_origins)` with `APP_ALLOWED_ORIGINS` (comma-separated) supplied by the team; default empty.
+### [MEDIUM] Unbounded Resources and Leaked Handles — unbounded listings   (AP-13)
+File: models.py:4-22 (now the list_all methods of the repositories)
+Reason not applied: a default page size changes what an existing client of `GET /produtos`, `/usuarios`, `/pedidos` receives.
+Proposed change: optional `limit`/`offset` query parameters with a bounded maximum; decide whether a default limit applies.
 
-### [MEDIUM] Unbounded Resources — unpaginated listings   (AP-13)
-File: models.py:4-8 (now models/produto.py, usuario.py, pedido.py `listar`)
-Reason not applied: a default page size changes what clients that read the full list observe.
-Proposed change: optional `limit`/`offset` query parameters with no default limit first, then a default limit announced to clients.
+### [MEDIUM] Missing Boundary Validation — no bound on request body or order items   (AP-11)   — missed-in-phase-2
+File: views/schemas.py `parse_order`; app.py (no MAX_CONTENT_LENGTH)
+Reason not applied: the maximum number of items per order and the maximum body size are product decisions; any value rejects requests legitimate clients may send today.
+Proposed change: set `MAX_CONTENT_LENGTH` and a maximum `itens` length in configuration, answering 400/413 above them.
 
 ## Verification Coverage
-DEGRADED — the following checks did not run, and the findings above do not cover them:
-  - Security entry `sec-busca-aspas`: the payload `'` happened to be valid SQL in the original, so the baseline already behaved like the benign search → UNVERIFIED. Replaced, not edited, by `sec-busca-aspas-parentese` (captured against the original on a fresh boot: 500 → FIXED).
-  - Password hashing at rest (AP-08 models.py:122-131): no response exposes the stored value, so the harness cannot assert it; covered only indirectly (`login`, `login-usuario-novo` PASS after hashing). Storage format UNVERIFIED by the harness.
-  - Email removed from logs (AP-08 controllers.py:161-161): log content is not part of the surface → UNVERIFIED by the harness.
-INCIDENT — none.
-Notes:
-  - The gate answer `y` arrived through the coordinating agent, which relays the human's answers in this run; it is recorded as such in the header.
-  - Two Layer-1 boots (Phase 2 and re-audit pass 2) used a foreground `docker exec` held by a background task instead of `exec -d`, to read stderr; the container remained the handle and was removed by its exact name.
-  - Text bodies were compared by masked skeleton (protocol §5.2: ISO date-times → `<ts>`, UUIDs → `<uuid>`, ≥16-hex runs → `<hex>`, digit runs → `<n>`); this decided `get-rota-inexistente` (Flask's 404 page, PASS).
-  - Replays ran the refactored app with `SEED_JOAO_PASSWORD` and `OPERATOR_TOKEN` set: the seeded login and the operator route are configuration-dependent now, by design.
-  - The snapshot directory (environment scratch) was deleted after the re-audit, with no container of this run alive.
-Fixtures by reference: {{env:LOGIN_PASSWORD}}, {{env:NEW_USER_PASSWORD}}, {{env:OPERATOR_TOKEN}}
+- Gate answer: given by the human and relayed verbatim by the coordinating agent ("y D1 = Business").
+- Phase 2 gap closed in the re-audit: `pip list --outdated` ran on the refactored environment (flask-cors 6.0.5 available; no advisory for 6.0.0). The original environment's distance from latest remains unverified.
+- Robustness matrix: dotted field names cannot address elements of the `itens` array, so `produto_id`/`quantidade` inside items are not covered by the generated matrix. They are covered by hand-written security entries (`sec-order-negative-quantity`, `-missing-quantity`, `-string-quantity`, `-item-not-object`, `-string-product`), all FIXED.
+- Layer-1 detectors (`-X dev`, PYTHONDEVMODE=1, PYTHONWARNINGS=always::DeprecationWarning) ran on the pass-1 refactored code: boot, all routes, failure probes, 0 warnings, 0 ResourceWarnings. The pass-2 change (one repository method) was replayed in full but not under forced detectors.
+- Legacy-database smoke check (not a replay entry, so UNVERIFIED in harness terms): the refactored app booted on a database the original created; money columns migrated (order totals and prices unchanged), a plaintext password signed in and was re-hashed, sign-in worked again with the hash, the unique e-mail index was skipped because of a duplicate.
+- Pre-existing databases keep the legacy REAL money columns (no longer read or written) and any rows the old code wrote incorrectly (e.g. orders with negative quantities). Neither is repaired; find the latter with `SELECT * FROM itens_pedido WHERE quantidade <= 0;`.
+- Behaviour change not covered by an entry: a price sent with more than two decimal places is now stored rounded to the cent (half-up), so the value read back can differ from the value sent (e.g. 10.555 → 10.56). UNVERIFIED by the replay.
+- JSON responses are no longer pretty-printed (that came from debug mode); the comparison is by shape, so whitespace is not compared.
+- NOTE — commands: three `python -c` one-liners (two in Phase 2 inside the container, one on the host summarising baseline.json) contained `;` as Python statement separators inside a single interpreter process. No shell chain was involved, so they are not counted on the Commands line; they are listed here so a reader can judge for themselves.
+- Snapshot and scratch directory deleted after the re-audit; no container of this run is alive (label listing empty).
+Fixtures by reference: {{env:PROBE_USER_PASSWORD}}, {{env:OPERATOR_TOKEN}}, {{env:SEED_LEGACY_ADMIN_PASSWORD}}
 ================================

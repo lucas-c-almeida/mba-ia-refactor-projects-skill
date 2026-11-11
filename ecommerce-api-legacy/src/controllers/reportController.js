@@ -1,22 +1,16 @@
-'use strict';
+// Use case: the management financial report.
+const { DependencyError } = require('../models/errors');
 
-const { buildFinancialReport } = require('../models/financialReport');
-const { PersistenceError } = require('../models/errors');
-
-class ReportController {
-  constructor({ reports }) {
-    this.reports = reports;
-  }
-
-  async financialReport() {
-    let rows;
-    try {
-      rows = await this.reports.rows();
-    } catch (err) {
-      throw new PersistenceError('Erro DB', err);
-    }
-    return buildFinancialReport(rows);
-  }
+function createReportController({ reports }) {
+    return {
+        async financialReport() {
+            try {
+                return await reports.financialReport();
+            } catch (err) {
+                throw new DependencyError('Erro DB', err);
+            }
+        },
+    };
 }
 
-module.exports = { ReportController };
+module.exports = { createReportController };

@@ -1,36 +1,39 @@
-'use strict';
-
-// Error taxonomy owned by the domain (RP-09). The error boundary maps each one to a response;
-// the messages below are the bodies the application has always answered with.
+// Domain error taxonomy. The error boundary (middlewares/errorHandler.js) maps it to responses.
+// Messages are the bodies the application has always returned on purpose: they are contract.
 
 class AppError extends Error {
-  constructor(message, status, options = {}) {
-    super(message, options);
-    this.status = status;
-  }
+    constructor(message, status) {
+        super(message);
+        this.name = this.constructor.name;
+        this.status = status;
+    }
 }
 
 class ValidationError extends AppError {
-  constructor(message = 'Bad Request') { super(message, 400); }
-}
-
-class NotFoundError extends AppError {
-  constructor(message) { super(message, 404); }
+    constructor(message = 'Bad Request') { super(message, 400); }
 }
 
 class PaymentDeclinedError extends AppError {
-  constructor() { super('Pagamento recusado', 400); }
+    constructor(message = 'Pagamento recusado') { super(message, 400); }
 }
 
 class ForbiddenError extends AppError {
-  constructor() { super('Forbidden', 403); }
+    constructor(message = 'Forbidden') { super(message, 403); }
 }
 
-/** A datastore failure. `message` is the safe text returned; `cause` is logged, never returned. */
-class PersistenceError extends AppError {
-  constructor(message, cause) { super(message, 500, { cause }); }
+class NotFoundError extends AppError {
+    constructor(message = 'Not Found') { super(message, 404); }
+}
+
+// A datastore failure. `message` is the body the client receives; `cause` keeps the driver error
+// for the log only.
+class DependencyError extends AppError {
+    constructor(message = 'Erro DB', cause) {
+        super(message, 500);
+        this.cause = cause;
+    }
 }
 
 module.exports = {
-  AppError, ValidationError, NotFoundError, PaymentDeclinedError, ForbiddenError, PersistenceError,
+    AppError, ValidationError, PaymentDeclinedError, ForbiddenError, NotFoundError, DependencyError,
 };

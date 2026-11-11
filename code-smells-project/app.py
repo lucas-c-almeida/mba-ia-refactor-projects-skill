@@ -1,62 +1,69 @@
-"""Composition root: loads configuration, builds the object graph, registers the routes
-and the error boundary. The only module that names concrete implementations."""
+"""Composition root: load configuration, build the object graph, register routes and
+the error boundary. The only module that names concrete implementations."""
 import logging
 
 from flask import Flask
 from flask_cors import CORS
 
-from config.settings import Settings, load_settings
-from controllers.notificador import NotificadorLog
-from controllers.pedido_controller import PedidoController
-from controllers.produto_controller import ProdutoController
-from controllers.relatorio_controller import RelatorioController
-from controllers.sistema_controller import SistemaController
-from controllers.usuario_controller import UsuarioController
-from middlewares.conexao import registrar_conexao_por_requisicao
-from middlewares.operador import criar_guarda_de_operador
-from middlewares.tratamento_de_erros import registrar_tratamento_de_erros
-from models.database import Database
-from models.pedido import PedidoRepository
-from models.produto import ProdutoRepository
-from models.relatorio import RelatorioRepository
-from models.usuario import UsuarioRepository
-from views import registrar_rotas
-
-logger = logging.getLogger("loja")
+from adapters.notifier import ConsoleNotifier
+from config.settings import load_settings
+from controllers.health_controller import HealthController
+from controllers.order_controller import OrderController
+from controllers.product_controller import ProductController
+from controllers.report_controller import ReportController
+from controllers.user_controller import UserController
+from middlewares import db_session, error_handler
+from models.database import bootstrap, connect
+from models.order_repository import OrderRepository
+from models.product_repository import ProductRepository
+from models.store_stats_repository import StoreStatsRepository
+from models.user_repository import UserRepository
+from views import orders, products, reports, system, users
 
 
-def create_app(settings: Settings = None) -> Flask:
+def _initialize_database(settings):
+    connection = connect(settings.database_path)
+    try:
+        bootstrap(connection, {"admin": settings.seed_admin_password,
+                               "customer": settings.seed_customer_password})
+    finally:
+        connection.close()
+
+
+def create_app(settings=None):
     settings = settings or load_settings()
-
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = settings.secret_key
+    if settings.secret_key:
+        app.config["SECRET_KEY"] = settings.secret_key
     app.config["DEBUG"] = settings.debug
-    CORS(app)
+    CORS(app, origins=settings.cors_origins)
 
-    database = Database(settings.database_path)
-    database.inicializar(settings)
-    obter_conexao = registrar_conexao_por_requisicao(app, database)
+    _initialize_database(settings)
+    current_connection = db_session.register(app, settings.database_path)
 
-    produtos = ProdutoRepository(obter_conexao)
-    usuarios = UsuarioRepository(obter_conexao)
-    pedidos = PedidoRepository(obter_conexao)
-    relatorios = RelatorioRepository(obter_conexao)
+    product_repository = ProductRepository(current_connection)
+    user_repository = UserRepository(current_connection)
+    order_repository = OrderRepository(current_connection)
 
-    controllers = {
-        "produtos": ProdutoController(produtos),
-        "usuarios": UsuarioController(usuarios),
-        "pedidos": PedidoController(pedidos, produtos, usuarios, NotificadorLog()),
-        "relatorios": RelatorioController(relatorios),
-        "sistema": SistemaController(produtos, usuarios, pedidos, settings),
-    }
-    registrar_rotas(app, controllers, criar_guarda_de_operador(settings.operator_token))
-    registrar_tratamento_de_erros(app)
+    products.register(app, ProductController(product_repository))
+    users.register(app, UserController(user_repository))
+    orders.register(app, OrderController(order_repository, product_repository, user_repository, ConsoleNotifier()))
+    reports.register(app, ReportController(order_repository), settings.operator_token)
+    system.register(app, HealthController(StoreStatsRepository(current_connection)), settings)
+    error_handler.register(app)
     return app
 
 
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    settings = load_settings()
+    app = create_app(settings)
+    print("=" * 50)
+    print("SERVIDOR INICIADO")
+    print("Rodando em http://localhost:{0}".format(settings.port))
+    print("=" * 50)
+    app.run(host=settings.host, port=settings.port, debug=settings.debug)
+
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    configuracao = load_settings()
-    aplicacao = create_app(configuracao)
-    logger.info("SERVIDOR INICIADO em http://%s:%s", configuracao.host, configuracao.port)
-    aplicacao.run(host=configuracao.host, port=configuracao.port, debug=configuracao.debug)
+    main()

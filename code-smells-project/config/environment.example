@@ -1,0 +1,23 @@
+# Variables to EXPORT in the shell (or the process manager) before starting the app.
+# This file is a list, not a file the application loads: nothing reads it at startup.
+# Secrets are deliberately empty: an empty value means "not configured" and keeps the
+# feature closed (no signing key, operator routes answer 403, seeded accounts get no
+# usable password).
+
+# Signing key for the framework. Empty = none configured.
+SECRET_KEY=
+# Debug mode and the interactive debugger. Keep false outside a developer machine.
+APP_DEBUG=false
+APP_HOST=0.0.0.0
+APP_PORT=5000
+# SQLite file, resolved against the project root.
+DATABASE_FILE=loja.db
+# Reported by GET /health as "ambiente".
+APP_ENV=producao
+# Cross-origin policy: "*" (current behaviour) or a comma-separated list of origins.
+CORS_ORIGINS=*
+# Operator credential for GET /relatorios/vendas (header X-Operator-Token). Empty = closed.
+OPERATOR_TOKEN=
+# Passwords for the accounts created by the first-boot seed. Empty = no usable password.
+SEED_ADMIN_PASSWORD=
+SEED_CUSTOMER_PASSWORD=

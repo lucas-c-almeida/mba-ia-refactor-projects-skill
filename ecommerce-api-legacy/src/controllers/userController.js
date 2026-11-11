@@ -1,23 +1,16 @@
-'use strict';
+// Use case: remove an account (operator only; the guard is applied by the route).
+const { DependencyError } = require('../models/errors');
 
-const { PersistenceError } = require('../models/errors');
-
-class UserController {
-  constructor({ users }) {
-    this.users = users;
-  }
-
-  /**
-   * Deletes the account. Its enrollments and payments are kept, as before: what should happen to
-   * them is a product decision recorded as a proposal in the audit report.
-   */
-  async deleteUser(id) {
-    try {
-      await this.users.deleteById(id);
-    } catch (err) {
-      throw new PersistenceError('Erro DB', err);
-    }
-  }
+function createUserController({ users }) {
+    return {
+        async deleteUser(id) {
+            try {
+                await users.deleteById(id);
+            } catch (err) {
+                throw new DependencyError('Erro DB', err);
+            }
+        },
+    };
 }
 
-module.exports = { UserController };
+module.exports = { createUserController };

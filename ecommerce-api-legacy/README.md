@@ -19,22 +19,18 @@ A aplicação não carrega arquivo `.env`: exporte as variáveis no ambiente ant
 
 | Variável | Obrigatória | Efeito |
 |---|---|---|
-| `PORT` | não (padrão `3000`) | Porta HTTP |
-| `OPERATOR_TOKEN` | não | Credencial de operador. As rotas `GET /api/admin/financial-report` e `DELETE /api/users/:id` exigem o header `X-Operator-Token` com este valor. **Sem a variável definida (ou vazia), essas rotas respondem `403`.** |
-
-```bash
-export OPERATOR_TOKEN=<um valor longo e aleatório>
-npm start
-```
+| `PORT` | não | Porta HTTP. Padrão: `3000`. |
+| `OPERATOR_TOKEN` | não | Credencial de operador exigida no header `X-Operator-Token` por `GET /api/admin/financial-report` e `DELETE /api/users/:id`. **Sem ela, as duas rotas respondem `403`.** |
+| `SEED_USER_PASSWORD` | não | Senha da conta de demonstração criada no boot. Sem ela, é gerada uma senha aleatória. |
 
 ## Estrutura
 
 ```
 src/
-├── app.js           composition root: configuração, wiring, rotas, error handler, listen
-├── config/          leitura e validação do ambiente
-├── models/          regras de domínio, schema/seed e repositórios (persistência)
-├── controllers/     casos de uso (checkout, relatório financeiro, remoção de usuário)
-├── views/           rotas HTTP e validação de entrada
-└── middlewares/     guard de operador, error boundary, adaptador async
+├── app.js            composition root: configuração, objetos, rotas, servidor
+├── config/           leitura do ambiente (único ponto)
+├── models/           regras de domínio, erros, schema/seed e repositórios
+├── controllers/      casos de uso (checkout, relatório, remoção de conta)
+├── routes/           rotas HTTP e validação de entrada
+└── middlewares/      guarda de operador, id de requisição, tratamento de erros
 ```

@@ -1,0 +1,141 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "capturedAt": "2026-11-11T19:51:52Z",
+  "results": {
+    "get-financial-report-membership": {
+      "assertions": [
+        {
+          "holds": true,
+          "op": "matches",
+          "path": "$[*].course"
+        },
+        {
+          "holds": true,
+          "op": "matches",
+          "path": "$[*].students[*].student"
+        }
+      ],
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": "AP-10",
+      "headers": {},
+      "id": "get-financial-report-membership",
+      "kind": "value",
+      "like": null,
+      "method": "GET",
+      "path": "/api/admin/financial-report",
+      "shape": {
+        "items": {
+          "properties": {
+            "course": "string",
+            "revenue": "number",
+            "students": {
+              "items": {
+                "properties": {
+                  "paid": "number",
+                  "student": "string"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-denied": {
+      "contentType": "text/html",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-denied",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "lines": [
+          "Pagamento recusado"
+        ],
+        "type": "text"
+      },
+      "state": "OBSERVED",
+      "status": 400
+    },
+    "post-checkout-existing-user": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-existing-user",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-new-user": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-new-user",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    },
+    "post-checkout-no-password": {
+      "contentType": "application/json",
+      "destructive": false,
+      "error": null,
+      "expect": null,
+      "finding": null,
+      "headers": {},
+      "id": "post-checkout-no-password",
+      "kind": "contract",
+      "like": null,
+      "method": "POST",
+      "path": "/api/checkout",
+      "shape": {
+        "properties": {
+          "enrollment_id": "number",
+          "msg": "string"
+        },
+        "type": "object"
+      },
+      "state": "OBSERVED",
+      "status": 200
+    }
+  },
+  "version": 3
+}

@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:3000
-# Valor da variável de ambiente OPERATOR_TOKEN com que a aplicação foi iniciada
-@operatorToken = {{$processEnv OPERATOR_TOKEN}}
+# Valor de OPERATOR_TOKEN exportado no ambiente da aplicação
+@operatorToken =
 
 ### Checkout - sucesso
 POST {{baseUrl}}/api/checkout
@@ -26,10 +26,10 @@ Content-Type: application/json
   "card": "5111222233334444"
 }
 
-### Relatório financeiro administrativo
+### Relatório financeiro administrativo (operador)
 GET {{baseUrl}}/api/admin/financial-report
 X-Operator-Token: {{operatorToken}}
 
-### Deletar usuário
+### Deletar usuário (operador)
 DELETE {{baseUrl}}/api/users/1
 X-Operator-Token: {{operatorToken}}

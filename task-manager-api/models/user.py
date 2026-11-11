@@ -1,129 +1,61 @@
-"""User entity, credential storage and queries (RP-08)."""
 import hashlib
 import hmac
 import re
-import secrets
 
-from database import db, get_by_id
-from models.clock import utc_now
-from models.errors import NotFoundError, ValidationError
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from database import db
+from models.clock import utcnow
 
 ROLE_USER = 'user'
 ROLE_ADMIN = 'admin'
 ROLE_MANAGER = 'manager'
 VALID_ROLES = (ROLE_USER, ROLE_ADMIN, ROLE_MANAGER)
-DEFAULT_ROLE = ROLE_USER
-
-MIN_PASSWORD_LENGTH = 4
+PASSWORD_MIN_LENGTH = 4
 EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$')
 
-# Responses keep the `password` field (a string) but never its value.
-MASKED_SECRET = '********'
+# Fields whose change takes over or locks an account: operator-only (RP-04).
+PRIVILEGED_FIELDS = ('email', 'password', 'role', 'active')
 
-# scrypt: salted, memory-hard password KDF from the standard library.
-_SCHEME = 'scrypt'
-_SCRYPT_N = 2 ** 14
-_SCRYPT_R = 8
-_SCRYPT_P = 1
-_SALT_BYTES = 16
-_KEY_BYTES = 32
-_SCRYPT_MAXMEM = 64 * 1024 * 1024
-_LEGACY_MD5_LENGTH = 32
-
-
-def _scrypt(password, salt, n, r, p):
-    return hashlib.scrypt(password.encode(), salt=salt, n=n, r=r, p=p,
-                          dklen=_KEY_BYTES, maxmem=_SCRYPT_MAXMEM)
+# Digests written by the previous implementation (unsalted MD5, 32 hex characters).
+# They are verified once at sign-in and replaced; see the report for the reset window.
+_LEGACY_DIGEST = re.compile(r'^[0-9a-f]{32}$')
 
 
 class User(db.Model):
     __tablename__ = 'users'
+    __table_args__ = (
+        db.CheckConstraint('role IN ({0})'.format(', '.join("'{0}'".format(r) for r in VALID_ROLES)),
+                           name='ck_users_role'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(150), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), default=DEFAULT_ROLE)
+    role = db.Column(db.String(50), default=ROLE_USER)
     active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=utc_now)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'email': self.email,
-            'password': MASKED_SECRET,
-            'role': self.role,
-            'active': self.active,
-            'created_at': str(self.created_at),
-        }
+    def set_password(self, pwd):
+        # A purpose-built password KDF with a per-credential salt (RP-08).
+        self.password = generate_password_hash(pwd)
 
-    # --- credentials -----------------------------------------------------------------------
+    def uses_legacy_digest(self):
+        return bool(_LEGACY_DIGEST.match(self.password or ''))
 
-    def set_password(self, password):
-        salt = secrets.token_bytes(_SALT_BYTES)
-        digest = _scrypt(password, salt, _SCRYPT_N, _SCRYPT_R, _SCRYPT_P)
-        self.password = '$'.join([_SCHEME, str(_SCRYPT_N), str(_SCRYPT_R), str(_SCRYPT_P),
-                                  salt.hex(), digest.hex()])
+    def check_password(self, pwd):
+        if self.uses_legacy_digest():
+            legacy = hashlib.md5(pwd.encode()).hexdigest()
+            return hmac.compare_digest(self.password, legacy)
+        return check_password_hash(self.password, pwd)
 
-    def check_password(self, password):
-        stored = self.password or ''
-        if stored.startswith(_SCHEME + '$'):
-            try:
-                _, n, r, p, salt_hex, digest_hex = stored.split('$')
-                candidate = _scrypt(password, bytes.fromhex(salt_hex), int(n), int(r), int(p))
-            except ValueError:
-                return False
-            return hmac.compare_digest(candidate.hex(), digest_hex)
-        if len(stored) == _LEGACY_MD5_LENGTH:
-            # Hashes written before the KDF: verified once, then replaced (needs_rehash).
-            legacy = hashlib.md5(password.encode()).hexdigest()
-            return hmac.compare_digest(legacy, stored)
-        return False
+    def differs_from(self, field, value):
+        """Whether setting `field` to `value` would change the stored account."""
+        if field == 'password':
+            return not self.check_password(value)
+        return getattr(self, field) != value
 
-    def needs_rehash(self):
-        return not (self.password or '').startswith(_SCHEME + '$')
 
-    # --- rules -----------------------------------------------------------------------------
-
-    @staticmethod
-    def check_email(email):
-        if not EMAIL_PATTERN.match(email):
-            raise ValidationError('Email inválido')
-
-    @staticmethod
-    def check_role(role):
-        if role not in VALID_ROLES:
-            raise ValidationError('Role inválido')
-
-    # --- queries ---------------------------------------------------------------------------
-
-    @classmethod
-    def find(cls, user_id):
-        return get_by_id(cls, user_id)
-
-    @classmethod
-    def get_or_404(cls, user_id):
-        user = cls.find(user_id)
-        if user is None:
-            raise NotFoundError('Usuário não encontrado')
-        return user
-
-    @classmethod
-    def find_by_email(cls, email):
-        return cls.query.filter_by(email=email).first()
-
-    @classmethod
-    def all_ordered(cls):
-        return cls.query.order_by(cls.id).all()
-
-    @classmethod
-    def count_all(cls):
-        return db.session.query(db.func.count(cls.id)).scalar()
-
-    @classmethod
-    def names_by_id(cls, ids):
-        ids = [i for i in ids if i is not None]
-        if not ids:
-            return {}
-        return dict(db.session.query(cls.id, cls.name).filter(cls.id.in_(set(ids))).all())
+def is_valid_email(email):
+    return bool(EMAIL_PATTERN.match(email))

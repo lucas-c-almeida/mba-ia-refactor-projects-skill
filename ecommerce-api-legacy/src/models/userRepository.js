@@ -1,25 +1,21 @@
-'use strict';
+// Persistence for user accounts.
 
-class UserRepository {
-  constructor(db) {
-    this.db = db;
-  }
+function createUserRepository(db) {
+    return {
+        findIdByEmail: (email) => db.get('SELECT id FROM users WHERE email = ?', [email]),
 
-  async findIdByEmail(email) {
-    const row = await this.db.get('SELECT id FROM users WHERE email = ?', [email]);
-    return row ? row.id : null;
-  }
+        async create({ name, email, passwordHash }) {
+            const result = await db.run(
+                'INSERT INTO users (name, email, pass) VALUES (?, ?, ?)',
+                [name, email, passwordHash],
+            );
+            return result.lastID;
+        },
 
-  async create({ name, email, passwordHash }) {
-    const { lastId } = await this.db.run(
-      'INSERT INTO users (name, email, pass) VALUES (?, ?, ?)', [name, email, passwordHash],
-    );
-    return lastId;
-  }
-
-  async deleteById(id) {
-    await this.db.run('DELETE FROM users WHERE id = ?', [id]);
-  }
+        async deleteById(id) {
+            await db.exclusive(() => db.run('DELETE FROM users WHERE id = ?', [id]));
+        },
+    };
 }
 
-module.exports = { UserRepository };
+module.exports = { createUserRepository };

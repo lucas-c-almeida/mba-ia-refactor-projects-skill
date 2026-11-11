@@ -1,27 +1,23 @@
-'use strict';
-
+// One-way password storage with the runtime's built-in scrypt KDF and a per-password random salt.
 const crypto = require('crypto');
-const { promisify } = require('util');
 
-const scrypt = promisify(crypto.scrypt);
-
-// Password storage with the runtime's built-in KDF: per-password random salt, one-way (RP-08).
-const SCHEME = 'scrypt';
 const SALT_BYTES = 16;
 const KEY_BYTES = 64;
+const GENERATED_PASSWORD_BYTES = 24;
 
-async function hashPassword(plainPassword) {
-  const salt = crypto.randomBytes(SALT_BYTES);
-  const key = await scrypt(plainPassword, salt, KEY_BYTES);
-  return `${SCHEME}$${salt.toString('hex')}$${key.toString('hex')}`;
+function hashPassword(plain) {
+    return new Promise((resolve, reject) => {
+        const salt = crypto.randomBytes(SALT_BYTES);
+        crypto.scrypt(plain, salt, KEY_BYTES, (err, key) => {
+            if (err) return reject(err);
+            resolve(`scrypt$${salt.toString('hex')}$${key.toString('hex')}`);
+        });
+    });
 }
 
-/**
- * Stored when an account is created without a password: it is not in the scheme's format, so no
- * password can ever match it.
- */
-function unusablePasswordHash() {
-  return `!${crypto.randomBytes(SALT_BYTES).toString('hex')}`;
+// Used when an account is created without a password: nobody knows it, unlike a shared default.
+function generatePassword() {
+    return crypto.randomBytes(GENERATED_PASSWORD_BYTES).toString('base64url');
 }
 
-module.exports = { hashPassword, unusablePasswordHash };
+module.exports = { hashPassword, generatePassword };

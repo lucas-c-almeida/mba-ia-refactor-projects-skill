@@ -1,31 +1,36 @@
 # task-manager-api
 
-API de Task Manager em Python/Flask usada como entrada do desafio `refactor-arch`, organizada em camadas MVC:
+API de Task Manager em Python/Flask usada como entrada do desafio `refactor-arch`, agora organizada em camadas MVC:
 
 ```
-app.py          composition root: create_app() monta configuração, controllers, rotas e error handler
-config/         leitura e validação das variáveis de ambiente
-models/         entidades, regras de domínio e consultas (Task, User, Category, relógio, erros)
-controllers/    casos de uso (tarefas, usuários, categorias, relatórios)
-routes/         rotas HTTP (parse → controller → resposta), validação de entrada e formatos de resposta
-middlewares/    tratamento centralizado de erros e credencial de operador
-seed.py         script de operador que recria os dados de exemplo
+app.py            raiz de composição (create_app): configuração, repositórios, controllers, rotas
+config/           leitura do ambiente (único módulo que lê variáveis de ambiente)
+models/           entidades, regras de domínio, repositórios (todas as queries), erros, relógio
+controllers/      casos de uso (tarefas, usuários, categorias, relatórios)
+routes/           camada de entrega: rotas, validação de entrada, serialização das respostas
+middlewares/      tratamento centralizado de erros e credencial de operador
+seed.py           popula o banco com dados de exemplo
 ```
 
 ## Como rodar
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env        # ou exporte as variáveis listadas nele
 python seed.py
 python app.py
 ```
 
-A aplicação sobe em `http://localhost:5000` (configurável por `APP_HOST`/`APP_PORT`; debug só com `APP_DEBUG=true`).
-O `seed.py` recria o banco SQLite (`instance/tasks.db`) com usuários, categorias e tasks de exemplo — **rode-o antes do primeiro boot**.
-As senhas das contas de exemplo vêm de `SEED_ADMIN_PASSWORD`, `SEED_USER_PASSWORD` e `SEED_MANAGER_PASSWORD`; sem elas, cada conta recebe uma senha aleatória.
+A aplicação sobe em `http://localhost:5000`. O `seed.py` popula o banco SQLite (`instance/tasks.db`) com usuários, categorias e tasks de exemplo — **rode-o antes do primeiro boot**. As senhas dos usuários de exemplo são geradas a cada execução e impressas uma única vez.
 
-### Operações de operador
+## Configuração
 
-`GET /reports/summary`, `DELETE /users/<id>` e a alteração de `role` ou `active` de um usuário exigem o header
-`X-Operator-Token` com o valor de `OPERATOR_TOKEN`. Sem `OPERATOR_TOKEN` configurado, essas operações respondem `403`.
+A aplicação não carrega arquivo `.env`: **exporte** as variáveis abaixo no ambiente do processo. Todas são opcionais.
+
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `OPERATOR_TOKEN` | vazio (fechado) | Credencial de operador, enviada no header `X-Operator-Token`. Exigida por `GET /reports/summary`, `DELETE /users/<id>` e por um `PUT /users/<id>` que altere `email`, `password`, `role` ou `active`. Sem valor, essas operações respondem `403`. |
+| `SECRET_KEY` | aleatória por processo | Chave de assinatura do Flask. |
+| `DATABASE_URL` | `sqlite:///tasks.db` | Banco de dados (caminho SQLite relativo à pasta `instance/` do projeto). |
+| `APP_DEBUG` | `false` | Modo debug do servidor. Nunca ligue em um host acessível pela rede. |
+| `APP_HOST` | `0.0.0.0` | Endereço de bind. |
+| `APP_PORT` | `5000` | Porta. |

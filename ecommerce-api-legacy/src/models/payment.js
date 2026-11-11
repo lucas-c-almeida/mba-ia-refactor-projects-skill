@@ -1,21 +1,25 @@
-'use strict';
+// Payment rules and money representation.
 
-const PaymentStatus = Object.freeze({ PAID: 'PAID', DENIED: 'DENIED' });
+const PAYMENT_STATUS = Object.freeze({ PAID: 'PAID', DENIED: 'DENIED' });
 
-// Approval rule preserved verbatim from the original implementation: a card number starting with
-// this prefix is approved, any other is denied. Whether it is a simulation stub or a business
-// rule is not stated anywhere in the project; it is kept as it was.
+// Rule preserved verbatim from the original code: there is no real gateway, and a card number
+// starting with this prefix is approved.
 const APPROVED_CARD_PREFIX = '4';
 
-const LAST_DIGITS_SHOWN = 4;
+const CENTS_PER_UNIT = 100;
 
 function decidePayment(cardNumber) {
-  return cardNumber.startsWith(APPROVED_CARD_PREFIX) ? PaymentStatus.PAID : PaymentStatus.DENIED;
+    return cardNumber.startsWith(APPROVED_CARD_PREFIX) ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.DENIED;
 }
 
-/** The only form of a card number that may reach a log. */
-function maskCardNumber(cardNumber) {
-  return `****${cardNumber.slice(-LAST_DIGITS_SHOWN)}`;
+// Money is stored and summed as integer cents; it crosses the boundary as a decimal number,
+// as it always has.
+function toCents(amount) {
+    return Math.round(amount * CENTS_PER_UNIT);
 }
 
-module.exports = { PaymentStatus, decidePayment, maskCardNumber };
+function fromCents(cents) {
+    return cents / CENTS_PER_UNIT;
+}
+
+module.exports = { PAYMENT_STATUS, decidePayment, toCents, fromCents };

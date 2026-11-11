@@ -1,40 +1,63 @@
-"""Category use cases."""
-from database import commit, db
-from models.category import DEFAULT_COLOR, Category
-from models.errors import ValidationError
-from models.task import Task
+"""Category use cases (split out of the former reports module, RP-03)."""
+import logging
 
-CATEGORY_FIELDS = ('name', 'description', 'color')
+from models.category import Category
+from models.errors import NotFoundError, PersistenceError
+
+logger = logging.getLogger(__name__)
+
+CATEGORY_NOT_FOUND = 'Categoria não encontrada'
 
 
 class CategoryController:
-    def list_categories(self):
-        """[(category, task_count)] in two queries."""
-        counts = Task.counts_per_category()
-        return [(category, counts.get(category.id, 0)) for category in Category.all_ordered()]
+    def __init__(self, categories, tasks):
+        self._categories = categories
+        self._tasks = tasks
 
-    def create_category(self, fields):
-        """`fields` holds only what the request sent; absent optional fields take defaults."""
-        if not fields.get('name'):
-            raise ValidationError('Nome é obrigatório')
-        category = Category(name=fields['name'],
-                            description=fields.get('description', ''),
-                            color=fields.get('color', DEFAULT_COLOR))
-        db.session.add(category)
-        commit('Erro ao criar categoria')
-        return category
+    def list_categories(self):
+        counts = self._tasks.count_by_category()
+        return [(category, counts.get(category.id, 0)) for category in self._categories.list_all()]
 
     def require_category(self, category_id):
-        return Category.get_or_404(category_id)
+        category = self._categories.get(category_id)
+        if not category:
+            raise NotFoundError(CATEGORY_NOT_FOUND)
+        return category
 
-    def update_category(self, category, fields):
-        for key in CATEGORY_FIELDS:
-            if key in fields:
-                setattr(category, key, fields[key])
-        commit('Erro ao atualizar')
+    def create_category(self, name, description, color):
+        category = Category()
+        category.name = name
+        category.description = description
+        category.color = color
+        try:
+            self._categories.add(category)
+            self._categories.commit()
+        except Exception:
+            self._categories.rollback()
+            logger.exception('Erro ao criar categoria')
+            raise PersistenceError('Erro ao criar categoria')
+        return category
+
+    def update_category(self, category_id, changes):
+        category = self.require_category(category_id)
+        for field in ('name', 'description', 'color'):
+            if field in changes:
+                setattr(category, field, changes[field])
+        try:
+            self._categories.commit()
+        except Exception:
+            self._categories.rollback()
+            logger.exception('Erro ao atualizar categoria %s', category_id)
+            raise PersistenceError('Erro ao atualizar')
         return category
 
     def delete_category(self, category_id):
-        category = Category.get_or_404(category_id)
-        db.session.delete(category)
-        commit('Erro ao deletar')
+        category = self.require_category(category_id)
+        try:
+            # The ORM detaches the category's tasks (sets their category_id to NULL), as before.
+            self._categories.delete(category)
+            self._categories.commit()
+        except Exception:
+            self._categories.rollback()
+            logger.exception('Erro ao deletar categoria %s', category_id)
+            raise PersistenceError('Erro ao deletar')

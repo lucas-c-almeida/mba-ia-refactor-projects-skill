@@ -317,7 +317,8 @@ policy — not applied. Never invent a policy to make the fix applicable.
 
 **Exception — privileged operations (`04-architecture-guidelines.md` §6).** An operation that runs
 caller-supplied queries or code, resets data in bulk, serves maintenance or diagnostics, deletes an
-account by request id when no identity model exists (no operation verifies a presented credential),
+account or changes its secret, sign-in identifier, role or enabled state by request id when no
+identity model exists (no operation verifies a presented credential),
 or computes a management aggregate (financial figures or per-principal rollups) has no legitimate anonymous caller, so closing it is **safe and is applied**, with or
 without an identity model. Remove it, or add the operator guard below. Ordinary domain-record
 changes and deletes, plain listings and lookups, sign-in and checkout keep the rule above — the
@@ -361,6 +362,37 @@ Cover it with two entries in the surface inventory: anonymous → `kind: "securi
 "rejected"`; with the operator credential → an ordinary entry whose shape must match the baseline
 (`06-validation-protocol.md` §2.1). An operation removed from the surface is recorded in the report
 as removed, with the reason.
+
+**Before** (Ruby — one update, open to everyone, that accepts ordinary and privileged fields alike)
+
+```ruby
+# PATCH /members/:id — no operation in this application verifies a credential
+def update
+  member = Member.find(params[:id])
+  member.update!(params.permit(:display_name, :passphrase, :access_level))
+  render json: member
+end
+```
+
+**After** — only a request that would change a privileged field needs the operator credential; the
+ordinary edit keeps working, and a refused request writes nothing
+
+```ruby
+PRIVILEGED_FIELDS = %i[passphrase access_level].freeze
+
+def update
+  member = Member.find(params[:id])
+  attrs = params.permit(:display_name, :passphrase, :access_level)
+  changing = PRIVILEGED_FIELDS.select { |f| attrs.key?(f) && member.differs_from?(f, attrs[f]) }
+  return head(:forbidden) if changing.any? && !operator_credential_valid?   # closed when unset
+
+  member.update!(attrs)
+  render json: member
+end
+```
+
+`differs_from?` compares with the stored value and, for a one-way-hashed secret, verifies the
+submitted value against the hash. Identity for the ordinary fields stays a proposal.
 
 Two moves: put the decision in one policy function, and move the enforcement onto the *operation*
 rather than onto one of its doors.

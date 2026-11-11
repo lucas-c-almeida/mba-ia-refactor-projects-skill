@@ -818,13 +818,13 @@ Lista em `docs/rounds/round8-changes.md`. ADR em `docs/decisions.md`.
 
 ## 9. Perguntas em aberto
 
-Nenhuma decisão em aberto. D1–D29 decididas. Rodada 8 (D29) preparada em `feat/round8`, com lista em
-`docs/rounds/round8-changes.md`, e ainda não executada. Rodada 7 executada nos 3 projetos (sessões novas,
-gate humano, sem `--yes`) e entregue em `release/delivery-r7`; relatório em
-`docs/rounds/round7-report.md`. Pendências registradas lá (§7): repetir a verificação independente
-sobre a entrega da rodada 7, escrever os scorecards da rodada 7 (Parte 1 e Parte 1+2) e os candidatos
-para a próxima rodada (header de pedido em preflight, stderr com processo destacado, campo
-`Root cause of:`).
+Nenhuma decisão em aberto. D1–D29 decididas. Rodada 8 (D29) executada nos 3 projetos (sessões novas,
+gate humano, sem `--yes`) e entregue em `release/delivery-r8`; relatório em
+`docs/rounds/round8-report.md`. Candidatos registrados lá (§6): contagem da linha da re-auditoria,
+revisão de classificação depois do gate e comparação de valor sem ordem no probe. Continuam abertas as
+pendências do `docs/rounds/round7-report.md` §7: verificação independente sobre a entrega, scorecards
+(Parte 1 e Parte 1+2), header de pedido em preflight, stderr com processo destacado e campo
+`Root cause of:`.
 
 ---
 
