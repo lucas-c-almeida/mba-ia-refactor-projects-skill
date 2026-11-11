@@ -234,7 +234,8 @@ the pattern that makes every other pattern in this catalog harder to fix.
 - A commented-out or feature-flag-disabled guard.
 - A **privileged operation with no guard** (`04-architecture-guidelines.md` §6): a surface entry
   that runs a query, command or code taken from the request; resets or destroys data in bulk;
-  serves maintenance or diagnostics; deletes an account by request id where no identity model
+  serves maintenance or diagnostics; deletes an account, or changes its secret, sign-in identifier,
+  role or enabled state, by request id where no identity model
   exists (no operation verifies a presented credential); or computes a management aggregate carrying
   financial figures or per-principal rollups — reachable with no operator credential. Report it even when the application has
   no identity model at all: that absence is the finding's cause, not its excuse.
@@ -246,6 +247,8 @@ destructive, escalates privilege, or exposes personal or financial data.
 operation is `safe`: Phase 3 removes or guards it. Business operations on a principal's own data in
 an application with no identity model are `contract-changing`: Phase 3 proposes the identity model.
 Split the two into separate findings when one file holds both, so each carries the right `Contract:`.
+One operation can hold both, field by field: its privileged fields are one `safe` finding, and its
+ordinary fields stay with the business finding.
 
 **De-escalate to HIGH** — the surface is genuinely public by design (a read-only public catalog, a
 health endpoint) and exposes no principal-scoped data; or the check exists correctly at a single

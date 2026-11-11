@@ -1458,6 +1458,37 @@ requisições byte-idênticas (o teste de conformidade compara o log do servidor
 dezenas de variantes por operação. E a contaminação: o autor conhece os alvos, então o recall da
 rodada 7 sobre eles mede se a skill pega o que já se sabia, não se generaliza.
 
+### D29 — Tomar ou bloquear conta é operação privilegiada (emenda à D27, rodada 8)
+
+**Contexto.** Ao rever a entrega da rodada 7 contra o comentário do avaliador sobre AP-04, as rotas
+administrativas e os agregados estavam fechados, mas uma operação continuava aberta com o mesmo
+impacto: qualquer anônimo trocava a senha de qualquer conta, o que é tomada de conta. A rodada 7 só
+protegeu papel e estado, por decisão no gate, e deixou a senha com a proposta de identidade. Lista
+congelada em [`round8-changes.md`](rounds/round8-changes.md).
+
+**Falha de raciocínio na D27.** A exclusão de conta entrou como privilegiada porque, sem modelo de
+identidade, não existe "a conta do próprio chamador". O mesmo argumento vale para qualquer mudança
+que tome ou bloqueie a conta, mas o texto só listava a exclusão. E a classificação era por operação,
+de modo que uma rota com campos comuns e campos sensíveis ficava ambígua inteira.
+
+**Decisão.** (1) Novo sinal: em aplicação sem modelo de identidade, mudar o segredo, o identificador
+de login, o papel ou o estado de uma conta escolhida pelo id da requisição é privilegiado. Operação
+que exige o segredo atual já verifica credencial e não entra. (2) Classificação por **efeito**:
+operação mista é dividida por campo; só o pedido que muda um campo privilegiado exige a credencial;
+reenviar o valor guardado não é mudança; a recusa vem antes de qualquer escrita. (3) O inventário
+cobre os dois lados: anônimo mudando campo privilegiado é `security`/`rejected`, e edição comum sem
+credencial continua entrada comum.
+
+**Alternativas rejeitadas.** *Proteger a operação inteira*: rejeita edição de perfil que clientes
+legítimos fazem hoje, o que a D7 proíbe. *Incluir todo DELETE de registro de domínio*: contradiz a
+Emenda 1 da D27 e exige decidir quem são os principais. *Manter a decisão no gate*: a correção
+dependeria da resposta de cada execução, e sob `--yes` cairia em `proposed`.
+
+**Custo aceito.** Sem modelo de identidade, o usuário deixa de trocar a própria senha sem o operador,
+o mesmo custo já aceito na exclusão de conta. Quando o e-mail é o identificador de login, editá-lo
+passa a exigir a credencial; sem isso, um anônimo bloquearia a vítima sem tocar na senha. O caso
+motivador veio de um dos alvos, e o resultado da rodada 8 não é evidência nova de generalização.
+
 ---
 
 ## 4. O princípio emergente: a skill nunca degrada em silêncio
@@ -1548,7 +1579,7 @@ frequentemente falsa: é o formato exato de uma alucinação bem-sucedida.
 
 ## 6. Estado do registro
 
-D1–D28 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3, D24 depois dela, D25 e D26 depois da rodada 4, D27 na rodada 6, D28 na rodada 7, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
+D1–D29 estão decididas (D15–D18 na rodada 2, D19–D23 na rodada 3, D24 depois dela, D25 e D26 depois da rodada 4, D27 na rodada 6, D28 na rodada 7, D29 na rodada 8, ver as notas que as precedem); `CLAUDE.md` §9 não registra perguntas em aberto no momento em que
 este documento foi escrito. Duas dessas decisões (D6 e D13) já foram revertidas uma vez, e
 o registro das reversões foi mantido deliberadamente: a versão final de cada uma é menos
 instrutiva do que o caminho que levou a ela.
@@ -1574,6 +1605,10 @@ e a comparação dele com a rodada 2. A partir desta revisão o autor não está
 alvos. A única entrada nova do catálogo (AP-20) vem de Karwin, *SQL Antipatterns*. O recall da
 rodada 3 na família que ela cobre é declarado contaminado em
 [`round3-changes.md`](rounds/round3-changes.md), e não conta como evidência de generalização.
+
+**Revisão da rodada 8 (2026-11-10).** D29 foi escrita por uma sessão que leu o código e os relatórios
+dos três alvos. Como a D27, é regra de decisão, e a contaminação está declarada em
+[`round8-changes.md`](rounds/round8-changes.md).
 
 **Revisão da rodada 7 (2026-11-04).** D28 foi escrita por uma sessão que leu o código, os
 relatórios, o gabarito (Partes 1 e 2) e a verificação independente dos três alvos. Diferente da
